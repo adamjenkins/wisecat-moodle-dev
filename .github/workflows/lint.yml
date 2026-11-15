@@ -1,0 +1,148 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate JSON manifests
+        run: |
+          for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json; do
+            echo "Validating $f"
+            python3 -c "import json,sys; json.load(open('$f'))"
+          done
+
+      - name: Check skill frontmatter
+        run: |
+          fail=0
+          for f in skills/*/SKILL.md; do
+            head -5 "$f" | grep -q "^name:" || { echo "::error file=$f::missing name"; fail=1; }
+            head -5 "$f" | grep -q "^description:" || { echo "::error file=$f::missing description"; fail=1; }
+          done
+          exit $fail
+
+      - name: Check command frontmatter
+        run: |
+          fail=0
+          for f in commands/*.md; do
+            [ -f "$f" ] || continue
+            head -5 "$f" | grep -q "^name:" || { echo "::error file=$f::missing name"; fail=1; }
+            head -5 "$f" | grep -q "^description:" || { echo "::error file=$f::missing description"; fail=1; }
+          done
+          exit $fail
+
+      - name: Check agent frontmatter
+        run: |
+          fail=0
+          for f in agents/*.md; do
+            [ -f "$f" ] || continue
+            head -5 "$f" | grep -q "^name:" || { echo "::error file=$f::missing name"; fail=1; }
+            head -5 "$f" | grep -q "^description:" || { echo "::error file=$f::missing description"; fail=1; }
+          done
+          exit $fail
+
+      - name: Verify version sync
+        run: |
+          plugin_v=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          mp_v=$(python3 -c "import json; print(json.load(open('.claude-plugin/marketplace.json'))['plugins'][0]['version'])")
+          if [ "$plugin_v" != "$mp_v" ]; then
+            echo "::error::version mismatch: plugin.json=$plugin_v marketplace.json=$mp_v"
+            exit 1
+          fi
+          echo "Version $plugin_v in sync"
+
+      - name: Adapters in sync with prompts
+        run: |
+          python3 scripts/build-adapters.py >/dev/null
+          if ! git diff --quiet adapters/; then
+            echo "::error::adapters/ out of sync — run: python3 scripts/build-adapters.py && commit"
+            git --no-pager diff --stat adapters/
+            exit 1
+          fi
+          echo "Adapters in sync."
+
+      - name: Skill filename matches frontmatter name
+        run: |
+          fail=0
+          for f in skills/*/SKILL.md; do
+            dir=$(basename "$(dirname "$f")")
+            name=$(grep -m1 "^name:" "$f" | sed 's/name:[[:space:]]*//')
+            if [ "$dir" != "$name" ]; then
+              echo "::error file=$f::dir name '$dir' != frontmatter name '$name'"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: No broken intra-repo links
+        run: |
+          fail=0
+          while IFS= read -r line; do
+            file=$(echo "$line" | cut -d: -f1)
+            target=$(echo "$line" | sed -E 's/.*\(([^)]+)\).*/\1/' | sed 's/#.*//')
+            case "$target" in
+              http*|mailto*|"") continue ;;
+            esac
+            dir=$(dirname "$file")
+            full="$dir/$target"
+            if [ ! -e "$full" ] && [ ! -e "$target" ]; then
+              echo "::error file=$file::link target not found: $target"
+              fail=1
+            fi
+          done < <(grep -rEn '\]\([^)]+\.md[^)]*\)' --include='*.md' . || true)
+          exit $fail
+
+      - name: Skill line-count budget (<= 400)
+        run: |
+          fail=0
+          for f in skills/*/SKILL.md; do
+            lines=$(wc -l < "$f")
+            if [ "$lines" -gt 400 ]; then
+              echo "::error file=$f::skill is $lines lines (budget: 400). Split into multiple skills."
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Run repo test harness
+        run: |
+          if [ -x tests/run.sh ]; then
+            tests/run.sh
+          else
+            echo "tests/run.sh missing or not executable — skipping"
+          fi
+
+  spellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: codespell-project/actions-codespell@v2
+        with:
+          check_filenames: true
+          skip: ./.git,./adapters,./node_modules,*.lock,CHANGELOG.md
+          ignore_words_file: .codespellignore
+
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run actionlint
+        run: |
+          bash <(curl -sSf https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+  linkcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Lychee external link check
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress --max-concurrency 4 --exclude-mail --accept 200,206,429 './**/*.md'
+          fail: false
