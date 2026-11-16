@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- The `moodle-mcp` server entry in the plugin manifest, and the README section about it. Installing the plugin no longer downloads and runs a separate MCP server.
+
 ### Added
 
 - `moodle-release-preflight`: the classes are merged from eleven into seven, by kind: 1 trust boundary (client ids and limits, two roles writing one state, frozen form fields, the question engine), 2 output (escaping, uploads), 3 restored, imported and authored data, 4 data lifecycle (privacy, reset, uninstall), 5 tests, 6 minor gates, 7 the extended checklist. New checks from an external security review of an admin-tool plugin: data that names a setting for `get_config()` is allowlisted, imports land as drafts, frozen core form fields are respected, core helpers that print text as HTML (`html_writer::select()` labels, formslib labels, select options, checkbox texts), draft-area upload validation, `send_file()` alongside `send_stored_file()`, test helpers in production code and English-only admin messages. The LICENSE and language-pack recipes moved to `reference.md`.

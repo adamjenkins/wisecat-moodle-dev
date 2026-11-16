@@ -11,14 +11,11 @@
 [![Aider](https://img.shields.io/badge/Aider-Conventions-orange.svg)](adapters/aider/)
 [![Continue](https://img.shields.io/badge/Continue-Rules-blueviolet.svg)](adapters/continue/)
 [![Moodle 4.x](https://img.shields.io/badge/Moodle-4.x%20%7C%205.x-orange.svg)](https://moodledev.io)
-[![MCP companion](https://img.shields.io/badge/MCP-moodle--mcp-8A2BE2.svg)](https://github.com/SaadRahman01/moodle-mcp)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 Scaffolds plugins, writes XMLDB upgrades, audits privacy/security, generates PHPUnit + Behat tests, builds AMD modules, reviews PRs — all following official Moodle coding standards (PSR-4, frankenstyle, MOODLE_INTERNAL, GPL headers, `get_string`, `$DB`).
 
 > 🧭 **You are on the `wisecat/moodle-5.3` branch of a fork** ([adamjenkins/claude-moodle-dev](https://github.com/adamjenkins/claude-moodle-dev), from [SaadRahman01/claude-moodle-dev](https://github.com/SaadRahman01/claude-moodle-dev)). It adds **Moodle 5.3** coverage (based on 5.3beta, to be re-checked at 5.3.0) and six extra skills: `moodle-5-3-changes`, `moodle-field-lessons`, `moodle-release-preflight`, `moodle-ci-matrix`, `moodle-definition-of-done` and `moodle-plugin-release`. **To install this branch in Claude Code you must name the branch**. Without it you get the default branch, which has none of this. See [Install → this branch](#claude-code-this-forks-moodle-53-branch).
-
-> 🔌 **Companion MCP server:** [`moodle-mcp`](https://github.com/SaadRahman01/moodle-mcp) — live `moodledev.io` documentation search inside Claude Desktop / Code, Cursor, Continue, Cline. `pipx install moodle-mcp`.
 
 ---
 
@@ -152,48 +149,6 @@ Copy `adapters/continue/` into `~/.continue/` (merge with existing `config.yaml`
 ### Any other assistant
 
 Paste relevant sections from [`adapters/generic/PROMPTS.md`](adapters/generic/PROMPTS.md) — it's one self-contained markdown file with every skill, agent, and command. Works with anything that takes a system prompt.
-
----
-
-## Companion MCP server: live Moodle docs
-
-[`moodle-mcp`](https://github.com/SaadRahman01/moodle-mcp) is a separate Model Context Protocol server that gives any MCP-capable client (Claude Desktop / Code, Cursor, Continue, Cline, Windsurf) live access to the canonical Moodle developer documentation. The skills here teach conventions; the MCP server provides authoritative lookups.
-
-### What it adds
-
-| Tool | What it returns |
-|------|-----------------|
-| `search_moodle_docs(query, limit, offset)` | Top hits on `moodledev.io` with title, URL, headings, excerpt. Synonym expansion (`cap`→`capability`, `ws`→`webservice`, `hook`↔`listener`), quoted-phrase boost, BM25 scoring, pagination. |
-| `fetch_moodle_page(url)` | Full body + headings for one page — follow-up after a search. |
-| `get_hooks_api_listeners()` | Core Hooks API index + detected hook classes. |
-| `get_capability_docs(component?)` | Access API + `RISK_*` quick-reference; optional component scope. |
-| `lookup_db_xmldb(query)` | XMLDB / schema / `upgrade.php` patterns. |
-| `list_plugin_types()` | Every Moodle plugin type with one-line hint + docs URL. |
-| `get_version_info()` | Current Moodle versions parsed from `/general/releases`. |
-| `search_tracker(query, limit)` | Issue search against `tracker.moodle.org` (Jira). |
-
-Plus MCP **resources** (`moodle://docs/apis/...`) and **prompts** (`moodle-plugin-skeleton`, `moodle-capability-review`, `moodle-hooks-migration`).
-
-No API keys. Sitemap + disk cache + conditional GET. Pairs cleanly with this plugin.
-
-### Install (Claude Code)
-
-Auto-wired when installing this plugin via marketplace. Requires [`uv`](https://docs.astral.sh/uv/) on PATH:
-
-```
-brew install uv      # or: pip install uv
-```
-
-The plugin's `mcpServers` entry runs `uvx --from git+https://github.com/SaadRahman01/moodle-mcp moodle-mcp` on demand — no manual `pipx install` needed.
-
-Manual install (any client):
-
-```
-pipx install moodle-mcp
-claude mcp add moodle moodle-mcp
-```
-
-Other clients: see [`moodle-mcp` README](https://github.com/SaadRahman01/moodle-mcp#wire-it-up-to-your-assistant).
 
 ---
 
