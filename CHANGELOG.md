@@ -28,6 +28,8 @@ entries below are what changed here.
 - `moodle-plugin-release` covers the package itself: the licence file in the ZIP root, the ZIP root folder, and
   inspecting the ZIP before upload, which CI never sees.
 - `moodle-release-preflight` checks for each kind of feedback that Plugins directory reviewers give.
+- README installation section: shell commands, project scope, how to check, update and remove the plugin, the
+  clash with the `moodle-dev` plugin, and what to do after `install.sh` for each assistant.
 - Adapters carry the reference and version files (`moodle-skill-files/`) with working links, and Cursor rules
   attach to `.scss` and `.css` files.
 - `tests/run.sh` checks the 400-line budget, that directory names match, that every reference and version file is

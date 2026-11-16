@@ -35,36 +35,89 @@ The full contract is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Claude Code
 
+You need Claude Code with plugin support and `git`. Installing from GitHub needs read access to the repository:
+Claude Code clones it with your own git credentials.
+
+Inside Claude Code:
+
 ```
 /plugin marketplace add adamjenkins/wisecat-moodle-dev
 /plugin install wisecat-moodle-dev@wisecat-moodle-dev
 ```
 
-From a local clone:
+Or from a shell:
 
 ```
-/plugin marketplace add /absolute/path/to/wisecat-moodle-dev
-/plugin install wisecat-moodle-dev@wisecat-moodle-dev
+claude plugin marketplace add adamjenkins/wisecat-moodle-dev
+claude plugin install wisecat-moodle-dev@wisecat-moodle-dev
 ```
 
-Check with `/plugin list`. After pulling new commits, run `/reload-plugins`.
+The plugin is installed for your user by default. To share it with everyone who works in one project, add
+`--scope project` to both commands, run them in that project, and commit the `.claude/settings.json` they write.
+
+From a local clone, give the path instead of the GitHub name:
+
+```
+git clone https://github.com/adamjenkins/wisecat-moodle-dev.git
+claude plugin marketplace add /absolute/path/to/wisecat-moodle-dev
+claude plugin install wisecat-moodle-dev@wisecat-moodle-dev
+```
+
+Start a new Claude Code session after installing. Then check it:
+
+- `claude plugin list` shows `wisecat-moodle-dev@wisecat-moodle-dev` as enabled.
+- `claude plugin details wisecat-moodle-dev@wisecat-moodle-dev` lists 25 skills, 10 commands and 2 agents.
+- Ask for something a skill covers, for example "Start a Boost child theme called theme_campus". The
+  `moodle-theme-development` skill should load before any file is written.
+
+**If the `moodle-dev` plugin is installed**, disable it: this toolkit grew out of it and uses the same skill and
+command names, so both would match the same tasks.
+
+```
+claude plugin disable moodle-dev@moodle-dev
+```
+
+Slash commands are typed as listed below (`/moodle-new-theme`). If another plugin has a command with the same
+name, use the full form, `/wisecat-moodle-dev:moodle-new-theme`.
+
+**Update** to the newest commit, then start a new session:
+
+```
+claude plugin marketplace update wisecat-moodle-dev
+claude plugin update wisecat-moodle-dev@wisecat-moodle-dev
+```
+
+**Remove** it:
+
+```
+claude plugin uninstall wisecat-moodle-dev@wisecat-moodle-dev
+claude plugin marketplace remove wisecat-moodle-dev
+```
 
 ### Other assistants
 
+The installer needs `bash` and a clone of this repository. It copies files into the project you are working on:
+
 ```
-./install.sh <cursor|copilot|aider|continue|generic> [--dest <path>]
+git clone https://github.com/adamjenkins/wisecat-moodle-dev.git
+cd wisecat-moodle-dev
+./install.sh <cursor|copilot|aider|continue|generic> --dest /path/to/your/moodle-project
 ```
 
-The default destination is the current directory. Each target also receives `moodle-skill-files/`: the reference
-and version files the skills link to.
+Without `--dest` it installs into the current directory. Each target also receives `moodle-skill-files/`: the
+reference and version files the skills link to. Keep that directory next to the installed files, or the links in
+them break.
 
-| Assistant | What is installed |
-|---|---|
-| Cursor | `.cursor/rules/*.mdc`: each skill is a rule attached to PHP, Mustache, JavaScript, SCSS and CSS files |
-| GitHub Copilot | `.github/copilot-instructions.md`, a chat mode per skill, a prompt file per command |
-| Aider | `CONVENTIONS.md`, with skills and commands under `.aider/` to load with `/read-only` |
-| Continue | `.continue/config.yaml`, rules and prompts |
-| Anything else | `MOODLE_PROMPTS.md`: one file with every skill, agent and command |
+| Assistant | What is installed | After installing |
+|---|---|---|
+| Cursor | `.cursor/rules/*.mdc`: each skill is a rule attached to PHP, Mustache, JavaScript, SCSS and CSS files | Nothing: Cursor reads `.cursor/rules/` |
+| GitHub Copilot | `.github/copilot-instructions.md`, a chat mode per skill, a prompt file per command | Nothing: Copilot reads `.github/` in the repository |
+| Aider | `CONVENTIONS.md`, with skills, commands and `moodle-skill-files/` under `.aider/` | Add `read: [CONVENTIONS.md]` to `.aider.conf.yml`; load a skill with `/read-only .aider/skills/<name>.md` |
+| Continue | `.continue/config.yaml`, rules and prompts | Restart Continue |
+| Anything else | `MOODLE_PROMPTS.md`: one file with every skill, agent and command | Paste the sections you need into the assistant's instructions |
+
+The installer overwrites files of the same name. Back up an existing `.continue/config.yaml` or
+`.github/copilot-instructions.md` first and merge by hand. To update, pull the clone and run the installer again.
 
 ## Skills
 
