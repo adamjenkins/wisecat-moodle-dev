@@ -1,0 +1,181 @@
+---
+mode: 'agent'
+description: Static check of a Moodle theme directory against the theme skills' common mistakes; reports file:line for each finding and states what was not checked.
+---
+You will check a Moodle theme by reading its files. Nothing is compiled, installed or loaded in a browser, and no
+file is changed.
+
+User's input: ${input:args}
+
+## Procedure
+
+1. Resolve the theme directory (default: cwd). It must hold `config.php` and `version.php`; if not, say so and
+   stop. Read `version.php` for `$plugin->component` (`theme_<name>`), `$plugin->requires`, `$plugin->supported`
+   and `$plugin->dependencies`, and `config.php` for `$THEME->parents`.
+2. Note the facts that decide which checks apply:
+   - **Versions.** Does `$plugin->supported` include `502`, `503` or both? Checks marked 5.2 or 5.3 apply only
+     when that branch is supported.
+   - **Parents.** Is `boost` in `$THEME->parents`? The Boost child checks apply only then. For a theme with no
+     parents, say that the stand-alone path is not a tested recipe (`moodle-theme-development`) and run the
+     checks that do not depend on Boost.
+   - **Moodle source.** If a Moodle root is reachable (the directory that holds `public/` and `admin/cli/`),
+     read its `public/version.php` for the branch. Checks that compare with core need it; without it they go
+     under "Not checked".
+3. Activate `moodle-theme-development`. Activate each other theme skill when its group below is reached: the
+   rule, its symptom and its fix are in the skill's "Common mistakes" table, and this command only says what to
+   look for. Do not judge a check from memory.
+4. Run the groups in order. For each check record one of: a finding with `file:line`, a pass that names what
+   was read, or N/A with the command that shows it does not apply.
+
+## A. `config.php` and `version.php`
+
+Skills: `moodle-theme-development`, `moodle-theme-boost-child`. Start with `grep -n '\$THEME->' config.php`.
+
+- `$THEME->name` equals the directory name.
+- `$THEME->parents` is an array; every parent is in `$plugin->dependencies`; a theme with two levels of parents
+  lists every ancestor, nearest first. **5.3+:** `classic` as a parent, which core no longer ships.
+- In a child, the keys that are not inherited are restated: `rendererfactory`, `usefallback`, `requiredblocks`,
+  `addblockposition`, `haseditswitch`, `usescourseindex`, `activityheaderconfig`, `yuicssmodules`.
+- Every key is in core's whitelist (the key reference of `moodle-theme-development`). Names that are silently
+  dropped include `renderfactory`, `editorsheets`, `undeletableblocktypes`, `enable_dock`.
+- `$THEME->editor_scss` names a file the theme ships.
+- `$THEME->scss` in a child is a closure, not a file name; a theme with files in `scss/` sets the key.
+- No `styles.php` in the theme root.
+- `$plugin->supported` is a two-number pair and `$plugin->requires` is not below its lowest branch;
+  `version.php` contains no `require`.
+- `$THEME->hidefromselector = true` in a theme that has Behat features.
+
+## B. SCSS
+
+Skill: `moodle-theme-scss` (its version notes list the variables and partials that differ). Search `scss/` and
+the SCSS strings built in `lib.php`.
+
+```bash
+grep -rnE '@import' scss/ lib.php
+grep -rnE '(darken|lighten|mix|tint-color|shade-color|rgba)\([^;]*\$(state-|dialogue-|card-bg|card-border-color)' scss/
+grep -rnE 'prefers-color-scheme|\[\[setting:|@include +dark-mode|dark-readable\(' scss/ lib.php
+grep -rnE '^\s*:root\s*\{' scss/
+grep -rnE 'var\(--mds-[a-z0-9-]+\)' scss/
+grep -rnE 'background(-color)?:\s*(#fff|#ffffff|white)\b' scss/
+```
+
+- **Imports.** A path into `bootstrap/`, `fontawesome/` or the design system's folders resolves on 5.2 only; a
+  5.3-only partial or a path into `lib/bundles` fails on 5.2. Report each against the versions the theme
+  supports.
+- **File names** `scss/moodle.scss`, `scss/bootstrap.scss`, `scss/fontawesome.scss`, `scss/design-system.scss`,
+  and a shipped copy of Boost's preset.
+- **Colour functions on variables that are `var()` strings on 5.3.** The grep above covers the most common
+  names; the full list is in the skill's 5.3 version notes.
+- **Pre-SCSS** (the pre callback and any file placed before Boost's preset) that uses `$gray-*`, `$mds-*`,
+  `tint-color()`, `shade-color()` or `@include`.
+- **Dark mode.** `prefers-color-scheme`; a bare `:root` block that sets `--bs-*` or `--mds-*`; a literal
+  background behind inherited text (each grep hit is a candidate: read the rule before reporting it).
+  **5.2 only:** `@include dark-mode`, `dark-readable()` and `var(--mds-...)` with no fallback do not work there.
+- **`[[setting:...]]`** placeholders, which core does not replace.
+- **Doubled callbacks.** A pre or extra SCSS callback in a Boost child that emits `brandcolor`, `scsspre`, the
+  `scss` setting or the background images: `grep -nE "brandcolor|scsspre|backgroundimage|settings->scss" lib.php`.
+- **Unvalidated values.** A setting value written into SCSS with no pattern check before it. Trace each
+  `get_config()` or `$theme->settings->` read in the SCSS callbacks to where it is emitted.
+- **RTL directives** written as `//` comments or placed after the last declaration.
+
+## C. PHP output: hooks, callbacks, renderers, icons
+
+Skill: `moodle-theme-renderers-output`.
+
+- Each callback in `db/hooks.php`, and each `lib.php` callback that core calls for every plugin, starts with a
+  guard on the current theme's name and parents. List the callbacks, then read each one.
+- Renderer classes: `grep -rnE 'extends +\\?core_renderer\b' classes/` (a Boost child extends Boost's class);
+  class name, namespace and file name match the lookup rules; no core method body copied.
+- `grep -rnE '(empty|isset)\(\$(this->page|PAGE)->' classes/ layout/ lib.php`: always "not set".
+- A theme renderer method used from the `maintenance` layout.
+- `theme_<name>_get_fontawesome_icon_map()` returning `core:` keys, or a mapped key with no SVG file.
+- `$theme->settings->` or `$PAGE->theme->settings->` used for the theme's own value in code a child may run.
+- **5.3+:** a renderer that extends `block_timeline\output\renderer`.
+
+## D. Layouts and templates
+
+Skill: `moodle-theme-layouts-templates`.
+
+- Each `$THEME->layouts` entry is whole: `file`, `regions`, `defaultregion` when regions is not empty, and the
+  options restated. Option keys that nothing reads.
+- Each file copied from core or Boost has an untouched `.upstream` twin and a header that names the source and
+  the Moodle version: `find . -name '*.upstream'`, then compare with the list of copied files. With a Moodle
+  root, `diff` each twin against the same file there and report a difference as "upstream changed".
+- A copied `drawers.mustache` or `navbar.mustache` in a theme that supports both versions: the menu partial is
+  chosen by the `reactprops` switch, and both drawer blocks are filled.
+- A layout template of the theme's own prints every required `output.*` call.
+- Template overrides: run `/moodle-mustache-lint` on `templates/`, or apply its theme override checks here.
+
+## E. Settings
+
+Skill: `moodle-theme-settings`. Skip with N/A when there is no `settings.php`.
+
+- The page replaces `$settings` with one named `themesetting<name>`, inside `if ($ADMIN->fulltree)`.
+- A tab is added after its settings; `hide_if()` is called on the outer page.
+- Every setting read in an SCSS callback, and every file setting, has
+  `set_updatedcallback('theme_reset_all_caches')`. List the names read in `lib.php`, then find each in
+  `settings.php`.
+- `admin_setting_configstoredfile` uses item id 0; `theme_<name>_pluginfile()` exists and checks the same file
+  areas; `setting_file_url()` names the same area.
+- Setting names use the slash form `theme_<name>/<setting>`.
+- A user preference set by the theme is declared in the privacy provider.
+- Whether a setting added since the last release came with a version bump can be judged only from the history:
+  report it as not checked unless `git log` is available and was read.
+
+## F. Tests and package
+
+Skills: `moodle-theme-testing-release`, `moodle-plugin-release`.
+
+- A PHPUnit test calls `get_css_content()` and asserts a selector that only this theme emits;
+  `assertNotEmpty($css)` alone passes on the fallback CSS.
+- Features carry `@theme @theme_<name>`, do not set the theme, and include at least one `@javascript` scenario:
+  `grep -rnE '^\s*@|theme' tests/behat/*.feature`.
+- Files present: `LICENSE` (full text), `pix/screenshot.png` or `.jpg`, `pix/favicon.ico`, `pix/icon.svg`,
+  `classes/privacy/provider.php`.
+- Strings present in `lang/en/theme_<name>.php`: `pluginname`, `choosereadme`, `configtitle`,
+  `privacy:metadata` or the preference strings, and `region-<name>` for a region no parent names.
+- `thirdpartylibs.xml` when `fonts/` or a vendored library is shipped.
+- The boilerplate and `@copyright` on `.scss` and `.mustache` files, with the original `@copyright` line kept in
+  copied files.
+- Bootstrap 4 class names in templates and `amd/src`:
+  `grep -rnE '\b(sr-only|ml-[0-5]|mr-[0-5]|float-(left|right)|font-weight-bold|badge-(primary|secondary)|custom-select)\b|data-toggle=' templates/ amd/src/`.
+
+## Output
+
+```markdown
+# Theme check: theme_<name>
+
+## Summary
+- Parents: <list> | Supports: <5.2, 5.3> | Moodle source compared: <version, or none>
+- Errors: N | Warnings: N | Not applicable: N | Not checked: N
+
+## Errors (breaks on a supported version, or blocks approval)
+- scss/<name>/post.scss:14 — `@import "bootstrap/functions"` — not found on 5.3, the theme falls back to stock Boost — FIX: <action> — see `moodle-theme-scss`
+
+## Warnings
+- config.php:31 — ...
+
+## Not applicable
+- Settings — no `settings.php` (`ls settings.php`: no such file)
+
+## Not checked
+- The SCSS was not compiled: run the theme's compile test, or `php admin/cli/build_theme_css.php --themes=<name> --direction=ltr` from the Moodle root with developer debugging on
+- No page was loaded: template and renderer overrides, the cascade, dark mode, RTL and phone width were not seen
+- PHPUnit, Behat, stylelint, the Mustache lint and phpcs were not run
+- The release ZIP was not built or listed
+- <any check skipped because the Moodle source for 5.2 or 5.3 was not available>
+
+## Suggested next steps
+1. ...
+```
+
+## Rules
+
+- Never modify files. Report only.
+- Every finding carries a `file:line`, or the command and the output that shows it. A grep hit is a candidate,
+  not a finding: read the lines around it first.
+- A check with no hits is reported as a pass only with the command that was run; an empty result from a command
+  that searched the wrong directory proves nothing, so confirm the path exists.
+- Say how sure each finding is: read in the theme's files, or compared with the Moodle source of a named version.
+- Always print the "Not checked" section. A static check cannot show that the theme compiles or that a rule
+  applies on the page.

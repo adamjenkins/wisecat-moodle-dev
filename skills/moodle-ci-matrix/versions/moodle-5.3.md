@@ -26,6 +26,7 @@ Rows for a plugin supporting 5.3, each overriding the 5.2 image defaults of the 
   healthy on the 5.3 rows; use `healthcheck.sh --connect --innodb_initialized`.
 - Grunt output can differ from 5.2's toolchain even with the same Node range; keep the Grunt step on one branch.
 - **5.3+:** `php public/admin/tool/phpunit/cli/util.php --snapshot` and `--restore` can cache an initialised core test
-  site between jobs; the options do not exist on 5.2 (`moodle-phpunit-testing`, its 5.3 version notes).
+  site between jobs; the options do not exist on 5.2, so a step that uses them is limited to the 5.3 rows
+  (`moodle-phpunit-testing` has the option details).
 - Behat on 5.3 can also run in dark mode (`init.php --colourmode=dark`); moodle-plugin-ci 4.5.11 has no option for it,
   so a dark-mode row needs its own step (`moodle-theme-testing-release`).

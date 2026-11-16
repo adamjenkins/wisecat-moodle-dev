@@ -65,8 +65,10 @@ class cleanup extends \core\task\scheduled_task {
 - `\core\task\manager::reschedule_or_queue_adhoc_task($task)` updates the next run time of a queued task with the
   same user, class, component and custom data instead of adding another; use it with `set_next_run_time()`.
 - `get_name()` is optional for ad-hoc tasks; it is what the task log and the admin queue page show.
-- `\core\task\manager::get_adhoc_tasks(\local_example\task\send_report::class)` lists the queued instances, which is
-  the reliable way to test "is it already queued" on both versions.
+- To test "is it already queued" on both versions, do not read the return value of `queue_adhoc_task($task, true)`
+  (false for a duplicate on 5.2, the existing id on 5.3). Call
+  `\core\task\manager::get_queued_adhoc_task_record($task, false)`, which returns the matching record or `false`, or
+  list the queued instances with `\core\task\manager::get_adhoc_tasks(\local_example\task\send_report::class)`.
 
 ## Failures and retries
 

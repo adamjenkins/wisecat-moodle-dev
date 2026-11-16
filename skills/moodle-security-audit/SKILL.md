@@ -1,6 +1,6 @@
 ---
 name: moodle-security-audit
-description: Use when reviewing or hardening Moodle plugin code for security, auditing a plugin's entry points, or responding to a vulnerability report. Covers require_login and require_capability, IDOR (context derived from the record), sesskey and CSRF, required_param and PARAM_* types, $DB placeholders and get_in_or_equal, output escaping (s, format_string, format_text, html_writer, Mustache triple braces, JS sinks), pluginfile and send_stored_file, uploads, \curl and SSRF, open redirects (PARAM_LOCALURL), secrets and \core\encryption, external functions (validate_context), dynamic forms, mobile methods and tasks. Skip when preparing a release or answering a Plugins directory reviewer (use moodle-release-preflight).
+description: Use when reviewing or hardening Moodle plugin code for security, auditing a plugin's entry points, or responding to a vulnerability report. Covers require_login and require_capability, IDOR (context derived from the record), sesskey and CSRF, required_param and PARAM_* types, $DB placeholders and get_in_or_equal, output escaping (s, format_string, format_text, html_writer, Mustache triple braces, JS sinks), pluginfile and send_stored_file, uploads, \curl and SSRF, open redirects (PARAM_LOCALURL), secrets and \core\encryption, external functions (validate_context), dynamic forms, mobile methods and tasks. Skip when the audit is the gate before a tag, a Plugins directory submission or a reviewer's finding (moodle-release-preflight).
 ---
 
 # Moodle Security Audit
@@ -248,8 +248,8 @@ open redirect.
 
 ## 11. Static analysis
 
-`moodle-plugin-ci phpcs` (the moodle-cs standard) flags `eval`, backticks, `extract()`, `error_log()` and a missing
-login call. It does not flag `unserialize()`, `call_user_func()`, superglobals, `PARAM_RAW`, missing capability
+`moodle-plugin-ci phpcs` (the moodle-cs standard) flags `eval`, `goto`, backticks, `extract()`, `error_log()` and a
+missing login call (read in the moodle-cs 3.7 source). It does not flag `unserialize()`, `call_user_func()`, superglobals, `PARAM_RAW`, missing capability
 checks or missing frankenstyle prefixes. Use it, then grep.
 
 ```bash
@@ -280,7 +280,7 @@ G 'get_records_sql|get_record_sql|execute\(' | grep -E '\$[a-z_]+\s*\.|"\s*\.\s*
 | `unserialize($input)` | Object injection | JSON, or `['allowed_classes' => false]` |
 | `file_get_contents($userurl)` or `curl_init()` | SSRF; blocked hosts and proxy ignored | `\curl` |
 | `redirect(optional_param('next', '', PARAM_URL))` | Open redirect | `PARAM_LOCALURL` |
-| `print_error()` | Fatal: removed after its final deprecation | `throw new moodle_exception(...)` |
+| `print_error()` | Fatal "undefined function": it no longer exists on 5.2 or 5.3 | `throw new moodle_exception(...)` |
 | `$USER->id == 2` as an admin check | Wrong on most sites | `is_siteadmin()` or a capability |
 | Access decided by a client header (`User-Agent`, `X-Forwarded-For`) | Headers are spoofable | Capabilities; `getremoteaddr()` for logging only |
 | `md5()` or `sha1()` for a password | Weak hash | `hash_internal_user_password()` |
@@ -307,7 +307,7 @@ maintainer privately first.
 ## References
 
 - https://moodledev.io/general/development/policies/security
-- https://moodledev.io/docs/apis/subsystems/output#escaping-content
+- https://moodledev.io/docs/apis/subsystems/output#string-formatting-functions
 - https://moodledev.io/docs/apis/subsystems/access
 - https://moodledev.io/docs/apis/subsystems/files
 - https://moodledev.io/docs/apis/core/dml#placeholders

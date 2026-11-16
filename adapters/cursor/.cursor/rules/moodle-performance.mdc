@@ -1,344 +1,295 @@
 ---
-description: Use when optimizing Moodle plugin performance — MUC caching definitions, query optimization, recordsets vs records, ad-hoc and scheduled tasks, lazy loading, OPcache, query log analysis, $PERF, and performance debug toolbar.
-globs: ["**/*.php", "**/*.mustache", "**/amd/src/**/*.js"]
+description: Use when a Moodle page, web service, filter or task is slow, runs too many queries, or runs out of memory, or when adding caching or background work - db/caches.php and \core_cache\cache::make (MUC application, session and request caches, cachedef_ strings, invalidation events), per-context or per-call repeated queries, N+1 loops, get_recordset vs get_records, batching large tables, $DB->perf_get_queries() budgets, ad-hoc and scheduled tasks (db/tasks.php, queue_adhoc_task, locks, retries), session locks, perfdebug, profiling and server tuning. Skip when the slowness is theme CSS compilation (moodle-theme-scss) or the task is a schema change (moodle-plugin-development).
+globs: ["**/*.php", "**/*.mustache", "**/amd/src/**/*.js", "**/*.scss", "**/*.css"]
 alwaysApply: false
 ---
 # Moodle Performance
 
 ## Overview
 
-Moodle bottlenecks: too many DB queries per request, full-table scans, loading large recordsets into memory, blocking work on the request path. Mitigations: MUC caching, indexes, recordsets, ad-hoc tasks, careful capability checks.
+A slow Moodle request is almost always one of three things: a query repeated once per item (per course module, per
+context, per user), a large result loaded into memory at once, or work done on the request that belongs in a task.
+Measure the query count first, fix the shape of the code, then cache what is still repeated.
 
 ## When to Use
 
-- Page renders slowly / hits per-page query limits
-- N+1 query pattern in loops
-- Memory-blow on large datasets
-- Long-running operations on POST handlers
-- Tuning a custom report or scheduled task
+- A page, filter, block or web service gets slower as a course gets bigger
+- The performance footer shows hundreds of queries, or memory grows with the data
+- A POST handler or upgrade step does long work (mail, grading, recalculation, external calls)
+- Adding `db/caches.php`, `db/tasks.php`, an ad-hoc task or a lock
+- **Skip when:** the cost is theme CSS or SCSS compilation (`moodle-theme-scss`), designing tables and indexes
+  (`moodle-plugin-development`), or a heavy upgrade step (`moodle-upgrade-migration`, which says to queue an ad-hoc
+  task instead).
 
-## Diagnosis
+## Measure first
 
-### Performance debug
-
-`config.php`:
+Turn on the performance footer on a development site: Site administration > Development > Debugging >
+"Performance info" (`perfdebug`, stored as 15 when on; `public/admin/settings/development.php`, 5.3.0). The footer
+shows DB reads and writes, time, memory, and cache hits and misses per definition. In `config.php`:
 
 ```php
-$CFG->debug = (E_ALL | E_STRICT);
+$CFG->debug = DEBUG_DEVELOPER;
 $CFG->debugdisplay = 1;
-$CFG->perfdebug = 15;     // shows query count + timings in footer
+$CFG->perfdebug = 15;
 ```
 
-Site admin > Development > Debugging > Performance info: enables the footer toolbar (queries, time, memory, MUC hits/misses, sessions reads/writes).
-
-### `$PERF`
+Count queries around the code path, in a script or a PHPUnit test, with the DML counters
+(`public/lib/dml/moodle_database.php`, 5.2 and 5.3):
 
 ```php
-global $PERF;
-$start = microtime(true);
-// ... work ...
-$PERF->dbqueries++;       // your manual counter
-mtrace('Took ' . round(microtime(true) - $start, 3) . 's');
+$before = $DB->perf_get_queries();      // Also perf_get_reads(), perf_get_writes().
+// ... the hot path ...
+$used = $DB->perf_get_queries() - $before;
 ```
 
-### Slow query log
-
-Postgres / MySQL slow-query log — turn on in dev. Moodle prefixes queries with the source class via `$CFG->dboptions['debug']`.
-
-## MUC — Moodle Universal Cache
-
-3 cache modes:
-
-| Mode | Storage | Lifetime | Use |
-|------|---------|----------|-----|
-| `MODE_APPLICATION` | Persistent (file/Redis/Memcached) | Until invalidated | Shared computed values |
-| `MODE_SESSION` | Session | Session lifetime | Per-user computed values |
-| `MODE_REQUEST` | PHP request | Single request | Memoize within request |
-
-### Define a cache
-
-`db/caches.php`:
+**A query budget test keeps a fix fixed.** Render the hot path for many items and assert a ceiling that does not grow
+with the number of items:
 
 ```php
-<?php
-defined('MOODLE_INTERNAL') || die();
+public function test_render_cost_does_not_grow_with_activities(): void {
+    global $DB;
+    $this->resetAfterTest();
+    $course = $this->getDataGenerator()->create_course(['summary' => '']);
+    for ($i = 0; $i < 30; $i++) {
+        $this->getDataGenerator()->create_module('page', ['course' => $course->id]);
+    }
+    $contexts = [];
+    foreach (get_fast_modinfo($course)->get_cms() as $cm) {
+        $contexts[] = $cm->context;
+    }
 
+    $before = $DB->perf_get_queries();
+    foreach ($contexts as $context) {
+        format_text('Plain text', FORMAT_HTML, ['context' => $context]);
+    }
+    $this->assertLessThanOrEqual(10, $DB->perf_get_queries() - $before);
+}
+```
+
+**Assert read counts only as "zero" or "at most N".** `perf_get_reads()` depends on the driver: on PostgreSQL an
+unlimited `get_recordset_select()` is a cursor (`DECLARE`, then one `FETCH` per buffer, then `CLOSE`), so one
+recordset counts as three or more reads, while MySQL and MariaDB count one. An exact-count assertion passes on one
+database and fails on the other. Assert zero reads for a cache hit, use `get_records_*` for small sets in tested
+code, and treat a non-zero exact count as unverified until the PostgreSQL CI row has run
+(`public/lib/dml/pgsql_native_moodle_database.php`, cursor handling, 5.3.0).
+
+Slow-query logging, EXPLAIN, profiling with `?PROFILEME` and server settings:
+[reference/diagnosis-and-server.md](../moodle-skill-files/moodle-performance/reference/diagnosis-and-server.md).
+
+## Queries
+
+### One query per item is the usual bug
+
+```php
+// Slow: one query per course.
+foreach ($courses as $course) {
+    $teacher = $DB->get_record('user', ['id' => $course->teacherid]);
+}
+
+// One query.
+[$insql, $params] = $DB->get_in_or_equal(array_column($courses, 'teacherid'), SQL_PARAMS_NAMED);
+$teachers = $DB->get_records_select('user', "id $insql", $params, '', 'id, firstname, lastname');
+```
+
+`get_in_or_equal()` throws on an empty array unless its fifth argument (`$onemptyitems`) is given; check for empty
+input first. The same applies to capabilities: one `get_users_by_capability($context, 'mod/quiz:attempt',
+'u.id, u.firstname, u.lastname')` instead of `has_capability()` for each user.
+
+### Resolve per-context values once per request
+
+Code that runs once per `format_text()`, `format_string()`, block or course module (filters above all) must not
+query once per call. Core calls a filter's `setup()` for every `format_text()` and `format_string()`; on a course page
+each activity has its own context, so a lookup that walks the parent contexts runs one query per ancestor per
+activity, even when the text does not need the filter. Symptom: the footer's query count grows by several queries
+for every activity added, and Plugins directory reviewers flag it. Fix: resolve each context once per request,
+reuse the parent levels, and reuse what core already loaded (a filter has its own context's settings in
+`$this->localconfig`; `public/filter/classes/text_filter.php`, 5.3.0):
+
+```php
+// db/caches.php
 $definitions = [
-    'active_announcements' => [
-        'mode'         => cache_store::MODE_APPLICATION,
-        'simplekeys'   => true,
-        'simpledata'   => true,
-        'ttl'          => 600,
-        'invalidationevents' => ['changesin_local_announcements'],
-    ],
-    'user_dashboard' => [
-        'mode'       => cache_store::MODE_SESSION,
+    'contextconfig' => [
+        'mode' => cache_store::MODE_REQUEST,
         'simplekeys' => true,
     ],
 ];
 ```
 
-Bump `version.php` after edits.
-
-### Use the cache
-
 ```php
-$cache = \cache::make('local_announcements', 'active_announcements');
-$value = $cache->get('all');
-if ($value === false) {
-    $value = $this->compute_announcements();
-    $cache->set('all', $value);
+public static function for_context(\core\context $context): \stdClass {
+    $cache = \core_cache\cache::make('filter_example', 'contextconfig');
+    if (($config = $cache->get($context->id)) !== false) {
+        return $config;
+    }
+    $parent = $context->get_parent_context();
+    $config = $parent ? clone(self::for_context($parent)) : get_config('filter_example');
+    foreach (filter_get_local_config('example', $context->id) as $name => $value) {
+        $config->$name = $value;
+    }
+    $cache->set($context->id, $config);
+    return $config;
 }
-return $value;
 ```
 
-### Invalidate
+A request cache is purged between PHPUnit tests (`public/lib/classes/test/testing_util.php`, `reset_dataroot()`
+calls `\core_cache\helper::purge_all()`, 5.3.0). A plain `static` array is not, so state from one test leaks into the
+next unless you add a reset method and call it.
+
+### Large result sets: recordsets, and batch by rows
+
+`get_records*()` loads every row into a PHP array. For a table that grows with the site, iterate a recordset and
+close it:
 
 ```php
-\cache_helper::invalidate_by_event('changesin_local_announcements', ['all']);
-// or
-$cache->delete('all');
-$cache->purge();
-```
-
-Trigger invalidation from a settings save or an observer.
-
-### `simplekeys` / `simpledata`
-
-- `simplekeys: true` — keys are alphanum (skips hashing) — faster
-- `simpledata: true` — values are scalars/arrays of scalars (skips serialization) — much faster
-
-Use both whenever possible.
-
-### Static cache (per-request)
-
-```php
-$cache = \cache::make('local_announcements', 'request_lookup');
-// MODE_REQUEST in caches.php — auto-cleared at end of request
-```
-
-## DB optimization
-
-### Recordsets for large data
-
-```php
-// BAD — loads everything into memory
-$rows = $DB->get_records('huge_table');
-foreach ($rows as $r) { /* ... */ }
-
-// GOOD — streams
-$rs = $DB->get_recordset('huge_table');
-foreach ($rs as $r) { /* ... */ }
-$rs->close();      // ALWAYS close
-```
-
-Use `get_recordset_sql` with `LIMIT` + offset for batched processing of millions of rows.
-
-### Avoid N+1
-
-```php
-// BAD
-foreach ($courses as $c) {
-    $teacher = $DB->get_record('user', ['id' => $c->teacherid]);
+$rs = $DB->get_recordset('local_example_log', ['courseid' => $courseid], 'id', 'id, userid, timecreated');
+foreach ($rs as $row) {
+    // ...
 }
-
-// GOOD — single query
-$tids = array_column($courses, 'teacherid');
-[$insql, $params] = $DB->get_in_or_equal($tids);
-$teachers = $DB->get_records_sql("SELECT * FROM {user} WHERE id $insql", $params);
+$rs->close();
 ```
 
-### Indexes
+An unclosed recordset keeps a cursor or result buffer open until the request ends. Keep per-row queries out of the
+loop body, or the recordset only moves the N+1 problem.
 
-```xml
-<INDEX NAME="userid-courseid" UNIQUE="false" FIELDS="userid, courseid"/>
-```
-
-Edit via XMLDB editor. Composite index column order matters — most-selective first, leftmost-prefix usable for partial queries.
-
-### `EXPLAIN` your queries
-
-```bash
-mysql> EXPLAIN SELECT ... ;
-postgres=# EXPLAIN ANALYZE SELECT ... ;
-```
-
-Look for:
-- `type: ALL` (full scan) — needs index
-- `Using filesort` / `Using temporary` — sort spilling
-- High `rows` estimate — selectivity issue
-
-## Move work off the request
-
-### Ad-hoc task — fire-and-forget
+**Batch on the ids you read, never on id arithmetic.** Ids are sparse (deleted rows, other plugins sharing the
+sequence, and PHPUnit starting every table's sequence at a different high value: `public/lib/classes/test/testing_util.php`,
+`reset_all_database_sequences()`, 5.2 and 5.3), so a loop over `lastid + 500` skips or repeats rows. Walk the key:
 
 ```php
-// classes/task/send_report.php
+$lastid = 0;
+do {
+    $rows = $DB->get_records_select('local_example_log', 'id > :lastid', ['lastid' => $lastid],
+        'id ASC', 'id, userid', 0, 500);
+    foreach ($rows as $row) {
+        // ...
+    }
+    $lastid = $rows ? array_key_last($rows) : $lastid;
+} while (count($rows) === 500);
+```
+
+To find the boundary of the next batch without loading it, read one row at the offset:
+`get_records_select(..., 'id ASC', 'id', 499, 1)` returns the 500th id.
+
+### Writes
+
+`update_record()` writes every column it is given, and the object usually came from an earlier read; near a counter
+or a status column that another request can change, use `set_field()` for the one column, or an SQL
+`UPDATE ... SET n = n + 1` through `$DB->execute()` (rule owned by `moodle-field-lessons`).
+
+## Caching with MUC
+
+Recipe for a definition: [reference/muc-caching.md](../moodle-skill-files/moodle-performance/reference/muc-caching.md) holds the option table, data sources,
+invalidation, versioned data and testing. The rules that bite most often:
+
+- **Every definition needs a `cachedef_<name>` string** in the plugin's `lang/en` file. The cache admin page and the
+  performance footer call `get_string('cachedef_' . $area, $component)` (`public/cache/classes/definition.php`,
+  `get_name()`, 5.3.0). Symptom: a missing-string finding from a Plugins directory reviewer, and
+  `[[cachedef_x]]` on the admin page. No CI check catches it.
+- **A `db/caches.php` change needs a version bump.** Definitions are read into the cache configuration on upgrade.
+  A definition used before that is found on first use, but with a "Cache definitions reparsed causing cache
+  reset" `debugging()` notice and a reset of the cache configuration (`public/cache/classes/factory.php`, 5.3.0).
+- **`get()` returns `false` for a miss.** Never cache a bare `false`; wrap it (`['value' => false]`) or cache `0`.
+- **Pick the mode by who shares the value:** `MODE_APPLICATION` for every user on every server, `MODE_SESSION` for
+  one user, `MODE_REQUEST` for this request only.
+- **Prefer event invalidation to `ttl`.** The definition class says so (`public/cache/classes/definition.php`,
+  5.3.0): not every store supports a TTL natively, and where it does not, every item is wrapped and checked.
+- **Class names:** `\core_cache\cache`, `\core_cache\store`, `\core_cache\helper` have existed since 4.5; the old
+  `\cache`, `\cache_store`, `\cache_helper` are class aliases with no notice on 5.2 or 5.3
+  (`public/cache/classes/cache.php`, `class_alias()`, 5.3.0). Core's own `db/caches.php` still writes
+  `cache_store::MODE_*`.
+
+## Work off the request: tasks
+
+Recipe for an ad-hoc task:
+
+```php
 namespace local_example\task;
+
 class send_report extends \core\task\adhoc_task {
     public function execute(): void {
         $data = $this->get_custom_data();
-        // do work
+        // ... build and send the report for $data->reportid ...
     }
 }
+```
 
-// trigger:
+```php
 $task = new \local_example\task\send_report();
-$task->set_custom_data(['userid' => $user->id, 'reportid' => $r->id]);
-$task->set_userid($user->id);     // runs as that user
-\core\task\manager::queue_adhoc_task($task);
+$task->set_custom_data(['reportid' => $report->id]);
+$task->set_userid($USER->id);                       // Runs as this user; must be an active user.
+\core\task\manager::queue_adhoc_task($task, true);  // true: do not queue a duplicate.
 ```
 
-Tasks run via cron. Long jobs don't block HTTP request.
+- **`set_userid()` makes queueing check the user.** `queue_adhoc_task()` calls `\core_user::require_active_user()`,
+  so a suspended or deleted user throws at queue time (`public/lib/classes/task/manager.php`, 5.2 and 5.3).
+- **Duplicate detection compares class, component, custom data and user.** Keep timestamps out of the custom data if
+  duplicates should collapse.
+- **Do not rely on the return value of `queue_adhoc_task($task, true)`.** **5.3+:** a duplicate returns the existing
+  task's id where 5.2 returned `false`; see [versions/moodle-5.3.md](../moodle-skill-files/moodle-performance/versions/moodle-5.3.md).
+- **Re-check permissions in `execute()`.** The user's capabilities may have changed between queueing and running.
+- **Throwing from `execute()` marks the task failed** and cron retries it with a growing delay. To wait for something
+  without counting a failure, call `$this->set_soft_retry_delay()` and return (present from 5.2.2 and on 5.3; guard
+  with `method_exists()` if `requires` is 5.2.0).
 
-### Scheduled task — recurring
+Scheduled tasks, `db/tasks.php`, locks, concurrency limits, retries and running tasks from the CLI:
+[reference/tasks.md](../moodle-skill-files/moodle-performance/reference/tasks.md).
 
-`db/tasks.php`:
+## Sessions and output
 
-```php
-$tasks = [[
-    'classname' => 'local_example\task\cleanup',
-    'blocking'  => 0,
-    'minute'    => '0',
-    'hour'      => '3',
-    'day'       => '*',
-    'month'     => '*',
-    'dayofweek' => '*',
-]];
-```
+- **Release the session lock early** in a long request that only reads the session:
+  `\core\session\manager::write_close();`. Parallel AJAX calls from one user otherwise queue behind each other. For
+  external functions, `'readonlysession' => true` does the same (`moodle-web-services`).
+- **Load heavy JavaScript on demand.** AMD source supports dynamic import, as core does in
+  `public/lib/amd/src/notification.js` (5.3.0):
 
-```php
-class cleanup extends \core\task\scheduled_task {
-    public function get_name(): string {
-        return get_string('task:cleanup', 'local_example');
-    }
-    public function execute(): void {
-        // ...
-    }
-}
-```
+  ```javascript
+  const onClick = async() => {
+      const {init} = await import('local_example/heavy');
+      init();
+  };
+  ```
 
-Run cron: `php admin/cli/cron.php`. Production: cron entry every minute.
+- **Production caches stay on:** `cachejs`, `cachetemplates` and theme designer mode off. `config-dist.php` marks
+  the changed value of each as not for production servers.
 
-### Locks for non-overlapping execution
+## Common mistakes
 
-```php
-$locktype = 'local_example_cleanup';
-$lockfactory = \core\lock\lock_config::get_lock_factory($locktype);
-if (!$lock = $lockfactory->get_lock('main', 5)) {
-    return;     // another instance running
-}
-try {
-    // ...
-} finally {
-    $lock->release();
-}
-```
+| Mistake | What happens | Fix |
+|---|---|---|
+| A lookup per context in a filter or block | Query count grows with the number of activities | Request cache keyed by context id; reuse parent levels |
+| `get_records()` on a table that grows with the site | Memory exhaustion on large sites | `get_recordset()` and `close()` |
+| Batching with `lastid + 500` | Rows skipped or processed twice | `id > :lastid ORDER BY id` with `limitnum` |
+| Exact `perf_get_reads()` assertion | Passes on MySQL, fails on PostgreSQL | Assert zero, or a ceiling |
+| `has_capability()` per user in a list | One access check per user | `get_users_by_capability()` |
+| Definition without `cachedef_<name>` | Reviewer finding; `[[cachedef_x]]` on the admin page | Add the string |
+| `db/caches.php` or `db/tasks.php` edited without a bump | Definition or task never appears | Bump `$plugin->version`, upgrade |
+| Caching `false` | Every read is a miss | Wrap the value |
+| `ttl` instead of invalidation | Stale data until expiry, wrapper cost | `invalidationevents` and `\core_cache\helper::invalidate_by_event()` |
+| Mail or external calls on POST | Slow page, timeouts, duplicate sends on retry | Ad-hoc task |
+| Lock released outside `finally` | Lock held until it expires after an exception | `try { ... } finally { $lock->release(); }` |
+| Truthiness test on `queue_adhoc_task($t, true)` | "Already queued" never detected on 5.3 | Ask the queue first with `get_queued_adhoc_task_record($t, false)` (5.3 version notes) |
+| Grade, modinfo or course APIs in `db/upgrade.php` | Upgrade slow or broken on large sites | Queue an ad-hoc task (`moodle-upgrade-migration`) |
 
-## Capability check optimization
+## Reference files
 
-`has_capability()` is expensive at scale. For lists:
+| File | Read it when |
+|---|---|
+| [reference/muc-caching.md](../moodle-skill-files/moodle-performance/reference/muc-caching.md) | Writing or changing a `db/caches.php` definition, choosing options (`simplekeys`, `staticacceleration`, identifiers, data source), invalidating, or testing cached code |
+| [reference/tasks.md](../moodle-skill-files/moodle-performance/reference/tasks.md) | Writing `db/tasks.php`, a scheduled task, a lock, a concurrency limit or retry handling, or running and debugging tasks from the CLI |
+| [reference/diagnosis-and-server.md](../moodle-skill-files/moodle-performance/reference/diagnosis-and-server.md) | Finding which query or function is slow (slow-query log, EXPLAIN, profiling), or tuning OPcache, sessions and cache stores on a server |
 
-```php
-// BAD — N capability checks
-foreach ($users as $u) {
-    if (has_capability('mod/quiz:attempt', $context, $u)) { /* ... */ }
-}
+## Version notes
 
-// GOOD — single batched query
-$users = get_users_by_capability($context, 'mod/quiz:attempt', 'u.id, u.firstname, u.lastname');
-```
-
-## Output / page
-
-```php
-$PAGE->set_pagelayout('embedded');     // skips heavy regions when appropriate
-$PAGE->add_body_class('skip-some-blocks');
-```
-
-Lazy-load AMD modules:
-
-```javascript
-// only load when needed
-const onClick = async () => {
-    const {init} = await import('local_example/heavy');
-    init();
-};
-```
-
-## OPcache + APCu
-
-`php.ini`:
-
-```ini
-opcache.enable = 1
-opcache.memory_consumption = 256
-opcache.max_accelerated_files = 20000
-opcache.validate_timestamps = 0    # production only
-opcache.revalidate_freq = 0
-```
-
-Moodle benefits massively from OPcache. With `validate_timestamps=0`, restart PHP after deploys.
-
-APCu for Moodle config cache: `$CFG->localcachedir = '/var/cache/moodle';`
-
-## Sessions
-
-- Use Redis sessions in production (`$CFG->session_handler_class = '\core\session\redis'`)
-- File sessions don't scale past one app server
-- Session writes — see "session lock" issues if multiple AJAX requests block on session
-
-```php
-// release session lock early when only reading
-\core\session\manager::write_close();
-```
-
-## Frontend
-
-- Run `npx grunt amd` — production builds are minified
-- Enable browser caching: `$CFG->cachejs = true; $CFG->cachetemplates = true;`
-- Theme designer mode (`$CFG->themedesignermode`) — OFF in production (disables CSS cache)
-
-## Common Mistakes
-
-| Mistake | Fix |
-|---------|-----|
-| `get_records` on huge table | `get_recordset` + close |
-| N+1 in loops | Batch with `get_in_or_equal` |
-| Sending email on POST | Move to ad-hoc task |
-| `has_capability` per row | `get_users_by_capability` |
-| MUC without `simplekeys`/`simpledata` | Set both true when possible |
-| MUC `MODE_REQUEST` for cross-request data | Use `MODE_APPLICATION` |
-| Long lock without try/finally | Release in `finally` block always |
-| Theme designer mode on prod | Off — kills CSS caching |
-| `validate_timestamps = 1` | OFF in prod, restart on deploy |
-| Forgetting `$rs->close()` | Recordset leaks — always close |
-| File sessions on multi-app-server | Switch to Redis/Memcached |
-
-## Profiling
-
-`xhprof` / `tideways`:
-
-```php
-// quick on-demand profile
-$CFG->profilingenabled = true;
-$CFG->profilingautostart = false;
-// add ?PROFILEME to URL — view in admin/tool/profiling
-```
-
-Per-request: `Site admin > Development > Profiling`.
-
-## Moodle 5.3 notes (beta — re-verify at 5.3.0)
-
-- `queue_adhoc_task($task, true)` now returns the existing task id for a duplicate (was `false`); don't test truthiness for "newly queued" ([MDL-86422](https://tracker.moodle.org/browse/MDL-86422)).
-- `adhoc_task::set_soft_retry_delay()` reschedules without counting a failure (also 5.2.2+) ([MDL-79763](https://tracker.moodle.org/browse/MDL-79763)); block uninstall deletes instances in an ad-hoc task ([MDL-89289](https://tracker.moodle.org/browse/MDL-89289)).
-- Full 5.3 catalogue: `moodle-5-3-changes`.
+| Moodle | File |
+|---|---|
+| 5.3 | [versions/moodle-5.3.md](../moodle-skill-files/moodle-performance/versions/moodle-5.3.md) |
 
 ## References
 
-- MUC: https://moodledev.io/docs/apis/subsystems/muc
-- Tasks API: https://moodledev.io/docs/apis/core/task
-- Performance recommendations: https://docs.moodle.org/en/Performance_recommendations
-- DB API recordsets: https://moodledev.io/docs/apis/core/dml#get_recordset
-- Profiling: https://moodledev.io/general/development/tools/profiling
-- See also: `moodle-field-lessons` (generalized field lessons for this area)
+- Caching (MUC): https://moodledev.io/docs/apis/subsystems/muc
+- Task API: https://moodledev.io/docs/apis/subsystems/task (ad-hoc: `/adhoc`, scheduled: `/scheduled`)
+- Lock API: https://moodledev.io/docs/apis/core/lock
+- Data manipulation API (recordsets): https://moodledev.io/docs/apis/core/dml
+- Profiling: https://moodledev.io/docs/guides/profiling
+- Related skills: `moodle-web-services` (`readonlysession`), `moodle-upgrade-migration`, `moodle-field-lessons`,
+  `moodle-release-preflight` (Plugins directory review checks), `moodle-phpunit-testing`

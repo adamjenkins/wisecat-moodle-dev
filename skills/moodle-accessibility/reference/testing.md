@@ -37,7 +37,7 @@ since best-practice failures in core markup are not yours to fix.
 
 ## Colour modes in Behat (5.3+)
 
-- `php admin/tool/behat/cli/init.php --colourmode=dark` (also `util.php --enable`) turns colour modes on and sets
+- `php public/admin/tool/behat/cli/init.php --colourmode=dark` (also `util.php --enable`) turns colour modes on and sets
   dark for every scenario of that run. A user preference still wins over it.
 - Do not pin a mode in accessibility scenarios: run the suite once as installed (light, since colour modes start off)
   and once initialised with `--colourmode=dark`, both in CI.

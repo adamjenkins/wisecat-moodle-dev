@@ -50,7 +50,8 @@ branch you target and copy its file set.
 ```
 
 - `subplugintypes` values are relative to the parent's directory. The older `plugintypes` key (paths relative to
-  the Moodle root) is still read as a fallback but logs "Falling back to deprecated plugintypes value" on 5.3.0;
+  the Moodle root) is read only when `subplugintypes` is absent, and then logs "Falling back to deprecated
+  plugintypes value" (5.2 and 5.3);
   core's `public/mod/assign/db/subplugins.json` carries both keys, which is the safe form for a plugin that
   also supports branches before 5.1.
 - The install directory comes from that file (here `public/mod/example/tool/<name>`), not from the type name

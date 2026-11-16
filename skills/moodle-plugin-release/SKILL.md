@@ -1,6 +1,6 @@
 ---
 name: moodle-plugin-release
-description: Use when releasing a Moodle plugin or theme, or submitting it to the Moodle Plugins directory (Marketplace): bumping $plugin->version vs $plugin->release, CHANGES.md and changelog entries, the LICENSE file and ZIP root folder a reviewer checks, building and listing the ZIP before upload (rootdirinvalid, "Missing plugin license file", "Use the plugin folder name as the root folder of the ZIP"), staging and tagging an annotated vX.Y.Z, pushing the branch before the tag, the moodle-release.yml workflow, answering a reviewer's issue, and confirming the version landed. Skip when only bumping version for a schema change (the /moodle-bump-version command) or doing pre-release QA (moodle-definition-of-done, moodle-release-preflight).
+description: Use when releasing a Moodle plugin or theme, or submitting it to the Moodle Plugins directory (Marketplace): bumping $plugin->version vs $plugin->release, CHANGES.md and changelog entries, the LICENSE file and ZIP root folder a reviewer checks, building and listing the ZIP before upload (rootdirinvalid, "Missing plugin license file", "Use the plugin folder name as the root folder of the ZIP"), staging and tagging an annotated vX.Y.Z, pushing the branch before the tag, the moodle-release.yml workflow, replying to a Plugins directory reviewer's issue, and confirming the version landed. Skip when only bumping version for a schema change (the /moodle-bump-version command) finishing the change itself (moodle-definition-of-done), or auditing the code for what reviewers catch (moodle-release-preflight).
 ---
 
 # Moodle Plugin Release
@@ -19,7 +19,8 @@ is read back, not assumed.
 - A release has been decided on and the version bump approved
 - A first submission to the Moodle Plugins directory, or a resubmission after review
 - Setting up tag-triggered publishing, or checking whether a pushed tag actually arrived
-- A Plugins directory reviewer opened an issue on the repository
+- A Plugins directory reviewer opened an issue and you are writing the reply (the code fix itself is
+  `moodle-release-preflight`)
 - **Skip when:** the change only needs a `$plugin->version` bump for a schema change (`/moodle-bump-version`),
   or QA is still open (walk `moodle-definition-of-done`, and `moodle-release-preflight` for the security and
   approval-blocker classes, first). Theme-specific release checks are in `moodle-theme-testing-release`.
@@ -63,17 +64,24 @@ $plugin->maturity  = MATURITY_STABLE;
 - `supported` must be a two-integer range, low first. `[502]` throws `coding_exception` "Incorrect syntax in
   plugin supported declaration" when the plugin is loaded; write `[502, 502]` for one branch
   (`\core\plugininfo\base::load_disk_version()`, `public/lib/classes/plugininfo/base.php`, 5.2 and 5.3.0).
-- `requires` is not below the lowest branch in `supported`. 5.3.0 is build `2026100500`
-  (`public/version.php`, 5.3.0). 5.2.0 is `2026042000`: the 5.2 branching date plus release increment `00`,
-  the scheme the comments in `public/version.php` describe (read in the 5.2.2+ tree, whose own value is
-  `2026042002.01`; the 5.2.0 tag itself was not opened).
-- The Plugins directory reads the release name, maturity and supported versions from the uploaded ZIP; they
-  can be overridden per version but default to what `version.php` says
-  (https://moodledev.io/general/community/plugincontribution/pluginsdirectory/api).
+- `requires` is not below the lowest branch in `supported`, or the plugin claims a branch it refuses to
+  install on. 5.2.0 is build `2026042000` and 5.3.0 is `2026100500` (`$version` in `public/version.php` at the
+  `v5.2.0` and `v5.3.0` tags). Use the `x.y.0` build, not the value of the tree you develop on: a 5.2.2 tree
+  says `2026042002.01`, which locks out 5.2.0 and 5.2.1 sites.
+- The directory reads the release name, maturity and supported versions from the uploaded ZIP; they can be
+  overridden per version but default to what `version.php` says
+  (https://moodledev.io/general/community/plugincontribution/pluginsdirectory/api, which documents the older
+  moodle.org web service).
 
 ## 2. Release notes and docs: one consistent story
 
-- `CHANGES.md` (if the plugin uses it): this version's notes only, replacing the previous body.
+- `CHANGES.md` (if the plugin uses it): this version's notes only, replacing the previous body. The release
+  workflow of section 6 submits the whole file as the version's release notes: it takes, in order, its
+  `release_notes` input, the body of the GitHub Release for the tag, then the first of `CHANGES.md`,
+  `CHANGES.txt`, `CHANGES.html`, `CHANGES`, `CHANGELOG.md` (and the same variants) or `UPGRADING.md` in the
+  repository root (`moodlehq/moodle-plugin-release`, workflow revision 2026091801, read, not run). When neither
+  the input nor a GitHub Release supplies the notes, a cumulative changelog with no `CHANGES.md` beside it is
+  published in full on every version.
 - `changelog.md` / `CHANGELOG.md`: prepend `## [x.y.z] - YYYY-MM-DD` with `### Added / Changed / Fixed /
   Security` (Keep a Changelog). Keep the file name the repository already uses.
 - `README.md`: supported Moodle versions match `$plugin->supported`; requirements, settings and
@@ -111,8 +119,9 @@ see them. Build the ZIP, list it, and fix the repository before tagging.
   `moodle-local_myplugin-1.4.2/`. Core's validator requires a single root directory whose name survives
   `clean_param(..., PARAM_PLUGIN)` ("rootdirinvalid" otherwise) and equals the name part of
   `$plugin->component` ("componentmismatchname") (`\core\update\validator::validate_files_layout()` and
-  `validate_version_php()`, `public/lib/classes/update/validator.php`, 5.3.0, identical in 5.2). Core's own help string names GitHub archives as the usual cause
-  (`public/lang/en/plugin.php`, `validationmsg_rootdirinvalid_help`). The admin upload page can rename the
+  `validate_version_php()`, `public/lib/classes/update/validator.php`, 5.3.0, identical in 5.2). Core's own
+  help string names GitHub archives as the usual cause (`public/lang/en/plugin.php`,
+  `validationmsg_rootdirinvalid_help`). The admin upload page can rename the
   root while extracting when it detects the component from `version.php`, so a wrong root sometimes installs
   through the UI; it still fails for an admin who unzips into `local/` by hand, and reviewers flag it every
   time.
@@ -210,9 +219,17 @@ jobs:
 
 - The plugin must already be approved in the directory. **The first submission is always a hand-built ZIP**
   (section 3), because the workflow can only add versions to an existing plugin.
-- The token comes from the moodle.org "Plugins > API access" page and is stored as a repository secret. Never
-  put a token in a URL or an echoed argument in a workflow; mask a computed secret with
-  `echo "::add-mask::$value"` before using it.
+- **The workflow builds the same ZIP as section 3.** It checks out the tag, reads `$plugin->component` from
+  `version.php`, and runs `git archive --format=zip --prefix="<name>/" HEAD` with the type prefix removed
+  (workflow revision 2026091801, read, not run). So `.gitattributes` `export-ignore` lines and uncommitted
+  files affect the published ZIP exactly as they affect a hand-built one, and a wrong `component` line stops
+  the run.
+- The token is created on the Moodle Marketplace under "Account Settings > Security"
+  (https://marketplace.moodle.com/account/security), shown once, and stored as the repository secret
+  `MOODLE_MARKETPLACE_TOKEN` (the workflow's README). The moodledev.io Plugins directory API page still
+  describes the older moodle.org "Plugins > API access" token, which this workflow does not use. Never put a
+  token in a URL or an echoed argument in a workflow; mask a computed secret with `echo "::add-mask::$value"`
+  before using it.
 - A red run usually means a missing or expired token secret. Fix the secret, then re-run with
   `workflow_dispatch` and the tag; do not re-tag.
 - The tag-push run uses the workflow file in the tagged tree. If that file was broken, fix it on the default
@@ -232,6 +249,15 @@ not a "no".
   import json, sys
   p = [x for x in json.load(sys.stdin)["plugins"] if x["component"] == "local_myplugin"][0]
   print(sorted((v["version"], v["release"]) for v in p["versions"])[-3:])'
+  ```
+
+  The endpoint a site itself asks when it installs or updates the plugin is `pluginfo.php`, which answers 404
+  for a version it does not know (`\core\update\api::get_plugin_info()` and `call_pluginfo_service()`,
+  `public/lib/classes/update/api.php`, 5.2 and 5.3.0; read, not run for this skill):
+
+  ```bash
+  curl -s -o /dev/null -w '%{http_code}\n' \
+    'https://download.moodle.org/api/1.3/pluginfo.php?plugin=local_myplugin@2026111600&format=json'   # 200
   ```
 
 - **Packagist** (if the plugin has `composer.json`): the newest version Composer clients will see. Until this
@@ -313,7 +339,8 @@ Reviewers file each finding as an issue on the plugin's tracker, with a priority
 
 - Version file: https://moodledev.io/docs/apis/commonfiles/version.php
 - Third-party libraries: https://moodledev.io/docs/apis/commonfiles/thirdpartylibs.xml
-- Plugins directory API and GitHub Actions: https://moodledev.io/general/community/plugincontribution/pluginsdirectory/api
+- Plugins directory web service (the older moodle.org API): https://moodledev.io/general/community/plugincontribution/pluginsdirectory/api
+- Marketplace API, as linked from the release workflow's README: https://moodledev.io/general/community/plugincontribution/moodlemarketplaceapi
 - Release workflow: https://github.com/moodlehq/moodle-plugin-release
 - Moodle Marketplace plugin submission guidelines: https://moodle.atlassian.net/wiki/external/ODRhYjAyNTY4NDVmNGJlNjljN2ViMzkwYzdmYmIwMGI
 - moodle-plugin-ci: https://moodlehq.github.io/moodle-plugin-ci/

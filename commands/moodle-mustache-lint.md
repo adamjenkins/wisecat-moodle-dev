@@ -1,6 +1,6 @@
 ---
 name: moodle-mustache-lint
-description: Lint Mustache templates for accessibility, security, hard-coded strings, and Moodle template conventions.
+description: Lint Mustache templates for accessibility, security, hard-coded strings, Moodle template conventions and, in a theme, template overrides.
 argument-hint: "[path] — file or directory; defaults to ./templates"
 ---
 
@@ -10,8 +10,11 @@ User's input: $ARGUMENTS
 
 ## Procedure
 
-1. Resolve target path. If `$ARGUMENTS` empty, glob `**/templates/**/*.mustache` under cwd.
-2. Activate `moodle-accessibility` and `moodle-theme-development` skills for rule context.
+1. Resolve target path. If `$ARGUMENTS` empty, glob `**/templates/**/*.mustache` under cwd. Skip
+   `*.mustache.upstream` files: they are untouched copies kept for comparison, not templates.
+2. Activate the `moodle-accessibility` skill for the markup rules. If the templates belong to a theme (the
+   component in the plugin's `version.php` starts with `theme_`), also activate `moodle-theme-layouts-templates`
+   and run the "Theme template overrides" checks below.
 3. For every `.mustache` file, check:
 
 ### Security
@@ -33,7 +36,8 @@ User's input: $ARGUMENTS
 - Aria labels likewise must use `{{#str}}`.
 
 ### Moodle conventions
-- Template starts with a Mustache comment block documenting context variables:
+- Template starts with a Mustache comment block documenting context variables and giving an example context.
+  `moodle-plugin-ci mustache` fails a template without `@template` or without `Example context (json):`.
   ```mustache
   {{!
       @template component/templatename
@@ -42,11 +46,57 @@ User's input: $ARGUMENTS
 
       Context variables required for this template:
       * variable - description
+
+      Example context (json):
+      { "variable": "value" }
   }}
   ```
+- Inside any `{{! }}` comment, `}}` ends the comment and the rest prints on the page. In example JSON with
+  nested objects write the closing braces apart (`} }`).
 - Use `{{#pix}}` for icons, not raw `<i class="fa-...">`.
 - Use `{{#js}}` for JS init, not inline `<script>`.
 - Use `core/modal` markup, not bootstrap-direct `<div class="modal">`.
+- Bootstrap 4 class names and attributes (`sr-only`, `ml-2`, `float-right`, `font-weight-bold`, `badge-primary`,
+  `data-toggle`) work only through Boost's compatibility layer. Report each with its Bootstrap 5 name
+  (`visually-hidden`, `ms-2`, `float-end`, `fw-bold`, `text-bg-primary`, `data-bs-toggle`).
+- A context variable named `uniqid` (browser renders overwrite it), and the `hidden` attribute on an element
+  that also has a `d-*` display class (the class wins).
+
+### Theme template overrides
+
+Only for a theme. The rules and their reasons are in `moodle-theme-layouts-templates`; this list says what to
+look for. On Moodle 5.2 and 5.3 core's templates are under `public/` in the Moodle root: `public/lib/templates/`
+for `core`, `public/<plugin directory>/templates/` for a plugin, `public/theme/boost/templates/` for Boost.
+
+- **Path.** An override is `templates/<component>/<name>.mustache`, with the component in frankenstyle (`core`,
+  `core_course`, `mod_forum`, `theme_boost`) and subdirectories following the template name. A file directly in
+  `templates/` is the theme's own template `theme_<name>/<file>`, so `templates/drawers.mustache` or
+  `templates/navbar.mustache` does not replace Boost's. Report a first-level directory that is neither a
+  component nor used by the theme's own template names.
+- **The original exists.** With a Moodle root available, check that the template being overridden exists in
+  that version. An override of a template core does not have is a dead file. Say which Moodle version was
+  compared; without a Moodle root, list this under "Not checked".
+- **Copied from the right place.** Boost overrides some core templates itself
+  (`public/theme/boost/templates/core/`). A Boost child that copied the same template from
+  `public/lib/templates/` loses Boost's changes.
+- **The `!` include.** `{{> component/name! }}` includes the component's original and skips every theme
+  override (Moodle 5.2 and later). An override that includes its own name without the `!` includes itself:
+  report it as an error. An override that only adds markup around the original should use the `!` form instead
+  of a copy.
+- **Blocks.** A `{{$name}}` block filled inside `{{< parent }}` must be one the parent defines; an unknown block
+  name is ignored without a warning. Compare with the parent template when it is available.
+- **The docblock is kept**, also in a file copied unchanged from core, and a copied file keeps the original
+  `@copyright` line.
+- **A template copied from Boost in a theme that supports 5.2 and 5.3.** `{{> core/primarymoremenu}}` and
+  `{{> core/secondarymoremenu}}` exist on 5.3 only, so they must sit inside the `reactprops` switch; a copied
+  `drawers.mustache` fills both the `drawerheadercontent` and the `drawercontrols` block.
+- **Parts a template cannot change.** **5.3+:** primary navigation, secondary navigation and the edit mode switch
+  are React components mounted from `core/primarymoremenu`, `core/secondarymoremenu` and `core/editswitch`. An
+  override of those three changes only the wrapper, the classes and the no-JavaScript fallback; the items
+  inside are not template markup. Boost's 5.3 templates no longer include `core/moremenu` for navigation
+  (`public/theme/boost/templates/navbar.mustache`, `drawers.mustache`, `columns2.mustache`, 5.3.0), so an
+  override of it does not reach them. The Timeline block has no templates on 5.3: files under
+  `templates/block_timeline/` are dead. Report each as "no effect on 5.3" when the theme supports 5.3.
 
 ### Output
 Produce a markdown report:
@@ -67,6 +117,14 @@ Produce a markdown report:
 ## Info
 - templates/foo.mustache — missing {{! @template ... }} header
 
+## Theme overrides (themes only)
+- templates/drawers.mustache:1 — does not override Boost's template: this name is theme_<name>/drawers — move to templates/theme_boost/drawers.mustache
+- templates/block_timeline/main.mustache:1 — no effect on 5.3: the block has no templates there
+
+## Not checked
+- Whether each overridden template exists in core (no Moodle source available)
+- The rendered page: a read of the files does not show that an override is used
+
 ## Suggested next steps
 1. ...
 ```
@@ -77,3 +135,5 @@ Produce a markdown report:
 - Be specific: `file:line` references.
 - If the file is non-existent or empty, say so and stop.
 - Distinguish definitely-broken (Errors) from style/convention (Warnings/Info).
+- This is a read of the files. The Mustache lint of `moodle-plugin-ci`, which also validates the rendered HTML,
+  was not run unless its output is in the report.

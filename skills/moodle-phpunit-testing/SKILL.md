@@ -1,6 +1,6 @@
 ---
 name: moodle-phpunit-testing
-description: Use when writing, running or debugging PHPUnit tests for a Moodle plugin or core - tests/*_test.php, advanced_testcase, resetAfterTest, data generators (tests/generator/lib.php), admin/tool/phpunit/cli/init.php and util.php, vendor/bin/phpunit --testsuite, "No tests executed!", "Unexpected debugging() call detected", "unexpected database modification", tests that pass on MySQL or MariaDB and fail on PostgreSQL, preventResetByRollback, redirectEvents/redirectMessages/redirectEmails, external functions with clean_returnvalue, route_testcase, privacy provider tests, mock_clock_with_frozen and get_mocked_http_client. Covers the test framework's mental model, the default test recipe, invocation traps, fixture and database traps from shipped plugins, and pointers to generators, special test cases and PostgreSQL isolation. Skip when writing Behat acceptance tests (moodle-behat-testing) or building a CI workflow (moodle-ci-matrix).
+description: Use when writing, running or debugging PHPUnit tests for a Moodle plugin or core - tests/*_test.php, advanced_testcase, resetAfterTest, data generators (tests/generator/lib.php), public/admin/tool/phpunit/cli/init.php and util.php, vendor/bin/phpunit --testsuite, "No tests executed!", "Unexpected debugging() call detected", "unexpected database modification", tests that pass on MySQL or MariaDB and fail on PostgreSQL, preventResetByRollback, redirectEvents/redirectMessages/redirectEmails, external functions with clean_returnvalue, route_testcase, privacy provider tests, mock_clock_with_frozen and get_mocked_http_client. Covers the test framework's mental model, the default test recipe, invocation traps, fixture and database traps from shipped plugins, and pointers to generators, special test cases and PostgreSQL isolation. Skip when writing Behat acceptance tests (moodle-behat-testing) or building a CI workflow (moodle-ci-matrix).
 ---
 
 # Moodle PHPUnit testing
@@ -233,8 +233,8 @@ Each was seen in practice on shipped plugins.
   objects, not arrays (`action_link` exports `$x->attributes`). Fix: open the method's `return` statement.
   Since 5.2.2, `block_myoverview` returns fields such as the course full name with numeric entities (`&#60;`) and
   unencoded quotes where earlier builds returned named ones (`&lt;`) (MDL-79755, `UPGRADING.md` of 5.2.2 and
-  5.3.0); compare decoded text,
-  `html_entity_decode($value, ENT_QUOTES | ENT_HTML5)`, when a test must pass on 5.2.0 to 5.2.1 as well.
+  5.3.0). Symptom: an exact-string assertion on such a field passes on 5.2.0 and 5.2.1 and fails from 5.2.2.
+  Fix: compare decoded text, `html_entity_decode($value, ENT_QUOTES | ENT_HTML5)`.
 - **`isset($PAGE->cm)` is always false and `empty($PAGE->cm)` always true.** `moodle_page` has `__get()` but no
   `__isset()` (`public/lib/pagelib.php`, 5.2 and 5.3), so a guard written that way skips the branch in tests and on
   the site. Fix: read it first, `$cm = $PAGE->cm; if ($cm) { ... }`.

@@ -144,9 +144,10 @@ $this->print_action_bar('myreport', null, $cm, $reporturl);
 
 - If the report calls `print_standard_header_and_messages()` but does not implement `setup_report_data()`, pass
   `null` as its fourth argument (`$options`), or the AJAX user search fails.
-- Full adoption: override `setup_report_data(stdClass $quiz, cm_info $cm, stdClass $course, ?context $context =
-  null): array` returning `[$options, $table, $allowedjoins]` (the new `mod_quiz_get_users_in_report` web service
-  calls it), and move a custom capability check from `display()` into `has_permission(context $context): void`,
+- Full adoption: override `setup_report_data(stdClass $quiz, cm_info $cm, stdClass $course, ?context $context):
+  array` (the signature in `report_base`; core's overview report adds `= null` to the last parameter) returning
+  `[$options, $table, $allowedjoins]` (the new `mod_quiz_get_users_in_report` web service calls it), and move a
+  custom capability check from `display()` into `has_permission(context $context): void`,
   which the web service also calls. Core examples: `quiz_statistics_report` (minimal), `quiz_overview_report` and
   `quiz_responses_report` (full), `quiz_grading_report` (`has_permission()`). MDL-81096.
 

@@ -1,7 +1,7 @@
 # Plugins directory review checks
 
 Read this when the plugin is about to be submitted to the Moodle Plugins directory (a first submission or a new
-version), or when a reviewer has opened an issue on it and you are answering.
+version), or when a reviewer has opened an issue on it and you are fixing what it reports.
 
 Each section is one kind of finding that Plugins directory reviewers raised on real submissions, none of which
 `moodle-plugin-ci` caught. Each gives what is flagged, a command that detects it, the fix, and what answer was
@@ -23,7 +23,8 @@ Flagged: a string that the plugin's code or core asks for is not in `lang/en/<co
 reports it as a missing required string with the key and component.
 
 Why CI misses it: `moodle-plugin-ci validate` asks only for `pluginname` (for a filter, only `filtername`; for an
-activity, `modulename` or `pluginname`). Strings that core builds from a convention are not checked at all.
+activity, `modulename` or `pluginname`, plus `<name>:addinstance`; read in the moodle-plugin-ci 4.5 source).
+Strings that core builds from a convention are not checked at all.
 
 Keys core asks for by convention (read in the 5.3.0 source):
 
@@ -182,10 +183,9 @@ reuse what core already loaded (`$this->localconfig` in a filter). Caching recip
 
 ## Answering a review
 
-- Reply on the issue the reviewer opened. Say what changed, in which commit and release, and what you found when
-  you looked for the same mistake elsewhere in the plugin.
+How to reply on the reviewer's issue (naming the fixing release, a reasoned no, checking a suggested fix before
+applying it) is in `moodle-plugin-release`. For the code side, two things from the sections above:
+
+- Look for the same mistake elsewhere in the plugin before answering; reviewers report one instance.
 - A precise reason for not making a suggested change is an acceptable answer (seen accepted for `PARAM_RAW`
-  kept with a stated reason, and for data deliberately left out of backup).
-- Check the suggested fix before applying it (see section 5).
-- Documentation links in reviews often point at an older versioned page (`moodledev.io/docs/4.5/...`). Read the
-  page for the branches the plugin supports.
+  kept with a stated reason, section 5, and for data deliberately left out of backup, section 7).

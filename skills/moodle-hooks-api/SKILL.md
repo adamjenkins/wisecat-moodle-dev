@@ -112,8 +112,10 @@ hook class (or the older `deprecated_callback_replacement` interface). Two behav
 `public/lib/moodlelib.php` (`get_plugins_with_function()`, `component_callback()`), 5.2 and 5.3.0:
 
 - A plugin that still has only the old function gets it called, plus the developer debugging "Callback
-  before_footer in local_example component should be migrated to new hook callback for ...". Under
-  `moodle-plugin-ci phpunit --fail-on-warning` or Behat this debugging fails the run.
+  before_footer in local_example component should be migrated to new hook callback for ...". Behat fails the step
+  that reaches it. PHPUnit prints "Unexpected debugging() call detected" as a notice and the run still passes
+  (core's `phpunit.xml.dist` fails on warnings and deprecations, not on notices; read in 5.2 and 5.3.0, not run), so
+  read the output of a green run (`moodle-phpunit-testing`).
 - A plugin that has both the old function and a `db/hooks.php` entry for the replacing hook gets only the hook
   called. So keeping the old function costs nothing while you still support a branch without the hook.
 
@@ -328,7 +330,7 @@ Cover both branches: the callback acts, and the callback returns early (guest, w
 | Removing the legacy function while a supported branch lacks the hook | That branch loses the feature | Keep both; core skips the old one when the hook is registered |
 | Throwing from `after_config` to deny access | Browser gets 500 or 404 | Send 403, print a minimal page, `exit` |
 | `php admin/cli/hooks_list.php` | No such script | Site administration > Development > Hooks overview (`/admin/hooks.php`) |
-| Treating the "should be migrated" debugging as noise | `--fail-on-warning` CI and Behat fail | Register the hook |
+| Treating the "should be migrated" debugging as noise | Behat steps fail on it; PHPUnit shows it only as a notice in a passing run | Register the hook |
 
 ## Reference files
 
@@ -340,7 +342,7 @@ Cover both branches: the callback acts, and the callback returns early (guest, w
 
 | Moodle | File |
 |---|---|
-| 5.3 | [versions/moodle-5.3.md](versions/moodle-5.3.md): hooks added in 5.3 (email, import map, RequireJS, Composer DI) and the `extend_user_menu` change |
+| 5.3 | [versions/moodle-5.3.md](versions/moodle-5.3.md): hooks added in 5.3 (email, import map, RequireJS map) and the `extend_user_menu` change |
 
 ## References
 

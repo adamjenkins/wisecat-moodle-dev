@@ -1,6 +1,6 @@
 ---
 name: moodle-definition-of-done
-description: Use when about to report a Moodle plugin or theme task complete, open a pull request, or hand work over for review. A definition-of-done checklist covering the moodle-plugin-ci gates (phplint, phpcs, phpdoc/moodlecheck, validate, savepoints, mustache, grunt with eslint, stylelint and gherkinlint), reading gate output instead of piping it through tail, PHPUnit and Behat counts, install.xml and upgrade path, course lifecycle (backup, restore, reset, uninstall and user preferences), privacy provider coverage, lang strings, renames, installing on a real site with upgrade and cache purge, browser checks in Firefox and Chromium as each role, CSS evidence, and proving each check can fail. Skip when exploring or prototyping with no intent to ship (and for the release itself use moodle-plugin-release).
+description: Use when about to report a Moodle plugin or theme task complete, open a pull request, or hand work over for review. A definition-of-done checklist covering the moodle-plugin-ci gates (phplint, phpcs, phpdoc/moodlecheck, validate, savepoints, mustache, grunt with eslint, stylelint and gherkinlint), reading gate output instead of piping it through tail, PHPUnit and Behat counts, install.xml and upgrade path, course lifecycle (backup, restore, reset, uninstall and user preferences), privacy provider coverage, lang strings, renames, installing on a real site with upgrade and cache purge, browser checks in Firefox and Chromium as each role, CSS evidence, and proving each check can fail. Skip when exploring or prototyping with no intent to ship, when the next step is a tag or a Plugins directory submission (moodle-release-preflight, then moodle-plugin-release), or for theme-only checks such as SCSS compile, dark mode and RTL (moodle-theme-testing-release).
 ---
 
 # Moodle Definition of Done
@@ -70,10 +70,9 @@ done
 - **Never trust `grunt ... --force`**: it downgrades every later failure to a warning and prints "Done, but
   with warnings". `grunt amd --force` builds and lints nothing. After a build, check that `amd/build` is newer
   than `amd/src`.
-- Gherkinlint uses core's `.gherkin-lintrc` (5.2 and 5.3.0): indentation in steps of two spaces (Feature 0,
-  Scenario 2, Step 4), no trailing spaces, no multiple empty lines, a newline at end of file, no unnamed
-  scenarios. A blank line after the last step fails as "Multiple empty lines are not allowed" (seen in practice;
-  the rule's source in gherkin-lint 4.2.2 agrees). The full shape is owned by `moodle-behat-testing`.
+- Gherkinlint uses core's `.gherkin-lintrc` (5.2 and 5.3.0). The usual failures are indentation, trailing
+  spaces and a blank line after the last step ("Multiple empty lines are not allowed"). The shape it enforces
+  is owned by `moodle-behat-testing`.
 - The full gate list, docblock rules moodlecheck enforces, and the standalone-tool traps are in
   [reference/ci-gates.md](reference/ci-gates.md).
 
@@ -115,11 +114,10 @@ done
 - Run Behat with `--scss-deprecations`, as the CI template does (`moodle-behat-testing`).
 - Every "I should see" for one mode of a form or page has an "I should not see" for the other modes' fields
   (`moodle-behat-testing`).
-- **PHPUnit green is not production.** A PHPUnit process has already loaded libraries a web request has not
-  (`course/lib.php` through the data generator, `lib/filelib.php` through the file storage). Code calling a
-  free function from them (`create_course()`, `fulldelete()`) without the matching `require_once` passes tests
-  and dies in the browser with "Call to undefined function". Routed POST bodies, hook dispatch, draft file areas and browser widgets (file picker,
-  editor, date selector) need one real request each.
+- **PHPUnit green is not production.** A PHPUnit process has already loaded libraries a web request has not,
+  so a missing `require_once` passes tests and dies in the browser with "Call to undefined function"
+  (`moodle-phpunit-testing` has the list). Routed POST bodies, hook dispatch, draft file areas and browser
+  widgets (file picker, editor, date selector) need one real request each.
 - **Renames and re-scopes reach past the class.** After renaming or splitting a state key, or turning a
   constant into a setting, grep the old key or literal in `tests/` (helpers that write `$SESSION` or config
   directly) and in `amd/src` (a hard-coded limit), then drive the browser down the changed path, not just to
@@ -134,8 +132,9 @@ done
   `moodle-plugin-ci install`, and check the output for `XMLDB has detected` and `Debugging:`. XMLDB reports a
   CHAR NOT NULL column with an empty-string default, or a TEXT column with a default, through `debugging()`
   on install (`xmldb_field::setDefault()`, `public/lib/xmldb/xmldb_field.php`, 5.2 and 5.3.0); the PHPUnit and
-  Behat init output has been seen not to show it (seen in practice, cause not traced in the source). While writing a table, `grep -n 'DEFAULT=""' db/install.xml` must print nothing: an
-  optional CHAR is `NOTNULL="false"` with no default.
+  Behat init output has been seen not to show it (seen in practice, cause not traced in the source). While
+  writing a table, `grep -n 'DEFAULT=""' db/install.xml` must print nothing: an optional CHAR is
+  `NOTNULL="false"` with no default.
 - Test both paths: a fresh install and an upgrade from the previous release, on a site that has rows in the
   changed tables. Both must give the same schema.
 - `moodle-plugin-ci savepoints` passes.
@@ -173,8 +172,8 @@ If the plugin stores course- or activity-linked data, check each of these, or st
   listed as unsupported or its option never appears, and grades stay stale.
 - **Uninstall**: core's `uninstall_plugin()` deletes the plugin's tables, config, capabilities, calendar
   events, tasks, web service functions, message providers and files, but not its user preferences
-  (`public/lib/adminlib.php`, `uninstall_plugin()`, 5.2 and 5.3.0). Add `db/uninstall.php` when the plugin stores preferences or writes outside its own tables (grade
-  items, config of other components):
+  (`public/lib/adminlib.php`, `uninstall_plugin()`, 5.2 and 5.3.0). Add `db/uninstall.php` when the plugin
+  stores preferences or writes outside its own tables (grade items, config of other components):
 
   ```php
   function xmldb_local_myplugin_uninstall() {
@@ -214,9 +213,8 @@ Green tests are not the finish line. Install the change on a running Moodle and 
   `php admin/cli/upgrade.php --non-interactive` and `php admin/cli/purge_caches.php` from the Moodle root (the
   CLI scripts sit beside `public/`, not inside it, in 5.2 and 5.3.0), and make the files readable by the web
   server user. Skipping the purge is the usual failure: core caches the class map in
-  `$CFG->cachedir/core_component.php` (`core_component::init()`, `public/lib/classes/component.php`, 5.3.0), so
-  a new class file
-  gives a fatal "class not found" on the site while PHPUnit is green.
+  `$CFG->cachedir/core_component.php` (`core_component::init()`, `public/lib/classes/component.php`, 5.2 and
+  5.3.0), so a new class file gives a fatal "class not found" on the site while PHPUnit is green.
 - Read the stored record, the rendered notice, or what the screenshot actually shows, not the fact that the
   command returned. Look at every screenshot you save.
 - Check every page you changed **in Firefox and in Chromium**. Engine differences (secure-context-only APIs,

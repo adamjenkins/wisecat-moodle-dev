@@ -24,8 +24,8 @@ Samples are valid on Moodle 5.2 and 5.3; source lines were read in 5.3.0 unless 
   `lock` and `hide` together), so hidden fields are not posted at all. Code or a test that builds the POST by hand
   must match what one real browser POST contains, not what `definition()` declares.
 - **`sesskey` and `_qf__<formname>` are added after `definition()`**, under the last header
-  (`public/lib/formslib.php:219-226`). Code that removes the last section of a form (a plugin decorating a core
-  form) must keep those hidden fields, or every submit fails the sesskey check.
+  (`public/lib/formslib.php`, the `moodleform` constructor, 5.2 and 5.3). Code that removes the last section of a
+  form (a plugin decorating a core form) must keep those hidden fields, or every submit fails the sesskey check.
 - **Checkboxes outside a moodleform** need `form="<formid>"` on each input to be submitted with it.
 
 ## validation(), files and draft areas

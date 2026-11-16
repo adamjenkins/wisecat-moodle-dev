@@ -2,7 +2,9 @@ You will perform a Moodle-specific security review.
 
 User's input: {{{ input }}}
 
-Activate the `moodle-security-audit` skill for context.
+Activate the `moodle-security-audit` skill for context: it holds the rule, the reason and the fix behind each
+line below. For a review before a release or a Plugins directory submission, also walk the defect classes of the
+`moodle-release-preflight` skill, which this checklist does not repeat.
 
 If `{{{ input }}}` is empty, ask for a file or plugin path.
 
@@ -19,7 +21,9 @@ Severities: `CRITICAL` (exploitable now), `HIGH` (privilege escalation / data le
 
 For every entry script (file with `require('config.php')` or similar):
 1. `require_login()` present and called early
-2. `require_capability()` against the **object's** context (not arbitrary system context)
+2. `require_capability()` against the **object's** context (not arbitrary system context), derived from the id in
+   the URL; every other id the request submits is re-checked against that object. `require_login()` alone is not
+   authorisation
 3. `require_sesskey()` on every state-changing request (POST or mutating GET)
 4. All input via `required_param`/`optional_param` with appropriate `PARAM_*` type — flag any `$_GET`/`$_POST`/`$_REQUEST` usage
 
@@ -32,28 +36,38 @@ For every DB call:
 For every output:
 9. User text rendered via `s()`, `format_string()`, `format_text()` — flag direct `echo $var`
 10. `format_string`/`format_text` is called with a `context`
-11. Mustache `{{{var}}}` raw output is justified (text already passed through `format_text`)
+11. Mustache `{{{var}}}` raw output is justified (text already passed through `format_text`). The other sinks that
+    print HTML get escaped values too: `html_writer` tag content, formslib labels and option texts, modal titles,
+    notifications, `redirect()` messages, `innerHTML` in `amd/src`. Trace what feeds a sink before reporting it
 
 For file APIs:
 12. `pluginfile.php` callback re-checks capability inside callback
-13. Files are served via `\file_storage` + `send_stored_file`, never raw `$CFG->dataroot`
+13. Files are served via `\file_storage` + `send_stored_file`, never raw `$CFG->dataroot`; user uploads are
+    force-downloaded unless the media type was validated
 14. Uploads use `file_save_draft_area_files` with `maxfiles`, `maxbytes`, `accepted_types`
 
 For HTTP / external:
 15. Uses `\curl` wrapper, not raw `curl_exec()` / `file_get_contents($url)`
-16. Open redirects: `redirect($next)` with `$next` from user input is validated against site host
+16. Open redirects: a redirect target from user input is read with `PARAM_LOCALURL`, not `PARAM_URL` or the
+    `Referer` header
 
 For secrets:
 17. No tokens / API keys committed in source — use `set_config`/`get_config`
 
 For dangerous PHP:
-18. No `eval()`, `create_function()`, `unserialize()` on user input
+18. No `eval()`, and no `unserialize()` on user input or restored data without `['allowed_classes' => false]`
 19. `print_error` is replaced with `throw new \moodle_exception()`
 
 For sessions:
 20. `\core\session\manager::write_close()` called early on AJAX endpoints that don't write session
 
+For web services (`classes/external/`):
+21. `execute()` calls `validate_parameters()`, then `validate_context()`, then `require_capability()`. The
+    `capabilities` key in `db/services.php` enforces nothing (`moodle-web-services`)
+
 After audit:
 - Print summary: `N CRITICAL, N HIGH, N MEDIUM, N LOW`
+- Say what was checked and how: this is a read of the code, nothing was run, and a line reported as clean names
+  the grep or the files that were read
 - Offer to apply fixes one-by-one or as a single patch (ask before writing)
 - For unresolved CRITICAL findings, recommend not deploying until fixed

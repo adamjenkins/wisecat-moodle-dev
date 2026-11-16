@@ -13,8 +13,8 @@ page there walks through them):
    `webservice/rest/server.php` answers HTTP 403 with an empty body, and the file scripts (`upload.php`,
    `pluginfile.php`) answer "Web services are not enabled in Advanced features."
 3. A service that contains the functions, enabled. A predefined service from `db/services.php` appears here after
-   the upgrade; enable it, or build a custom one. Otherwise "Web service is not available (it doesn't exist or
-   might be disabled)".
+   the upgrade; enable it, or build a custom one. Otherwise `servicenotavailable`, "Web service is not available.
+   (It doesn't exist or might be disabled.)".
 4. If the service has `restrictedusers => 1`: the user added under Authorised users. Otherwise "The user is not
    allowed for this service".
 5. The user holds `webservice/rest:use` (or `webservice/soap:use`), otherwise "You are not allowed to use the rest

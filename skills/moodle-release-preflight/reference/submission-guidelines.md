@@ -14,9 +14,10 @@ table, run from the plugin root.
 
 "CI" means the standard `moodle-plugin-ci` workflow (phplint, phpcs and phpdoc with `--max-warnings 0`,
 validate, savepoints, mustache, grunt, phpunit, behat). What each command checks was read in the
-moodle-plugin-ci 4.5 and moodle-cs 3.7 source, not run. CI fully covers about six of the rules (coding style, PHP
-boilerplate and `@copyright`, lang file syntax, a login call after `config.php`, both databases when the matrix
-has them) and partly covers about eight. None of the kinds of finding reviewers have raised on real submissions
+moodle-plugin-ci 4.5 and moodle-cs 3.7 source, not run. By a hand count against the page, CI fully covers about
+six of the rules (coding style, PHP boilerplate and `@copyright`, lang file syntax, a login call after
+`config.php`, both databases when the matrix has them) and partly covers about eight; treat both numbers as
+approximate. None of the kinds of finding reviewers have raised on real submissions
 was caught by CI.
 
 Set the component once:
@@ -147,7 +148,7 @@ The page lists these as reasons a plugin will not be approved:
 | `phplint` | PHP syntax | Anything else |
 | `phpcs` | moodle-cs on `*.php` only: style, boilerplate, `@copyright` and `@license` present, lang file syntax, a login call after `config.php`, forbidden tokens and functions | Non-PHP files, frankenstyle prefixes, capabilities, superglobals, `PARAM_RAW` |
 | `phpdoc` | local_moodlecheck's remaining rules: `@param` lists against function arguments, inline tags, no inline phpdoc blocks | Most docblock rules, which moved to phpcs |
-| `validate` | Required files, `pluginname` (a filter: `filtername` only; an activity: `modulename` or `pluginname`), table prefixes, the `xmldb_<component>_upgrade` name, Behat feature tags | Licence file, README, other required strings, backup for a module |
+| `validate` | Required files, `pluginname` (a filter: `filtername` only; an activity: `modulename` or `pluginname`, plus `<name>:addinstance` and the `mod/<name>:addinstance` capability), table prefixes, the `xmldb_<component>_upgrade` name, Behat feature tags | Licence file, README, other required strings, backup for a module |
 | `savepoints` | `upgrade_plugin_savepoint()` calls in `db/upgrade.php` | Whether the upgrade works on real data |
 | `mustache` | Template syntax, an example context, HTML validity of the rendered example | Templates under `templates/mobileapp/` |
 | `grunt` | AMD build, eslint, stylelint, gherkinlint, and that `amd/build` matches `amd/src` | CSS scope |

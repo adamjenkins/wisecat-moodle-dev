@@ -19,9 +19,9 @@ php admin/cli/purge_caches.php
 - `upgrade.php` is needed after any `version.php` bump. Without a bump, a changed `install.xml`, `db/access.php`,
   `db/services.php`, `db/tasks.php` or `db/caches.php` is not re-read.
 - The purge rebuilds the class map cached in `$CFG->cachedir/core_component.php`
-  (`core_component::init()`, `public/lib/classes/component.php`, 5.3.0). A new class file without a purge fails on the site with
-  "class not found" while PHPUnit, which builds its own map, is green. The purge also drops compiled theme
-  CSS, the language string cache and the template cache.
+  (`core_component::init()`, `public/lib/classes/component.php`, 5.2 and 5.3.0). A new class file without a
+  purge fails on the site with "class not found" while PHPUnit, which builds its own map, is green. The purge
+  also drops compiled theme CSS, the language string cache and the template cache.
 - The web server user must be able to read every file. Repository files created with mode 0600 give
   "Permission denied" warnings that only appear in the web server log.
 - Confirm the installed version is the one you meant: the plugin's row on `admin/plugins.php`, or

@@ -5,8 +5,8 @@ through core, and you are writing their export and delete calls.
 
 A subsystem link in `get_metadata()` only declares the use. Each subsystem below gives the plugin static helper
 methods to find, export and delete its data; the plugin calls them from its own provider methods, with its own
-component name and area. Signatures were read in the 5.3.0 source; the providers are identical in 5.2
-(`diff` of each `classes/privacy/provider.php`, read, not run).
+component name and area. Signatures were read in the 5.3.0 source and none of the calls was run. The providers
+named here are identical in 5.2, except `core_grades` (see Grades and completion).
 
 ## Declaring the link
 
@@ -54,8 +54,8 @@ comments::get_users_in_context_from_sql($userlist, 'c', 'mod_example', 'entry', 
 ```
 
 `export_comments()` takes `$onlyforthisuser = true` as its last argument; pass false to export every comment on an
-item the user owns. For contexts, join `{comments}` on
-`component`, `commentarea`, `userid` in `get_contexts_for_userid()`.
+item the user owns. For contexts, join `{comments}` on `component`, `commentarea`, `userid` in
+`get_contexts_for_userid()`.
 
 ## Ratings (`core_rating`)
 
@@ -140,10 +140,11 @@ A plagiarism plugin itself implements `\core_plagiarism\privacy\plagiarism_provi
 
 Grades written through `grade_update()` belong to `core_grades`. Its provider works on the course context: it
 exports the user's grades there and deletes the `grade_grades` and `grade_grades_history` rows (and feedback
-files) of every grade item of the course; in a module context it handles only outcome-to-activity associations
-(`public/grade/classes/privacy/provider.php`). So an activity's grades go when the course context is erased for
-`core_grades`, not when the module context is erased for the activity; the plugin declares the link and does
-nothing else. Activity completion in a module context
-is removed by core's `request\helper` after the plugin's delete methods run
-(`public/privacy/classes/local/request/helper.php`). A plugin that writes grade items outside the gradebook API,
-or completion rows itself, owns that data.
+files) of every grade item of the course (`public/grade/classes/privacy/provider.php`, 5.2 and 5.3.0).
+**5.3+:** in a module context it also exports and deletes the outcome-to-activity associations
+(`grade_outcomes_modules`) and nothing else; on 5.2 it does nothing in a module context. So an activity's
+grades go when the course context is erased for `core_grades`, not when the module context is erased for the
+activity; the plugin declares the link and does nothing else. Activity completion in a module context is
+removed by core's `request\helper` after the plugin's delete methods run
+(`public/privacy/classes/local/request/helper.php`). A plugin that writes grade items outside the gradebook
+API, or completion rows itself, owns that data.

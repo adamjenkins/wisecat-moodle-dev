@@ -1,6 +1,6 @@
 ---
 name: moodle-release-preflight
-description: Use when about to tag a Moodle plugin release, submit it to the Moodle Plugins directory, answer a Plugins directory reviewer's issue, or send the plugin for an external security review. A pre-release audit of the defect classes reviews caught in shipped plugins despite green CI: client-trusted ids and limits, require_login() without a capability, sibling actions that skip a rule, frozen form fields, unescaped sinks (html_writer, formslib labels, modal titles, redirect messages), inline-served uploads, unclean restore and imports, settings read by name, privacy drift, reset and uninstall gaps, vacuous tests, missing frankenstyle prefixes, missing lang strings (pluginname, filtername, cachedef_), PARAM_RAW, mkdir 0777, raw cURL, and an extended checklist (SQL from mobile args, unserialize, IDOR, CSRF, noclean, SSRF, group leaks). Skip when writing new feature code or doing a broad security audit (use moodle-security-audit).
+description: Use when about to tag a Moodle plugin release, submit it to the Moodle Plugins directory, fix a code finding a Plugins directory reviewer raised, or send the plugin for an external security review. A pre-release audit of the defect classes reviews caught in shipped plugins despite green CI: client-trusted ids and limits, require_login() without a capability, sibling actions that skip a rule, frozen form fields, unescaped output sinks, inline-served uploads, unclean restore and imports, settings read by name, privacy drift, reset and uninstall gaps, vacuous tests, missing frankenstyle prefixes, missing lang strings, PARAM_RAW, mkdir 0777, raw cURL, and an extended checklist (unserialize, IDOR, CSRF, noclean, SSRF, group leaks). Skip when writing new feature code (moodle-plugin-development), reviewing code for security with no release at stake (moodle-security-audit), finishing an ordinary task (moodle-definition-of-done), or building the ZIP, tagging and replying to the reviewer (moodle-plugin-release).
 ---
 
 # Moodle Release Preflight
@@ -16,8 +16,10 @@ in a review, and each comes with a check and a fix. Run both before a release; t
 
 - Before tagging a release or uploading a version to the Moodle Plugins directory
 - Before sending a plugin to an external security or code review
-- When a Plugins directory reviewer has opened an issue and you are fixing and answering it
-- Reviewing a change that touches request handling, uploads, output, restore, privacy or course reset
+- When a Plugins directory reviewer has opened an issue and you are fixing the code and looking for the same
+  defect elsewhere (how to reply is in `moodle-plugin-release`)
+- Checking a change that touches request handling, uploads, output, restore, privacy or course reset before it
+  goes into a release
 - **Skip when:** writing new feature code (`moodle-plugin-development`), doing a broad security review
   (`moodle-security-audit`), or building, tagging and uploading the release itself (`moodle-plugin-release`)
 
@@ -29,7 +31,8 @@ the moodle-plugin-ci 4.5 and moodle-cs 3.7 source, not run):
 - **The ZIP.** CI installs from the checkout. The licence file and the ZIP's root folder, the two most common
   review findings, are never seen. Check the built ZIP with `moodle-plugin-release`.
 - **Most required strings.** `validate` asks for `pluginname` (a filter: `filtername` only; an activity:
-  `modulename` or `pluginname`). `cachedef_*`, capability and message provider strings are not checked.
+  `modulename` or `pluginname`, plus `<name>:addinstance`). `cachedef_*`, other capability strings and message
+  provider strings are not checked.
 - **Frankenstyle prefixes.** `validate` checks table names; `phpcs` checks global function names for lower case
   only. A missing prefix is an approval blocker.
 - **Authorisation and parameter types.** `phpcs` checks that a login call follows `config.php`, not that a
@@ -325,8 +328,8 @@ built ZIP: `moodle-plugin-release`.
 ## 7. Extended security checklist
 
 Classes 1 to 6 come from reviews of submitted plugins. Static audits of widely installed third-party plugins
-found more: SQL from mobile `$args`, `unserialize()` of restored data, IDOR and
-client-supplied `userid`, GET-without-sesskey writes, `noclean` on student or LLM text, SSRF through PDF
+found more: SQL from mobile `$args`, `unserialize()` of restored data, IDOR and client-supplied `userid`,
+GET-without-sesskey writes, `noclean` on student or LLM text, SSRF through PDF
 renderers, SEPARATEGROUPS leaks. For any plugin with request entry points, walk
 [reference/extended-security-checklist.md](reference/extended-security-checklist.md) after classes 1 to 6 and
 report each line; where they overlap, report a finding once. Its `riskbitmask` line includes `RISK_XSS` on any

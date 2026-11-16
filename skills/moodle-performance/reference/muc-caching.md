@@ -165,9 +165,8 @@ Core ships the stores `apcu`, `file`, `redis`, `session` and `static` on 5.2 and
 Without any configuration, application caches go to the file store in `$CFG->cachedir` (shared between web servers
 when `dataroot` is shared), session caches to the session store, request caches to the static store
 (`default_application`, `default_session`, `default_request` in `public/cache/classes/config_writer.php`, 5.3.0).
-Administrators
-map definitions to Redis or APCu in Site administration > Plugins > Caching > Configuration; code must work with any
-store, so do not depend on eviction order or on a TTL being honoured.
+Administrators map definitions to Redis or APCu in Site administration > Plugins > Caching > Configuration; code
+must work with any store, so do not depend on eviction order or on a TTL being honoured.
 
 ## Testing cached code
 

@@ -1,332 +1,237 @@
 ---
 name: moodle-upgrade-migration
-description: Use when upgrading a Moodle plugin across versions, fixing deprecated API usage, or migrating to Moodle 4.x/5.x (incl. 5.1/5.2/5.3) conventions — print_error, add_to_log, formslib changes, external_api namespace, Hooks API, /public doc-root, Routing Engine, PSR-4 migration, PHP 8.1–8.4 upgrades, and required upgrade.txt notes.
+description: Use when porting a Moodle plugin written for 3.x, 4.x, 5.0 or 5.1 up to 5.2, moving it to a newer PHP version, or needing the porting method for any version: raising $plugin->requires and $plugin->supported, one codebase or a branch per Moodle version, guarding an API that differs between supported branches, fixing deprecation debugging ("has been deprecated", "Call to undefined function print_error", "Undefined constant"), writing db/upgrade.php steps that must survive a failed upgrade, or porting old code (print_error, add_to_log, external_api without namespace, lib.php callbacks, Bootstrap 4 classes, /public directory). Skip when the question is what Moodle 5.3 removed, moved, deprecated or added (moodle-5-3-changes) or writing a plugin from scratch (moodle-plugin-development).
 ---
 
-# Moodle Upgrade & Migration
+# Moodle Upgrade and Migration
 
 ## Overview
 
-Moodle deprecates aggressively but rarely removes. Code from Moodle 2.x often still runs in 4.5 — but uses APIs that emit warnings, fail PHP 8 strict checks, or block plugin directory acceptance. This skill catalogs the migration path from each generation.
+A plugin declares a range of Moodle versions it supports, and every core API it calls must exist and behave the
+same across that range. Porting is three jobs: find what changed between the lowest and highest supported branch,
+make the code work on all of them (feature tests, not version numbers), and move stored data forward with
+`db/upgrade.php` steps that can be re-run. Per-release catalogues live elsewhere (`moodle-5-3-changes`); this skill
+is the method and the cross-version rules.
 
 ## When to Use
 
-- Upgrading a plugin to support a newer Moodle version
-- Resolving deprecation warnings
-- Migrating to PHP 8.1 / 8.2 / 8.3 / 8.4
-- Plugin directory submission rejection ("uses deprecated API")
-- Cross-version compat (`$plugin->requires` bump)
+- Raising `$plugin->requires`, adding a branch to `$plugin->supported`, or adding a branch to CI (when the branch
+  is 5.3, the list of what to fix is `moodle-5-3-changes`)
+- A deprecation `debugging()` notice, an "undefined function/constant/class" fatal, or a changed return value
+  after a core upgrade
+- Writing or reviewing `db/upgrade.php`
+- Porting code written for Moodle 3.x or 4.x
+- Moving to a newer PHP version
+- **Skip when:** you want everything that changed in 5.3 (`moodle-5-3-changes`), are creating a plugin
+  (`moodle-plugin-development`), or are preparing the release itself (`moodle-plugin-release`).
 
-## Strategy
-
-1. Bump `$plugin->requires` to your minimum target Moodle version
-2. Replace deprecated APIs (table below)
-3. Add `upgrade.txt` to document changes
-4. Run `phpcs --standard=moodle` + visual smoke test
-5. Bump `$plugin->version` + add `db/upgrade.php` step if schema changed
-
-## Deprecation table
-
-| Old | New | Since |
-|-----|-----|-------|
-| `print_error('errkey', 'comp')` | `throw new \moodle_exception('errkey', 'comp')` | 3.7 |
-| `add_to_log()` | Trigger an event class | 2.7 |
-| `notify('text', 'notifyproblem')` | `\core\notification::error('text')` | 3.0 |
-| `redirect($url, 'msg', 0)` | `redirect($url, 'msg', null, \core\notification::INFO)` | 3.0 |
-| `external_api` (bare) | `\core_external\external_api` | 4.2 |
-| `external_function_parameters` etc. | `\core_external\...` | 4.2 |
-| `$mform->setHelpButton()` | `$mform->addHelpButton()` | 2.0 |
-| Magic callbacks `<comp>_extend_navigation` | Hooks API `\core\hook\...` (where applicable) | 4.4 |
-| `\core\session\manager::write_close()` | Same — but check if needed | — |
-| `mtrace()` in non-CLI | Use `debugging()` or proper logger | — |
-| `cleardoubleslashes` | Use `clean_param($url, PARAM_URL)` | — |
-| `addslashes()` for DB | Use `$DB->...` placeholders | 2.0 |
-| `mysql_*` functions | `$DB` always | 2.0 |
-| `userdate($t, '', false)` (no timezone) | Pass timezone or use `core_date::get_user_timezone_object()` | 3.2 |
-| `create_function()` | Closures `function() { }` | PHP 7.2 removed |
-| `each($array)` | `foreach` | PHP 7.2 removed |
-| `assert($string)` | Real expression | PHP 7.2+ |
-| `(unset)` cast | Plain `unset()` | PHP 7.2+ |
-| `\Mustache_Engine` direct | `$OUTPUT->render_from_template` | — |
-| `cm_info::get_modinfo` second arg | API change in 3.4 | 3.4 |
-| `format_text` no `context` | Always pass `['context' => $context]` | 2.0 |
-| `\html_writer::nonempty_tag` | Use `html_writer::tag` with check | 3.5 |
-| `\stdClass` w/o `: \stdClass` return type in PHP 8.1+ | Add return types | 8.1 |
-
-## PHP version migrations
-
-### → PHP 8.0
-
-- `each()`, `create_function()` removed
-- `'string' . null` warns — explicit cast
-- Negative string offset behavior changed
-- Named arguments — Moodle prohibits in public APIs (positional only)
-
-### → PHP 8.1
-
-- Implicit nullable parameters `(string $x = null)` deprecated → `(?string $x = null)`
-- `Returning by reference from a void function`
-- Internal classes `#[\AllowDynamicProperties]` if you set undeclared properties
-- `tempnam`, `parse_url` minor signature changes
-
-### → PHP 8.2
-
-- Dynamic properties on user classes deprecated
-- `${...}` string interpolation deprecated → `{$...}`
-- `utf8_encode`/`utf8_decode` deprecated
-
-### → PHP 8.3
-
-- `#[\Override]` attribute encouraged
-- `Date_Create_From_Format` strict-ness
-- Typed class constants supported
-
-### → PHP 8.4
-
-- Implicit nullable params now hard-deprecated: `function f(string $x = null)` → `function f(?string $x = null)`
-- Optional param before required param deprecated — reorder so optionals come last
-- `E_STRICT` constant removed (was already a no-op)
-- `trigger_error(..., E_USER_ERROR)` deprecated — throw an exception instead
-- CSV functions: `fputcsv()` / `fgetcsv()` / `str_getcsv()` default `$escape` deprecated — pass `''` explicitly to opt out of legacy escape
-- `xml_set_*_handler` string-callable form deprecated — pass `[$obj, 'method']` or first-class callable
-- `mysqli_kill()`, `mysqli_refresh()`, `mysqli_ping()` deprecated — irrelevant to Moodle ($DB layer), but flag in custom code
-- `DatePeriod` ISO8601 string constructor deprecated → `DatePeriod::createFromISO8601String()`
-- `mb_trim()`, `mb_ltrim()`, `mb_rtrim()` added — prefer over manual regex trimming for multibyte
-
-## Moodle 3.x → 4.x
-
-### Theme
-
-- 3.x default theme `Clean` removed; use Boost
-- 4.0 introduced course index, secondary navigation, drawers
-- Layouts: `frontpage`, `mydashboard`, `incourse`, `course` may need overrides
-
-### Hooks API (4.4+)
-
-Old:
-```php
-function local_example_extend_navigation(global_navigation $nav) { /* ... */ }
-```
-
-New (where supported):
-```php
-// db/hooks.php
-$callbacks = [
-    [
-        'hook'     => \core\hook\navigation\primary_extend::class,
-        'callback' => '\local_example\hooks\navigation::extend_primary',
-    ],
-];
-```
+## The model: a plugin supports a range
 
 ```php
-// classes/hooks/navigation.php
-namespace local_example\hooks;
-class navigation {
-    public static function extend_primary(\core\hook\navigation\primary_extend $hook): void {
-        $hook->get_primary_view()->add(/* ... */);
-    }
-}
+// version.php
+$plugin->component = 'local_example';
+$plugin->version   = 2026111600;
+$plugin->requires  = 2026042000;      // 5.2.0: the lowest core version number you accept.
+$plugin->supported = [502, 503];      // [lowest, highest] branch, both ends inclusive.
 ```
 
-Magic callbacks still work in 4.4+; Hooks API is preferred for new code, required for some new extension points.
+- `requires` is a core `$version` number; `supported` is a pair of branch numbers. `[502]` is malformed and core
+  throws `coding_exception` (`public/lib/classes/plugininfo/base.php`, read in 5.2 and 5.3.0). Details:
+  `moodle-field-lessons`.
+- The local development site proves one row of the range. An API added, moved, deprecated or changed inside the
+  range is a bug on the other rows until guarded, and only CI on every branch shows it.
+- Core release values: 5.2.0 is `2026042000`, 5.3.0 is `2026100500` (`public/version.php` of each tree).
+- Deprecation timeline (https://moodledev.io/general/development/policies/deprecation): an API deprecated in a
+  non-LTS release X.Y is removed in (X+1).0; one deprecated in the LTS (the last release of a series, 5.3 for the
+  5.x series) is removed in (X+2).0. So anything deprecated in 4.5 to 5.2 is due to go in 6.0, and anything
+  deprecated in 5.3 in 7.0. Stages: initial deprecation (works, emits `debugging()`), final deprecation (the
+  function is a stub that throws `coding_exception`), removal (undefined).
 
-### External API namespace
+## Default recipe for a port
+
+1. **List what changed**, for every branch inside the new range: read the root `UPGRADING.md` (sections `## 5.3`,
+   `## 5.2`, ...; per-component `UPGRADING.md` files carry the same notes) of the highest branch, and for branches
+   before 4.5 the `upgrade.txt` files. Grep it for every core symbol the plugin calls:
+
+   ```bash
+   # Function names the plugin calls, then the upgrade-note lines that mention any of them.
+   grep -rhoE '\b[a-z][a-z0-9_]{3,}\(' --include=*.php . | tr -d '(' | sort -u > /tmp/calls.txt
+   grep -nwFf /tmp/calls.txt /path/to/moodle/UPGRADING.md
+   # Everything core marks deprecated, with the version and replacement:
+   grep -rn -A1 '#\[\\core\\attribute\\deprecated' /path/to/moodle/public --include=*.php | grep -v /tests/
+   ```
+
+   Return values and argument defaults change too, not only names: on 5.3 `\core\task\manager::queue_adhoc_task($task,
+   true)` returns the id of the existing task where 5.2 returned `false` (`public/lib/classes/task/manager.php`,
+   both trees). A caller that treated a truthy result as "newly queued" breaks on 5.3 with no notice.
+2. **Raise the floor** in `version.php` if you can; every branch you drop removes guards. Raise any dependency in
+   `$plugin->dependencies` in the same commit that starts calling a symbol the dependency added.
+3. **Replace or guard each changed API** (next section).
+4. **Move data** with `db/upgrade.php` steps (rules below) and bump `$plugin->version`.
+5. **Run the suite on every supported branch** with `DEBUG_DEVELOPER`. In PHPUnit an "Unexpected debugging() call
+   detected" line in a passing run is a finding: it is a deprecation you have not fixed. Behat fails the step on it.
+   CI matrix: `moodle-ci-matrix`.
+6. **Write the change down** in the plugin's `CHANGES.md` and, if other code calls your APIs, in an upgrade notes
+   file (`UPGRADING.md` or `upgrade.txt`; for plugins the format is free,
+   https://moodledev.io/general/development/upgradenotes). Name the replacement, not only what went:
+
+   ```markdown
+   ## 2.0.0
+   ### Deprecated
+   - `local_example_get_items()` is deprecated; use `\local_example\api::get_items()`. Removal in 3.0.0.
+   ### Changed
+   - Requires Moodle 5.2; supports 5.2 and 5.3.
+   ```
+
+## Guarding an API that differs inside the range
+
+Test for the feature, not the version. `$CFG->branch` is a stored config value that core writes only after the
+core upgrade (`public/admin/index.php`, `admin/cli/upgrade.php`, 5.3.0), so it is stale while core upgrades, and
+it says nothing about point-release backports.
 
 ```php
-// Pre-4.2
-class get_items extends external_api { /* ... */ }
-
-// 4.2+
-use core_external\external_api;
-use core_external\external_function_parameters;
-class get_items extends external_api { /* ... */ }
-```
-
-Compatibility shim: 4.2+ aliases bare names to namespaced for back-compat — but new code should use namespaced.
-
-### Course format API
-
-`format_<name>` plugins migrated from `format_base` to `\core_courseformat\base`:
-
-```php
-// classes/output/courseformat/content.php
-namespace format_yourname\output\courseformat;
-class content extends \core_courseformat\output\local\content { /* ... */ }
-```
-
-3.x format plugins need full rewrite for 4.0+.
-
-## Moodle 4.x → 5.x
-
-### 5.0 (2025-04)
-
-- PHP 8.2 minimum
-- Bootstrap 5 fully replaces Bootstrap 4 utility classes
-  - `.sr-only` → `.visually-hidden`
-  - `.float-left` → `.float-start`
-  - `.ml-*` → `.ms-*`
-  - `data-toggle` → `data-bs-toggle`
-- Some 4.x deprecations finalize
-- New AI subsystem (`\core_ai`)
-
-### 5.1 (2025-10-06)
-
-- **PHP 8.2 min, 8.3 & 8.4 supported.** Sodium ext required. 64-bit only. `max_input_vars` ≥ 5000.
-- **`/public` document root.** Web server must point at `<moodleroot>/public`. Plugins still live above (`/local/...`, `/mod/...`) — installer relocates; manual moves needed for in-place upgrades.
-- **Routing Engine** (optional, BC-safe) — new request dispatcher + cleaner URLs.
-- Deprecations:
-  - `file_encode_url()` deprecated → use `moodle_url::make_pluginfile_url()`
-  - Device-related theme functions final-deprecated
-  - Quiz callback classes/functions deprecated (see `mod/quiz/UPGRADING.md`)
-  - `course/changenumsections.php` page removed
-  - Course "max sections" setting removed
-- DB prefix max length now 10 chars.
-- Always check per-component `UPGRADING.md` (5.1 replaces `upgrade.txt` for API change notes).
-
-### 5.2 (2026-04-20)
-
-- **PHP 8.3 min, 8.4 supported.**
-- **Upgrade path:** must come from 4.4 or later. Older → upgrade through 4.4/5.0/5.1 first.
-- **Oracle DB removed.** Minimums bumped: PostgreSQL 16, MySQL 8.4, MariaDB 10.11, SQL Server 2019.
-- **React in core** — base library available via importmaps; new UI code may use React components.
-- Composer support for third-party library installation in plugins.
-- OpenTelemetry integration.
-- Final deprecations:
-  - `core/modal_factory`, `core/modal_registry` (AMD) — use `core/modal` directly
-  - Pre-PHP 7 style constructors removed (no method named after class)
-  - Everything in `lib/deprecatedlib.php` from ≤ 4.4 removed
-- New/expanded web services: `site_info`, `mobile_config`, `choice_results`.
-
-### 5.3 (beta — re-verify at 5.3.0)
-
-- **Requirements:** upgrade from 4.4+; PHP 8.3 min; MariaDB 11.4, PostgreSQL 17, MySQL 8.4, SQL Server 2019 ([MDL-86887](https://tracker.moodle.org/browse/MDL-86887)). Beta is `$version = 2026091600.00`, branch `503`.
-- **Classic theme removed:** settings migrate to Boost; re-parent Classic child themes or install Classic first ([MDL-88351](https://tracker.moodle.org/browse/MDL-88351)).
-- **Now fatal:** `FEATURE_GROUPMEMBERSONLY` true blocks install/upgrade ([MDL-83231](https://tracker.moodle.org/browse/MDL-83231)); legacy `external_*()` functions throw ([MDL-76583](https://tracker.moodle.org/browse/MDL-76583)); `set_main_table()` needs an alias ([MDL-88397](https://tracker.moodle.org/browse/MDL-88397)); `duration` `defaultunit` must be in `units` ([MDL-89434](https://tracker.moodle.org/browse/MDL-89434)).
-- **Behaviour:** report columns sortable by default ([MDL-87404](https://tracker.moodle.org/browse/MDL-87404)); `queue_adhoc_task(..., true)` returns an existing id ([MDL-86422](https://tracker.moodle.org/browse/MDL-86422)); `marker_updated` event not fired ([MDL-87709](https://tracker.moodle.org/browse/MDL-87709)); AI token columns moved to `ai_action_register` ([MDL-89123](https://tracker.moodle.org/browse/MDL-89123)); quiz reports must call `print_action_bar()` ([MDL-81096](https://tracker.moodle.org/browse/MDL-81096)).
-- **Deprecated:** `user/lib.php` functions → `\core\user::*` ([MDL-82650](https://tracker.moodle.org/browse/MDL-82650)); global `\external_*` names ([MDL-81225](https://tracker.moodle.org/browse/MDL-81225)); `get_return_section()`/`'sr'` → `get_page_section()`/`'pagesectionid'` ([MDL-86284](https://tracker.moodle.org/browse/MDL-86284)); `add_navitem()` → `add_menu_item()` ([MDL-88938](https://tracker.moodle.org/browse/MDL-88938)); `NO_MOODLE_COOKIES` checks → `\core\session\manager::supports_cookies()` ([MDL-87174](https://tracker.moodle.org/browse/MDL-87174)).
-- Full 5.3 catalogue: `moodle-5-3-changes`.
-
-Always check `/public/lib/upgrade.txt` (path changed in 5.1) and per-component `UPGRADING.md` for the target version.
-
-## upgrade.txt convention
-
-`<plugin>/upgrade.txt`:
-
-```
-This files describes API changes in /local/example/*,
-information provided here is intended especially for developers.
-
-=== 1.5.0 ===
-* The deprecated function local_example_old_thing() has been removed. Use local_example_new_thing() instead.
-* New \local_example\hooks\foo class for the navigation hook (Moodle 4.4+).
-
-=== 1.4.0 ===
-* New web service local_example_export_csv.
-```
-
-Mirrors Moodle's own `lib/upgrade.txt`. Plugin directory reviewers read it.
-
-## db/upgrade.php cumulative example
-
-```php
-<?php
-defined('MOODLE_INTERNAL') || die();
-
-function xmldb_local_example_upgrade($oldversion) {
-    global $DB;
-    $dbman = $DB->get_manager();
-
-    if ($oldversion < 2024010100) {
-        $table = new xmldb_table('local_example_items');
-        $field = new xmldb_field('status', XMLDB_TYPE_INTEGER, '4', null,
-            XMLDB_NOTNULL, null, '0', 'name');
-        if (!$dbman->field_exists($table, $field)) {
-            $dbman->add_field($table, $field);
-        }
-        upgrade_plugin_savepoint(true, 2024010100, 'local', 'example');
-    }
-
-    if ($oldversion < 2024050100) {
-        // Drop legacy index
-        $table = new xmldb_table('local_example_items');
-        $index = new xmldb_index('legacy_idx', XMLDB_INDEX_NOTUNIQUE, ['userid']);
-        if ($dbman->index_exists($table, $index)) {
-            $dbman->drop_index($table, $index);
-        }
-        upgrade_plugin_savepoint(true, 2024050100, 'local', 'example');
-    }
-
-    if ($oldversion < 2025010100) {
-        // Data migration — chunked to avoid memory blow
-        $rs = $DB->get_recordset_select('local_example_items', 'metadata IS NULL');
-        foreach ($rs as $r) {
-            $r->metadata = json_encode([]);
-            $DB->update_record('local_example_items', $r);
-        }
-        $rs->close();
-        upgrade_plugin_savepoint(true, 2025010100, 'local', 'example');
-    }
-
-    return true;
-}
-```
-
-Each `if` block targets one historical version. Never delete past blocks — sites may upgrade through multiple versions.
-
-## Compatibility shim pattern
-
-For plugins supporting multiple Moodle versions:
-
-```php
-if (class_exists('\core_external\external_api')) {
-    class_alias('\core_external\external_api', '\local_example\compat\external_api');
+// A function or method added in the newer branch.
+if (method_exists(\core_courseformat\base::class, 'get_page_section')) {
+    $section = $format->get_page_section();          // 5.3+
 } else {
-    class_alias('\external_api', '\local_example\compat\external_api');
+    $section = $format->get_return_section();        // 5.2; deprecated on 5.3
 }
-```
 
-Or guard with `\core\plugin_manager::get_remote_plugin_info` and `moodle_major_version()`:
-
-```php
-if (version_compare(moodle_major_version(), '4.4', '>=')) {
-    // Hooks API path
+// A method added to a class that may already exist on the older branch: test the method, not the class.
+if (method_exists(\core_courseformat\local\cmactions::class, 'delete')) {
+    \core_courseformat\formatactions::cm($course->id)->delete($cmid);
 } else {
-    // Magic callback fallback
+    course_delete_module($cmid);
 }
+
+// A constant removed in the newer branch (ASSIGN_ATTEMPT_REOPEN_METHOD_NONE is gone in 5.2): reference it
+// only behind defined(); a bare use throws "Error: Undefined constant" when the line runs.
+$noreopen = defined('ASSIGN_ATTEMPT_REOPEN_METHOD_NONE')
+    && $assign->get_instance()->attemptreopenmethod === constant('ASSIGN_ATTEMPT_REOPEN_METHOD_NONE');
 ```
 
-## Common Mistakes
+- Guard the call that differs, not the whole feature, and keep the newer path first so the guard is easy to delete
+  when the floor rises.
+- A new optional parameter on a user-land function can be passed on the older branch without a guard: PHP ignores
+  surplus arguments to a function that does not declare them. `delete_course($course, false, false)` is valid on
+  5.2 and forces synchronous deletion on 5.3.
+- Hooks: one `db/hooks.php` can name a hook that exists only on the newer branch; the entry is simply never
+  dispatched on the older one (`moodle-hooks-api`).
+- When the code grows a guard per screen, branch the plugin per Moodle version instead (one `MOODLE_5xx_STABLE`
+  branch each, `supported = [503, 503]`). Themes that copy Boost templates reach that point quickly
+  (`moodle-theme-development`).
 
-| Mistake | Fix |
-|---------|-----|
-| Bumping `$plugin->requires` without testing on min version | Test against `$plugin->requires` Moodle release |
-| Removing `db/upgrade.php` blocks | Keep all historical blocks |
-| Skipping `upgrade_plugin_savepoint` | Required — marks step as done |
-| Adding new field without `field_exists` guard | Use guard in case site is mid-upgrade |
-| Forgetting `upgrade.txt` | Plugin directory reviewers expect it |
-| Removing deprecated function used by other plugins | Mark deprecated for one major, then remove |
-| Using PHP 8.2 features without bumping `$plugin->requires` Moodle | Match Moodle's PHP min |
-| `print_error` left after migration | Replace with `throw new moodle_exception` |
-| `external_api` namespace mismatch breaking 4.1 | Use compatibility alias |
+## db/upgrade.php rules
 
-## Tools
+The skeleton and the XMLDB editor workflow are in `moodle-plugin-development`. The rules that matter when a site
+upgrades across several versions:
 
-```bash
-# Find deprecated API usage
-phpcs --standard=moodle --report=summary local/example
-moodle-cs/standards/Moodle/...
+- **Keep every historical step.** A site can jump from any old version to the newest; each `if ($oldversion <
+  N)` block runs once, in order, and ends with `upgrade_plugin_savepoint(true, N, 'local', 'example')`
+  (`upgrade_mod_savepoint()` for activities, `upgrade_block_savepoint()` for blocks).
+- **Make each step safe to run twice.** DDL is not transactional on MySQL and MariaDB: when a step dies halfway,
+  the changes before the failure stay, the savepoint is not reached, and the next upgrade attempt runs the step
+  again from the top. A second `add_field()` then throws "Field already exists" and the site is stuck. Guard every
+  DDL call (`field_exists()`, `index_exists()`, `table_exists()`, `key` changes inside the same guards) and write
+  data changes so that repeating them changes nothing.
+- **Do not call high-level APIs from an upgrade step**: grade, modinfo, course, completion, events, caches. They
+  depend on the current schema of other components, which may not be upgraded yet, and they are slow per row.
+  Queue an ad-hoc task and let cron do it on the finished site:
 
-# Find PHP version issues
-phpcompatinfo analyser:run local/example
-phpstan analyse local/example --level=5
-```
+  ```php
+  if ($oldversion < 2026111601) {
+      // Recalculate cached grades for existing instances after the schema change above.
+      $task = new \local_example\task\recalculate_after_upgrade();
+      \core\task\manager::queue_adhoc_task($task, true);
+      upgrade_plugin_savepoint(true, 2026111601, 'local', 'example');
+  }
+  ```
+
+- **Iterate with recordsets and set fields directly** for data migration: `get_recordset_select()` plus
+  `$DB->set_field()` or `update_record()` on the fields you change, closing the recordset.
+- **Test the step on a site that has rows.** A fresh install never runs `upgrade.php`, and an empty table passes
+  any data migration. Install the previous release, create data, then upgrade.
+- An `install.xml` change without an upgrade step does nothing on existing sites; XMLDB keys are indexes and must
+  be dropped around a NOT NULL change: both in `moodle-field-lessons`.
+- Changing a default, a capability, or a setting definition also needs a version bump for existing sites (and for
+  the PHPUnit `init.php`, which is a no-op until some version changes).
+
+## Old code you will still find
+
+| Old code | Status on 5.2 and 5.3 | Replacement |
+|---|---|---|
+| `print_error('key', 'component')` | Removed (undefined function) | `throw new \moodle_exception('key', 'component')` |
+| `add_to_log(...)` | Removed | Trigger an event class (`\local_example\event\thing_viewed::create(...)->trigger()`) |
+| `notify('text')` | Removed | `\core\notification::error('text')` or `echo $OUTPUT->notification('text', 'error')` |
+| `external_api` and the other global `external_*` classes | 5.2: alias; 5.3: deprecated, notice on first use | `use core_external\external_api;` (since 4.2) |
+| `external_format_text()` and the other `external_*()` functions | 5.2: work, no notice; 5.3: throw `coding_exception` | `\core_external\util::format_text()` etc. (exists on both) |
+| `require_once($CFG->libdir . '/externallib.php')` | Not needed | autoloaded `\core_external\...` |
+| `<component>_before_footer()` and other output callbacks | Deprecated: debugging notice | Hooks (`moodle-hooks-api`) |
+| `core/modal_factory`, `core/modal_registry` (AMD) | Removed in 5.2 | `core/modal` subclasses with `ModalX.create()` |
+| `.sr-only`, `.ml-*`, `.float-left`, `data-toggle` | Bootstrap 4 compat layer, removal in 6.0 | `.visually-hidden`, `.ms-*`, `.float-start`, `data-bs-toggle` |
+| `course_delete_module()`, `duplicate_module()`, `moveto_module()` | Deprecated in 5.2 | `\core_courseformat\formatactions::cm($courseid)->delete()`, `duplicate()`, `move_before()`, `move_end_section()` |
+| Theme or plugin files built from `$CFG->dirroot . '/lib/fonts/'` | Gone on 5.3 | `[[font:core\|fa-solid-900.woff2]]` in CSS |
+
+The longer list (formslib, navigation, course formats, older PHP-era functions) is in
+[reference/legacy-api-replacements.md](../moodle-skill-files/moodle-upgrade-migration/reference/legacy-api-replacements.md).
+
+## Traps
+
+- **Behat fails on a deprecation that PHPUnit tolerates.** A deprecated call such as `moveto_module()` on 5.2 makes
+  every Behat step that reaches it fail with the debugging message, while PHPUnit reports only "Unexpected
+  debugging() call" and passes. Fix the call, do not silence the output.
+- **A docblock is not the code.** `qbank_helper::get_question_structure()` documents random slots with `qtype` set
+  to `'random'`, but on 5.2 sets it to `null` and adds `->random = true`
+  (`public/mod/quiz/classes/question/bank/qbank_helper.php`, 5.2). Compare slots by `->random`. Read the return
+  statement of any core function whose result you branch on.
+- **Classes moved into namespaces lose their old name eventually.** `\mod_assign\output\assign_header` moved in 4.0;
+  write the namespaced name with `use`. Grep for bare names of renamed classes in each component's
+  `db/renamedclasses.php` (`public/lib/db/renamedclasses.php` for core).
+- **The 5.1 `/public` directory changed paths, not APIs.** From 5.1 the web root is `<moodle>/public`, and plugins
+  live under it (`public/local/example`); `$CFG->dirroot` points at `public`, and `$CFG->root` at the directory
+  above it, where Composer's `vendor/` and, on 5.3, `lib/bundles/` live. Code that builds paths from
+  `$CFG->dirroot` keeps working; code that hard-coded `__DIR__ . '/../../lib/...'` across the boundary does not.
+  CLI admin scripts are at the root: `php admin/cli/purge_caches.php`.
+- **Raising the PHP floor is Moodle's call, not yours.** Use only PHP features of the lowest PHP that the lowest
+  supported Moodle branch allows (8.3 for 5.2 and 5.3, `public/admin/environment.xml`). PHP changes:
+  [reference/php-versions.md](../moodle-skill-files/moodle-upgrade-migration/reference/php-versions.md).
+- **Do not bump `$plugin->release` to signal compatibility.** Compatibility is `requires` and `supported`;
+  `release` is your own version string (`moodle-plugin-release`).
+
+## Common mistakes
+
+| Mistake | What happens | Fix |
+|---|---|---|
+| `$plugin->supported = [502]` | Core throws on plugin load | `[502, 503]` |
+| Testing only on the dev site's branch | Fatal on another CI row | CI on every branch in `supported` |
+| `if ($CFG->branch >= 503)` as the guard | Stale during the core upgrade; blind to backports | `method_exists()` / `class_exists()` |
+| Treating `queue_adhoc_task($t, true)` truthy as "queued now" | Wrong on 5.3 (returns existing id) | Compare ids, or check `get_queued_adhoc_task_record()` |
+| `add_field()` with no `field_exists()` guard | Second upgrade attempt dies, site stuck | Guard every DDL call |
+| `rebuild_course_cache()` or grade API in `upgrade.php` | Errors or wrong data mid-upgrade | Queue an ad-hoc task |
+| Deleting old upgrade steps | Sites skipping versions miss schema | Keep every step |
+| Upgrade step tested only on a fresh install | Data migration never ran | Upgrade a site with rows |
+| Referencing a removed constant bare | "Undefined constant" fatal | `defined()` guard or own value |
+| Ignoring "Unexpected debugging() call" in a green run | Behat fails later; removal in the next major | Fix the deprecation now |
+
+## Reference files
+
+| File | Read it when |
+|---|---|
+| [reference/legacy-api-replacements.md](../moodle-skill-files/moodle-upgrade-migration/reference/legacy-api-replacements.md) | porting code written for Moodle 3.x or 4.x, or a deprecated function, class or template is not in the table above |
+| [reference/php-versions.md](../moodle-skill-files/moodle-upgrade-migration/reference/php-versions.md) | moving code to a newer PHP version, or PHP itself (not Moodle) emits the deprecation |
+| [reference/release-history.md](../moodle-skill-files/moodle-upgrade-migration/reference/release-history.md) | the plugin's current minimum is below 5.2 and you need what changed in 4.x, 5.0 and 5.1 |
+
+## Version notes
+
+| Moodle | File |
+|---|---|
+| 5.2 | [versions/moodle-5.2.md](../moodle-skill-files/moodle-upgrade-migration/versions/moodle-5.2.md): requirements, and the 5.2 removals and deprecations a port from 5.1 hits |
+| 5.3 | [versions/moodle-5.3.md](../moodle-skill-files/moodle-upgrade-migration/versions/moodle-5.3.md): requirements, values for `requires`, and spanning 5.2 and 5.3 in one codebase |
 
 ## References
 
-- Plugin upgrade flow: https://moodledev.io/docs/guides/migrating
-- API deprecations: https://moodledev.io/general/development/policies/deprecation
-- upgrade.txt format: https://moodledev.io/general/development/policies/codingstyle#upgrade
-- Hooks API: https://moodledev.io/docs/apis/core/hooks
-- Per-version notes: https://moodledev.io/general/releases
-- See also: `moodle-field-lessons` (generalized field lessons for this area)
+- https://moodledev.io/general/development/policies/deprecation
+- https://moodledev.io/general/development/upgradenotes
+- https://moodledev.io/docs/guides/upgrade
+- https://moodledev.io/general/releases
+- Root `UPGRADING.md` of the target Moodle tree

@@ -1,241 +1,301 @@
 # moodle-phpunit-testing
 
-> Use when writing, running, or debugging PHPUnit tests for Moodle plugins or core. Covers advanced_testcase, resetAfterTest, data generators, mocking $DB, testing events/tasks/external functions, and CLI invocation.
+> Use when writing, running or debugging PHPUnit tests for a Moodle plugin or core - tests/*_test.php, advanced_testcase, resetAfterTest, data generators (tests/generator/lib.php), public/admin/tool/phpunit/cli/init.php and util.php, vendor/bin/phpunit --testsuite, "No tests executed!", "Unexpected debugging() call detected", "unexpected database modification", tests that pass on MySQL or MariaDB and fail on PostgreSQL, preventResetByRollback, redirectEvents/redirectMessages/redirectEmails, external functions with clean_returnvalue, route_testcase, privacy provider tests, mock_clock_with_frozen and get_mocked_http_client. Covers the test framework's mental model, the default test recipe, invocation traps, fixture and database traps from shipped plugins, and pointers to generators, special test cases and PostgreSQL isolation. Skip when writing Behat acceptance tests (moodle-behat-testing) or building a CI workflow (moodle-ci-matrix).
 
-# Moodle PHPUnit Testing
+# Moodle PHPUnit testing
 
 ## Overview
 
-Moodle ships its own PHPUnit harness with test bootstrap, transactional resets, and data generators. Tests live in `<plugin>/tests/<thing>_test.php` and extend `advanced_testcase`. Never call `parent::setUp()` for DB cleanup — use `$this->resetAfterTest()`.
+Moodle runs PHPUnit 11.5 (5.2 and 5.3, `vendor/phpunit/phpunit`) against a separate test database and dataroot,
+resets state after each test, and gives every component a test suite. A green run proves less than it seems: the
+bootstrap preloads libraries a web request does not, PostgreSQL wraps each test in a transaction MySQL cannot, and a
+wrong invocation runs zero tests and exits 0. This skill gives the model, the recipe and the traps.
+
+How sure each statement is: rules marked "seen in practice" were observed on real plugins; everything else was read in
+the 5.2 and 5.3.0 source (paths below are relative to the Moodle root) and not run for this skill.
 
 ## When to Use
 
-- Writing unit/integration tests for any Moodle plugin or core API
-- Debugging test failures (`Database was modified` errors, isolation issues)
-- Adding a data generator (`tests/generator/lib.php`)
-- Testing events, scheduled tasks, ad-hoc tasks, external functions
-- Setting up CI for Moodle test suites
+- Writing tests for a plugin's classes, events, tasks, external functions, privacy provider, templates or settings
+- A test fails only on CI, only on PostgreSQL, only when run alone, or only in a particular order
+- `init.php` output, "No tests executed!", warnings, or "Unexpected debugging() call detected"
+- Adding a data generator or a shared test base class
+- **Skip when:** writing Behat features (`moodle-behat-testing`), setting up the GitHub Actions workflow and matrix
+  (`moodle-ci-matrix`), or doing the pre-release walk (`moodle-definition-of-done`).
 
-**Skip when:** writing Behat acceptance tests (use `moodle-behat-testing`).
+## Mental model
 
-## First-time setup
+1. **Separate site.** `$CFG->phpunit_prefix` and `$CFG->phpunit_dataroot` in `config.php` name a second database
+   prefix and dataroot (`config-dist.php`). `init.php` installs every plugin on disk into them and writes
+   `phpunit.xml` from `phpunit.xml.dist`, with one `<testsuite name="<component>_testsuite">` per component and
+   `suffix="_test.php"` directories. Never edit `phpunit.xml`; it is regenerated.
+2. **Init is keyed on versions.** Init reinstalls only when the hash of all component versions changes. A table added
+   to `install.xml`, or a changed settings default, without a version bump never reaches the test site; any bump
+   anywhere makes every run demand a re-init.
+3. **Reset per test.** `advanced_testcase` restores `$CFG`, `$DB`, `$USER`, caches and the database after each test
+   (`public/lib/phpunit/classes/advanced_testcase.php`, 5.2 and 5.3). With `$this->resetAfterTest()` the reset is
+   silent; without it, a test that wrote anything fails with "Warning: unexpected database modification, resetting
+   DB state".
+4. **PostgreSQL is different.** On PostgreSQL (and SQL Server) each test runs inside a delegated transaction that is
+   rolled back (`setup_test_environment()`, same file). MySQL and MariaDB cannot roll back DDL, so they reset by
+   truncation. Code that depends on transaction state behaves differently on the two families.
+5. **Not a web request.** `CLI_SCRIPT` is true, the bootstrap has already loaded libraries such as
+   `course/lib.php` and `lib/filelib.php`, `$OUTPUT` is not a page renderer, and no form was posted. A missing
+   `require_once` or a broken routed POST passes here and fails on the first real page load.
+6. **Strict by default.** `phpunit.xml.dist` sets `failOnWarning="true"` and `failOnDeprecation="true"` and
+   `beStrictAboutOutputDuringTests="true"` (5.2 and 5.3). A debugging() call left at teardown is raised as
+   "Unexpected debugging() call detected." (`teardown_test_environment()`).
+
+## Setup and running
+
+From the Moodle root (5.1 and later keep plugin CLI scripts under `public/`; `vendor/` stays at the root):
 
 ```bash
-php admin/tool/phpunit/cli/init.php       # writes phpunit.xml + initializes test DB
-vendor/bin/phpunit --testsuite local_example_testsuite
+php public/admin/tool/phpunit/cli/init.php                     # install test site, write phpunit.xml
+vendor/bin/phpunit --testsuite local_example_testsuite          # one component
+vendor/bin/phpunit public/local/example/tests/manager_test.php  # one file
+vendor/bin/phpunit --filter test_create_item public/local/example/tests/manager_test.php
+php public/admin/tool/phpunit/cli/util.php --drop && php public/admin/tool/phpunit/cli/init.php  # forced rebuild
 ```
 
-`phpunit.xml` is regenerated by `init.php` — never hand-edit. Re-run after installing a new plugin.
+- **Run by `--testsuite` or by an explicit `*_test.php` file, never by a bare directory.** PHPUnit's default suffix
+  for a directory argument is `Test.php`, which matches none of Moodle's `*_test.php` files. Symptom: "No tests
+  executed!" and exit code 0, which reads as a pass. Fix: the commands above, then read the summary line and require
+  `Tests: N` with N greater than 0. Seen in practice.
+- **"OK, but there were issues" is a failing run in CI.** Core's own `phpunit.xml.dist` already fails on warnings
+  and deprecations, and `moodle-plugin-ci phpunit --fail-on-warning` does the same. Fix the warning; do not add a
+  flag to hide it.
+- **"Moodle PHPUnit environment was initialised for different version" means some component on disk changed**
+  (`public/lib/phpunit/bootstraplib.php`, 5.2 and 5.3), not that yours is broken. Re-run `init.php`. When your own
+  schema change is not picked up, bump the plugin's `$plugin->version` or use `util.php --drop` then `init.php`.
+- **Run each new test file alone once**, and the whole suite in reverse order once
+  (`vendor/bin/phpunit --testsuite local_example_testsuite --order-by=reverse`). Alone catches a missing
+  `require_once` that another file happened to load; reverse order catches tests that depend on each other.
+  Seen in practice.
 
-## Test class skeleton
+## The default test
 
 ```php
 <?php
+// (GPL header)
+
 namespace local_example;
-defined('MOODLE_INTERNAL') || die();
 
 /**
- * @group local_example
- * @covers \local_example\manager
+ * Tests for the item manager.
+ *
+ * @package    local_example
+ * @category   test
+ * @copyright  2026 Your Name <you@example.com>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+#[\PHPUnit\Framework\Attributes\CoversClass(manager::class)]
 final class manager_test extends \advanced_testcase {
-
-    public function test_create_item(): void {
+    #[\Override]
+    protected function setUp(): void {
+        parent::setUp();
         $this->resetAfterTest();
-        $generator = self::getDataGenerator();
-        $course = $generator->create_course();
-        $user = $generator->create_user();
+    }
 
-        $manager = new manager();
-        $id = $manager->create_item($course->id, $user->id, 'hello');
-
+    public function test_create_item_stores_name(): void {
         global $DB;
+        $course = $this->getDataGenerator()->create_course();
+        $user = $this->getDataGenerator()->create_user();
+
+        $id = (new manager())->create_item($course->id, $user->id, 'hello');
+
         $row = $DB->get_record('local_example_items', ['id' => $id], '*', MUST_EXIST);
         $this->assertSame('hello', $row->name);
+        $this->assertEquals($course->id, $row->courseid);
     }
 }
 ```
 
-Key rules:
-- File name: `<thing>_test.php`, class: `<thing>_test`
-- `final class` (Moodle policy since 4.2)
-- `@covers` annotation required by Moodle CS
-- `@group <component>` enables `--group` filtering
-- `void` return type on test methods, `: void` on `setUp`
-- `self::` (not `$this->`) for static methods like `getDataGenerator()`
+What moodle-cs enforces on test files (moodle-cs 3.7, `moodle/Sniffs/PHPUnit/`):
 
-## Data generators
-
-Plugin generator at `tests/generator/lib.php`:
-
-```php
-<?php
-defined('MOODLE_INTERNAL') || die();
-
-class local_example_generator extends component_generator_base {
-    public function create_item(array $record = []): \stdClass {
-        global $DB, $USER;
-        $defaults = [
-            'courseid'   => 0,
-            'userid'     => $USER->id,
-            'name'       => 'Item ' . random_string(8),
-            'timecreated'=> time(),
-        ];
-        $record = (object)array_merge($defaults, $record);
-        $record->id = $DB->insert_record('local_example_items', $record);
-        return $record;
-    }
-}
-```
-
-Use:
-
-```php
-$gen = self::getDataGenerator()->get_plugin_generator('local_example');
-$item = $gen->create_item(['name' => 'test']);
-```
-
-Activity module generator extends `testing_module_generator` and implements `create_instance()`.
+- File `tests/<name>_test.php`, class `<name>_test`, namespace of the component (a file in `tests/local/` uses
+  `local_example\local`). The class is `final` (warning `UnitTestClassesFinal`).
+- Coverage: a `#[CoversClass]`, `#[CoversTrait]`, `#[CoversFunction]`, `#[CoversMethod]` or `#[CoversNothing]`
+  attribute on the class (on a method the sniff accepts only `#[CoversNothing]`), or an `@covers` docblock tag at
+  class or method level. A test with none gets the warning "is missing any coverage information, own or at class
+  level". The attributes are ignored only when phpcs knows the branch is below 5.0 (`TestCaseCoversSniff`,
+  `AbstractTestCaseSniff::shouldCheckTestCaseAttributes()`); with an unknown branch, or 5.0 and later, they count.
+  Tell phpcs the lowest branch you support with `--runtime-set moodleBranch 502`.
+- `setUp()`, `tearDown()`, `setUpBeforeClass()` and `tearDownAfterClass()` call their parent exactly once
+  (`ParentSetUpTearDownSniff`; "must call to parent::setUp() only once"). Calling the parent does not reset the
+  database; `resetAfterTest()` does.
+- No `defined('MOODLE_INTERNAL') || die();` in a file that only declares a class. Test helpers need full docblocks.
+- Test methods are `public function test_...(): void`. `getDataGenerator()`, `setUser()` and `setAdminUser()` are
+  static, so `self::` and `$this->` both work.
 
 ## Common patterns
 
-### Test an event
-
 ```php
+// Events: assert class, context and objectid, not only the count.
 $sink = $this->redirectEvents();
 $manager->do_thing();
 $events = $sink->get_events();
 $sink->close();
-$this->assertCount(1, $events);
 $this->assertInstanceOf(\local_example\event\thing_done::class, $events[0]);
-```
 
-### Test an email
-
-```php
-$sink = $this->redirectEmails();
+// Notifications and email: assert the rendered text, which catches {$a} placeholder mistakes.
+$sink = $this->redirectMessages();
 $manager->notify($user);
-$messages = $sink->get_messages();
-$this->assertSame($user->email, $messages[0]->to);
-```
+$this->assertStringNotContainsString('{$a', $sink->get_messages()[0]->fullmessage);
 
-### Test a scheduled task
-
-```php
-$task = new \local_example\task\cleanup();
-$task->execute();
-// assert side effects
-```
-
-### Test an external (web service) function
-
-```php
+// External function: always clean the return value against its declared structure.
 $this->setUser($user);
-$result = \local_example\external\get_items::execute($courseid);
-$result = \core_external\external_api::clean_returnvalue(
-    \local_example\external\get_items::execute_returns(),
-    $result
-);
-$this->assertCount(2, $result);
-```
+$result = \local_example\external\get_items::execute($course->id);
+$result = \core_external\external_api::clean_returnvalue(\local_example\external\get_items::execute_returns(), $result);
 
-`clean_returnvalue` is mandatory — catches schema mismatches.
-
-### Test an ad-hoc task
-
-```php
+// Ad-hoc task: queue it (or let the code under test queue it), then run the queue.
 \core\task\manager::queue_adhoc_task(new \local_example\task\send_report());
 $this->runAdhocTasks(\local_example\task\send_report::class);
+
+// Scheduled task: call execute() and assert its side effects.
+(new \local_example\task\cleanup())->execute();
+
+// Email: the sink captures before any mail is sent.
+$sink = $this->redirectEmails();
+$manager->notify($user);
+$this->assertSame($user->email, $sink->get_messages()[0]->to);
+
+// Users: setUser($user), setAdminUser(), setGuestUser(); each replaces $USER.
+
+// Time: freeze the clock that code reads through \core\di::get(\core\clock::class).
+$clock = $this->mock_clock_with_frozen(1893456000);   // 2030-01-01 00:00 UTC.
 ```
 
-### Login as a user
+Code that calls `time()` directly does not see the mocked clock; read the time through `\core\clock` in new code.
+`redirectHook()`, `assertDebuggingCalled()`, `get_mocked_http_client()` and `get_mocked_string_manager()` are on the
+same class. The helper classes behind them have namespaced, autoloaded names on 5.2 and 5.3
+(`\core\test\phpunit\phpunit_util`, `\core\test\phpunit\event_sink`, `message_sink`, `phpmailer_sink`,
+`\core\test\testing_util`); the old global names (`\phpunit_util`, `\phpunit_event_sink`) keep working without
+debugging until 6.0 (MDL-87716, `public/lib/UPGRADING.md` under 5.2). Generators, special test cases and
+PostgreSQL detail are in the reference files below.
 
-```php
-$user = $this->getDataGenerator()->create_user();
-$this->setUser($user);             // sets $USER global
-$this->setAdminUser();             // shortcut
-$this->setGuestUser();
-```
+- **Prefer the real test database to a mocked `$DB`.** The reset makes real rows cheap, and a mocked
+  `moodle_database` tests your expectations of the DML API rather than the SQL. When a collaborator must be faked,
+  inject it: obtain it in production code through `\core\di::get()` and replace it in the test with
+  `\core\di::set(\local_example\remote\api::class, $mock)`. Never assign to the global `$DB`.
+- **Coverage:** `vendor/bin/phpunit --coverage-text --testsuite local_example_testsuite` needs pcov or Xdebug loaded.
+  `--group <name>` selects tests tagged `#[\PHPUnit\Framework\Attributes\Group('<name>')]` (PHPUnit 11 behaviour,
+  not run for this skill); `--testsuite` is the selector that `init.php` builds for every component.
+- **A code path behind an optional PHP extension runs only where the extension is loaded.** An `if
+  (extension_loaded('imagick'))` branch is skipped on a site with GD only and runs on every CI row, so it fails
+  there first. Load the extension locally (`php -d extension=imagick.so vendor/bin/phpunit ...`) or treat that branch
+  as untested; the CI side is in `moodle-ci-matrix`.
 
-### Time-travel
+## Rules that green suites hide
 
-```php
-$this->mock_clock_with_frozen(1700000000);    // Moodle 4.4+
-// or in older versions, manually set timecreated/timemodified
-```
+Each was seen in practice on shipped plugins.
 
-## Running tests
+- **A debugging() message in a green run is a finding.** Symptom: "Unexpected debugging() call detected" as a notice,
+  or a deprecation that `failOnDeprecation` fails on the newest branch only. Fix: call the replacement API, guarded
+  with `method_exists()` when the old branch lacks it; use `assertDebuggingCalled()` only when the debugging is the
+  behaviour under test.
+- **Every template gets a test that renders it.** A `{{#str}}` key missing from the lang file, or a wrong context
+  key, passes every lint and unit test and breaks the live page. Fix:
 
-```bash
-# Single suite
-vendor/bin/phpunit --testsuite local_example_testsuite
+  ```php
+  global $PAGE;
+  $html = $PAGE->get_renderer('core')->render_from_template('local_example/card', $context);
+  $this->assertStringNotContainsString('[[', $html);   // A missing string renders as [[key]].
+  $this->assertStringContainsString('>' . s($name) . '<', $html);
+  ```
 
-# Single file
-vendor/bin/phpunit local/example/tests/manager_test.php
+  Use `$PAGE->get_renderer()` in tests, not `$OUTPUT`, which is not a page renderer outside a real request.
+- **A test process has loaded libraries a page has not.** The data generator requires `course/lib.php`
+  (`public/lib/testing/generator/data_generator.php`), `get_file_storage()` requires `lib/filelib.php`, and every
+  earlier test in the same run leaves its own `require_once` files loaded. Symptom: free functions from those
+  files work in PHPUnit and the page dies with "Call to undefined function". Fix: add the `require_once` in the
+  file that calls them, and make one real web request to every new entry point before calling the work done.
+- **`CLI_SCRIPT` is true under PHPUnit.** A `if (CLI_SCRIPT) { return; }` guard short-circuits every positive test,
+  and a suite that only asserts `false` then passes against broken code. Fix: inject the condition, and give every
+  negative test a positive twin that must pass.
+- **Negative tests assert the specific reason.** "It threw" proves nothing when it threw for an unrelated reason.
+  Fix: `expectExceptionMessage()` or assert the error code; a security regression test counts only after it was
+  seen failing with the fix reverted, at the exact output position.
+- **`assign_capability()` defaults to `$overwrite = false`** and does nothing when a row exists, for example the
+  archetype's allow. Fix: pass `true`, clear caches, and assert the gate flipped before testing it:
 
-# Single method
-vendor/bin/phpunit --filter test_create_item local/example/tests/manager_test.php
+  ```php
+  assign_capability('local/example:view', CAP_PROHIBIT, $roleid, $context->id, true);
+  accesslib_clear_all_caches_for_unit_testing();
+  $this->assertFalse(has_capability('local/example:view', $context, $user));
+  ```
 
-# By group
-vendor/bin/phpunit --group local_example
+- **Ids from the database are strings.** `$cm->id`, record ids and `contextlist::get_contextids()` hold numeric
+  strings, so `assertSame(5, $cm->id)` and `assertContains($context->id, $contextids)` fail. Fix: `assertEquals()`,
+  or cast both sides with `intval`/`array_map('intval', ...)`.
+- **Read core return shapes before asserting on them.** Many core `export_for_template()` results are stdClass
+  objects, not arrays (`action_link` exports `$x->attributes`). Fix: open the method's `return` statement.
+  Since 5.2.2, `block_myoverview` returns fields such as the course full name with numeric entities (`&#60;`) and
+  unencoded quotes where earlier builds returned named ones (`&lt;`) (MDL-79755, `UPGRADING.md` of 5.2.2 and
+  5.3.0). Symptom: an exact-string assertion on such a field passes on 5.2.0 and 5.2.1 and fails from 5.2.2.
+  Fix: compare decoded text, `html_entity_decode($value, ENT_QUOTES | ENT_HTML5)`.
+- **`isset($PAGE->cm)` is always false and `empty($PAGE->cm)` always true.** `moodle_page` has `__get()` but no
+  `__isset()` (`public/lib/pagelib.php`, 5.2 and 5.3), so a guard written that way skips the branch in tests and on
+  the site. Fix: read it first, `$cm = $PAGE->cm; if ($cm) { ... }`.
+- **Expected timestamps come from an independent tool.** Near DST or a window boundary, a hand-computed value is
+  wrong as often as the code. Paste the command in a comment; when a new test fails, decide which side is wrong
+  before changing code:
 
-# Coverage (requires xdebug or pcov)
-vendor/bin/phpunit --coverage-html coverage/ local/example/tests
-```
+  ```php
+  // python3 -c "from datetime import datetime; from zoneinfo import ZoneInfo;
+  //   print(int(datetime(2030, 3, 31, 9, tzinfo=ZoneInfo('Europe/London')).timestamp()))"
+  ```
 
-## Test database
+- **A fixture date that must be in the future is far-future or computed.** A literal that was "next year" when
+  written turns the suite red with no code change. Fix: a date in 2030 or later with the same DST shape, or
+  `time() + DAYSECS`, or a frozen clock.
+- **Multilang in tests:** set `$SESSION->forcelang` after `setUser()`, which clears it; `force_current_language()`
+  does nothing without an installed language pack.
+- **Your own observers run in your tests.** A `course_deleted` observer of the plugin can delete fixtures a test
+  built; an observer with `'internal' => false` runs only after commit (see the PostgreSQL reference).
+- **A probe that writes attacker-shaped data is a `resetAfterTest()` test**, never a CLI script: any script that
+  requires `config.php` writes to the live database.
 
-- Separate DB defined in `config.php`: `$CFG->phpunit_prefix = 'phpu_';`
-- Reset between tests via transactions — `$this->resetAfterTest()` enables it
-- Schema drift error: re-run `php admin/tool/phpunit/cli/init.php`
-- "Database was modified" failure means a test mutated DB without `resetAfterTest()`
+## Common mistakes
 
-## Mocking
+| Mistake | What happens | Fix |
+|---|---|---|
+| `vendor/bin/phpunit public/local/example/tests` | "No tests executed!", exit 0 | `--testsuite local_example_testsuite` or a file path; require `Tests: N > 0` |
+| Treating "OK, but there were issues" as green | CI fails on the same warning | Fix the warning or deprecation |
+| No `resetAfterTest()` in a test that writes | "Warning: unexpected database modification" | Call it in `setUp()` or the test |
+| `setUp()` without `parent::setUp()` | phpcs error from moodle-cs | Call the parent once, first |
+| Schema change, no version bump | New table missing in tests, init says nothing | Bump `version`, or `util.php --drop` then `init.php` |
+| Hand-editing `phpunit.xml` | Lost on the next init | Re-run `init.php`; pass per-run options on the command line |
+| `assertSame()` on an id or context id | Fails on string versus int | `assertEquals()` or cast |
+| `assign_capability()` without `$overwrite` | Prohibit silently not applied; test checks nothing | Pass `true`, clear caches, assert the flip |
+| Skipping `clean_returnvalue()` | Return-structure bugs reach the web service | Always clean the external result |
+| Asserting with `time()` | Flaky at second boundaries | `mock_clock_with_frozen()` or `assertTimeCurrent()` |
+| Template tested through its context only | Missing `{{#str}}` key breaks the live page | Render it and assert no `[[` |
+| Test passes locally on MariaDB | Fails on the PostgreSQL CI row | Read the PostgreSQL reference; treat it as unverified until that row runs |
+| Test passes only in the full suite | Missing `require_once` or order dependence | Run the file alone, and the suite with `--order-by=reverse` |
+| `if (empty($PAGE->cm))` | Always true: the branch never runs | Copy to a variable first |
+| Mocking `$DB` or replacing the global | Tests the mock, breaks isolation | Real test rows; fake collaborators through `\core\di::set()` |
+| Testing a log-store or observer effect on MariaDB only | Red on the PostgreSQL row | `preventResetByRollback()`, or assert through `redirectEvents()` |
 
-Moodle prefers integration tests with the real test DB over mocking `$DB`. When you must mock:
+## Reference files
 
-```php
-$mockDB = $this->createMock(\moodle_database::class);
-$mockDB->method('get_record')->willReturn((object)['id' => 1]);
-// inject via DI, never replace global
-```
+| File | Read it when |
+|---|---|
+| [reference/generators-and-fixtures.md](../moodle-skill-files/moodle-phpunit-testing/reference/generators-and-fixtures.md) | You write a plugin data generator, create activities, quiz attempts, grades, enrolments or users for a test, instantiate a block class, change module order, or back up and restore a course inside a test |
+| [reference/special-testcases.md](../moodle-skill-files/moodle-phpunit-testing/reference/special-testcases.md) | You test an external function, a routed controller (`route_testcase`), a privacy provider, admin settings pages, a moodleform or dynamic form, an HTTP client call, a hook listener, or core AI actions |
+| [reference/postgresql-and-isolation.md](../moodle-skill-files/moodle-phpunit-testing/reference/postgresql-and-isolation.md) | A test touches transactions, event observers, message processors, the log store or `perf_get_reads()`, or passes on MySQL/MariaDB and fails on PostgreSQL |
 
-Avoid replacing the global `$DB` — breaks isolation.
+## Version notes
 
-## Common Mistakes
-
-| Mistake | Fix |
-|---------|-----|
-| Forgetting `$this->resetAfterTest()` | Add at start of every DB-touching test |
-| Class not `final` | Add `final` (Moodle 4.2+ policy) |
-| Missing `@covers` | Add `@covers \Fully\Qualified\Class` |
-| Hand-editing `phpunit.xml` | Re-run `admin/tool/phpunit/cli/init.php` |
-| Using `parent::setUp()` to reset DB | Use `resetAfterTest()` instead |
-| Skipping `clean_returnvalue` on external fn | Always wrap external returns to catch schema bugs |
-| `$this->getDataGenerator()` (instance) | Moodle prefers `self::getDataGenerator()` (static) |
-| Asserting time with `time()` | Use `mock_clock_with_frozen` or compare with tolerance |
-
-## CI snippet (GitHub Actions)
-
-```yaml
-- name: PHPUnit
-  run: |
-    php admin/tool/phpunit/cli/init.php
-    vendor/bin/phpunit --testsuite ${{ matrix.suite }}
-```
-
-## Moodle 5.3 notes (beta — re-verify at 5.3.0)
-
-- Exporter/web-service strings use numeric entities (`&#38;` not `&amp;`), also 5.2.2+: update assertions ([MDL-79755](https://tracker.moodle.org/browse/MDL-79755)).
-- `admin/tool/phpunit/cli/util.php` gains `--snapshot[=NAME]`, `--restore=NAME` and `--upgrade`, so CI can restore a cached core install and upgrade in the plugin ([MDL-88495](https://tracker.moodle.org/browse/MDL-88495)).
-- Password/auth functions delegate to DI classes `\core\authentication\password` and `\core\authentication`, mockable via `\core\di::set()` ([MDL-88580](https://tracker.moodle.org/browse/MDL-88580)); `#[\DI\Attribute\Inject]` properties are filled by `\core\di::get()`/`make()` ([MDL-89528](https://tracker.moodle.org/browse/MDL-89528)).
-- `route_testcase` adds `assert_route_is_scoped()`, `assert_route_is_unscoped()`, `assert_route_required_scopes()` ([MDL-89089](https://tracker.moodle.org/browse/MDL-89089)).
-- Full 5.3 catalogue: `moodle-5-3-changes`.
+| Moodle | File |
+|---|---|
+| 5.3 | [versions/moodle-5.3.md](../moodle-skill-files/moodle-phpunit-testing/versions/moodle-5.3.md) |
 
 ## References
 
-- PHPUnit in Moodle: https://moodledev.io/general/development/tools/phpunit
-- Data generators: https://moodledev.io/docs/apis/subsystems/testing/generators
-- Test writing guide: https://moodledev.io/general/development/policies/testing
-- Coverage: https://moodledev.io/general/development/tools/phpunit#code-coverage
-- See also: `moodle-field-lessons` (generalized field lessons for this area)
+- https://moodledev.io/general/development/tools/phpunit
+- https://moodledev.io/docs/apis/subsystems/testing/generators (data generators)
+- https://moodledev.io/general/development/policies/codingstyle (test naming and docblocks)
+- `public/lib/phpunit/classes/advanced_testcase.php` (5.2 and 5.3): every helper named above
+- `public/admin/tool/phpunit/cli/init.php` and `util.php` (5.2 and 5.3)
+- Upgrade-specific changes: `moodle-5-3-changes`. Pre-release walk: `moodle-definition-of-done`.

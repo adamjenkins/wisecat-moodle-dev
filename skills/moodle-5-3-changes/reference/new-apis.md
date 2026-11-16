@@ -150,10 +150,12 @@ throw new \moodle_exception('errorwhilesaving', 'local_example', previous: $e);
 
 ### Personal access tokens (MDL-87706)
 
-`\core\api\token_manager::issue_token(string $name, int $userid, array $scopes, ...)` mints tokens with a `pat_`
-prefix and a maximum lifetime of one year (default 30 days). Users manage them at `/user/personalaccesstokens.php`,
-which needs the new system capability `moodle/api:createtoken` (risks config, data loss, spam, personal, XSS;
-manager archetype only). Issue tokens through `token_manager`, not the repository classes.
+`\core\api\token_manager` (get it from `\core\di::get()`; its constructor takes repositories and a clock) has
+`issue_token(string $name, int $userid, array $scopes, ?string $description, int $expirytime): string`, which mints
+a token with a `pat_` prefix. The longest lifetime is one year (`MAX_LIFETIME`); the form offers 7, 30, 60, 90 and
+365 days and preselects 30. Users manage tokens at `/user/personalaccesstokens.php`, which requires the new system
+capability `moodle/api:createtoken` (`RISK_SPAM | RISK_PERSONAL`; allowed by default for the authenticated user and
+manager archetypes, `public/lib/db/access.php`). Issue tokens through `token_manager`, not the repository classes.
 
 ### OAuth2 authorization server (MDL-89181)
 

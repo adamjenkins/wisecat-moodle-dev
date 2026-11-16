@@ -1,235 +1,250 @@
 ---
-description: Use when upgrading a plugin or theme to Moodle 5.3, targeting 5.3 (branch 503, MOODLE_503_STABLE), setting $plugin->requires for 5.3, or fixing 5.3 deprecations and breakages — user/lib.php functions moved to \core\user, legacy external_* classes and functions, FEATURE_GROUPMEMBERSONLY, Classic theme removal, Boost dark colour mode, React navigation and block_timeline, theme_boost/bootstrap/* imports, report builder sortable/set_main_table changes, duration element units, quiz report group selector, assign overrides and marker allocation, adhoc task ids, login/token.php hardening. Skip when working on 5.2 or earlier only, or for general plugin authoring (use moodle-plugin-development).
-globs: ["**/*.php", "**/*.mustache", "**/amd/src/**/*.js"]
+description: Use when porting a plugin or theme to Moodle 5.3 (branch 503, MOODLE_503_STABLE, $version 2026100500), adding 5.3 to $plugin->supported or CI, or fixing what 5.3 broke or deprecated — user/lib.php functions moved to \core\user, external_* functions that now throw, FEATURE_GROUPMEMBERSONLY, set_main_table() alias, duration units, queue_adhoc_task returning an id, the sr parameter, Classic theme removal, React primary/secondary navigation, dark colour mode, theme_boost/bootstrap imports, block_timeline renderer removal, quiz report action bar, assign overrides and marker events, enablemyhome on fresh sites, delete_course async. Skip when the plugin supports only 5.2 or the port starts from a version before 5.2, or when the question is the porting method (version guards, db/upgrade.php steps, PHP versions) rather than the 5.3 list (moodle-upgrade-migration), or the task is a theme recipe rather than what changed (moodle-theme-development).
+globs: ["**/*.php", "**/*.mustache", "**/amd/src/**/*.js", "**/*.scss", "**/*.css"]
 alwaysApply: false
 ---
 # Moodle 5.3 Changes
 
 ## Overview
 
-A developer digest of what changed in Moodle 5.3 and what plugin and theme
-authors must do about it. Breaking changes and deprecations come first, then
-new capabilities, then an upgrade checklist.
-
-**Status:** based on the Moodle **5.3beta (Build: 20260916)** `UPGRADING.md`
-and the MDL tracker issues it cites, checked against the 5.3beta source. It
-will be re-verified against 5.3.0 final. Where the notes and the beta code
-disagree, this skill follows the code and says so.
-
-See [reference.md](reference.md) for the full per-component catalogue — every
-5.3beta upgrade note, with actions, snippets and MDL links.
+What Moodle 5.3 removed, moved, deprecated, changed and added, and how to find each in a plugin. Based on the
+`## 5.3` section of the root `UPGRADING.md` of the 5.3.0 release (`$version = 2026100500.00`, `5.3 (Build:
+20261005)`) and checked against the 5.3.0 and 5.2 source by reading; where the notes and the code disagree, this
+skill follows the code and says so. Nothing here was run unless an entry says "run on 5.3.0".
 
 ## When to Use
 
-- Porting a plugin or theme to 5.3, or adding MOODLE_503_STABLE to CI
-- A 5.3 site shows debugging notices, `coding_exception`s or install failures
-  from plugin code
-- Choosing replacements for APIs deprecated in 5.3
-- Deciding whether a new 5.3 API (React components, colour modes, PATs, OAuth2
-  scopes) is usable given your supported versions
-- **Skip when:** the plugin only supports 5.2 or earlier, or the question is
-  general Moodle plugin structure (use `moodle-plugin-development`,
-  `moodle-upgrade-migration`)
+- Adding `MOODLE_503_STABLE` to CI or `503` to `$plugin->supported`
+- A 5.3 site shows debugging notices, `coding_exception`s, fatal errors or install failures from plugin code
+- CSS, templates, JavaScript or Behat selectors stopped matching on 5.3
+- Choosing whether a 5.3-only API is usable given the plugin's supported range
+- **Skip when:** the plugin supports only 5.2 or earlier, or you need the general porting method rather than the
+  5.3 list (`moodle-upgrade-migration`); building or fixing a theme beyond what changed (`moodle-theme-development`).
 
-## Platform and requirements
+## Release facts
 
-| Item | 5.3 value |
-|---|---|
-| `$branch` | `503` |
-| Beta version number | `2026091600.00` (`5.3beta (Build: 20260916)`) — re-check at 5.3.0 |
-| PHP | 8.3.0 minimum |
-| Databases | MariaDB 11.4, MySQL 8.4, PostgreSQL 17, SQL Server 15.0 (MariaDB was 10.11 and PostgreSQL 16 in 5.2) |
-| Upgrade from | Moodle 4.4 or later |
-| Composer | `composer install` was already required in 5.2; 5.3 adds `league/oauth2-server` (MDL-88457), and OAuth2 server admin pages check it via the new `\core\composer` status API (MDL-88576), so re-run `composer install` after upgrading |
-
-The database minimums come from `admin/environment.xml`, not UPGRADING.md.
-At the time of the beta the moodledev.io 5.3 release page listed older values
-(PostgreSQL 16, MariaDB 10.11, upgrade from 4.5); treat `environment.xml` as
-authoritative and re-check at release.
-
-For CI: drop MariaDB < 11.4 and PostgreSQL < 17 from MOODLE_503 jobs.
-
-## Breaking changes and removals
-
-Code that will fail, throw, or visibly break on 5.3:
-
-| Area | Change | Action |
+| Item | 5.3 | Source |
 |---|---|---|
-| core (MDL-83231) | `plugin_supports(..., FEATURE_GROUPMEMBERSONLY)` always throws `coding_exception`; installing/upgrading a module whose `<mod>_supports('groupmembersonly')` returns true throws `plugin_defective_exception` | Delete the `case FEATURE_GROUPMEMBERSONLY:` |
-| core_external (MDL-81225, MDL-76583) | `external_generate_token()`, `external_create_service_token()`, `external_delete_descriptions()`, `external_validate_format()`, `external_format_string()`, `external_format_text()`, `external_generate_token_for_current_user()`, `external_log_token_request()` are final-deprecated stubs and throw | Use `\core_external\util::` methods |
-| core_external | Global `\external_api`, `\external_value`, `\external_single_structure` etc. are no longer `class_alias`es in `lib/externallib.php`; they resolve via the renamed-classes map | `use core_external\external_api;` etc.; drop `require_once($CFG->libdir . '/externallib.php')` |
-| login/token.php (MDL-87010) | Credentials in the query string throw; `appsitecheck` parameter removed; service is validated before authentication | POST credentials; don't probe with `appsitecheck=1` |
-| core_form (MDL-89434) | `duration` element with `units` throws if the effective `defaultunit` (default `MINSECS`) is not in `units` | Set `defaultunit` to one of your `units` |
-| core_reportbuilder (MDL-87404) | Columns are sortable by default | Add `->set_is_sortable(false)` where sorting must stay off |
-| core_reportbuilder (MDL-88397) | `set_main_table($table, $alias)` — alias has no default | Always pass an alias |
-| core_ai (MDL-89123) | `prompttokens`/`completiontoken(s)` moved from `ai_action_*` child tables to `ai_action_register` | Update direct SQL |
-| mod_quiz (MDL-81096) | Group selector no longer printed for custom quiz reports | Call `$this->print_action_bar(...)` (see below) |
-| mod_assign (MDL-87709) | `marker_updated` event no longer triggered by core | Observe `marker_added` / `marker_removed` |
-| core_courseformat (MDL-88410) | Collapse/expand-all toggle moved from `content\section` output + template to `content` | Move overrides to `local/content.mustache` |
-| core_courseformat (MDL-88949) | Course index subsection ARIA moved to the activity `treeitem` | Update both `courseindex/cm` and `courseindex/section` overrides |
-| block_timeline (MDL-88287) | Rewritten in ESM + React; `output\main`, `output\renderer`, AMD modules and templates removed without stubs | Drop overrides of the old renderer/templates |
-| theme (MDL-88351) | Classic theme removed from core and uninstalled on upgrade; customised settings are migrated to Boost only if Classic was the site default theme | Re-parent Classic child themes or install Classic separately *before* upgrading |
-| theme_boost (MDL-89050) | `drawer` template block `{{$drawerheadercontent}}` replaced by `{{$drawercontrols}}` | Rename the block in overriding templates |
-| Navigation (MDL-87830, MDL-89294) | Primary and secondary nav rendered by React `core/nav/Nav` / `PrimaryNav`: `.mds-nav-pill` instead of `.nav-link`, no `.moremenu`; Boost navbar includes `core/primarymoremenu` | Retarget CSS/JS/Behat selectors; child navbars switch to `core/primarymoremenu` |
-| Modals (MDL-75699) | `core/modal` title is `<h2 class="modal-title fs-5">`, was `<h5>` | Body headings start at `<h3>`; fix selectors on `h5.modal-title` |
-| core_grades (MDL-89497, MDL-88407) | Courses with penalty-deducted grades are frozen on upgrade until a grade manager keeps or applies the fix | Warn admins; penalty-applying plugins re-test grading |
-| tool_task (MDL-86422) | `queue_adhoc_task($task, true)` returns the existing task's id instead of `false` for a duplicate | Don't use truthiness to mean "newly queued" |
-| Exporters (MDL-79755, also 5.2.2+) | Formatted exporter strings use numeric entities (`&#38;` not `&amp;`) | Update test assertions and JS comparisons |
-| Block uninstall (MDL-89289) | Instances deleted later by an ad-hoc task | Put per-instance cleanup in `instance_delete()`; don't assume contexts are gone |
-| Linear navigation (MDL-89406) | Formats returning true from `uses_linear_navigation()` get the prev/next footer **on by default** unless they add a `format_<name>/enablelinearnav` admin setting | Add the setting if you need an off switch |
+| Branch | `503`, `MOODLE_503_STABLE`; the LTS of the 5.x series | `public/version.php` |
+| `$version` of 5.3.0 | `2026100500.00`: `$plugin->requires = 2026100500;` | `public/version.php` |
+| PHP | 8.3.0 minimum; 8.4 supported | `public/admin/environment.xml`; https://moodledev.io/general/releases/5.3 |
+| Databases | PostgreSQL 17, MariaDB 11.4, MySQL 8.4, SQL Server 2019 (15.0) (5.2: PostgreSQL 16, MariaDB 10.11) | `environment.xml` |
+| Upgrade from | 4.4 or later | `environment.xml` |
+| Composer | run `composer install` at the Moodle root; 5.3 adds `league/oauth2-server` for the OAuth2 server | MDL-88457, MDL-88576 |
+| Removal schedule | deprecated in 5.3 means removed in 7.0 (LTS rule); deprecated in 4.5-5.2 means removed in 6.0 | https://moodledev.io/general/development/policies/deprecation |
 
-Quiz report minimal fix:
+## How to find what 5.3 changes in a plugin
 
-```php
-// In your quiz report's display() — mod_quiz\local\reports\report_base subclass.
-$this->print_action_bar('myreport', null, $cm, $reporturl);
+Run these from the plugin root. Each hit is a row in the tables below.
+
+```bash
+# Removed or now fatal
+grep -rn "FEATURE_GROUPMEMBERSONLY" .
+grep -rnE "\bexternal_(generate_token|create_service_token|delete_descriptions|validate_format|format_string|format_text|generate_token_for_current_user|log_token_request)\(" .
+grep -rn "block_timeline\\\\output\|block_timeline_renderer\|render_login" classes/ renderers.php 2>/dev/null
+grep -rnE "'duration'.*units|set_main_table\(\s*'[a-z_]+'\s*\)" .
+grep -rnE "prompttokens|completiontoken\b" .
+grep -rnE "'classic'|theme_classic" config.php version.php
+# Deprecated (notices on 5.3)
+grep -rnE "\b(user_[a-z_]+|can_view_user_details_cap)\(" --include=*.php . | grep -v "function user_"
+grep -rnE "extends\s+\\\\?external_api\b|new\s+\\\\?external_(value|single_structure|multiple_structure|function_parameters|warnings|files|format_value)\(" .
+grep -rnE "get_return_section\(|'sr'\s*=>|[?&]sr=|add_navitem\(|get_main_table\(\)|NO_MOODLE_COOKIES" .
+grep -rn "theme_boost/bootstrap/" amd/src
+# Behaviour that changed silently
+grep -rn "queue_adhoc_task(.*true)" .
+grep -rn "marker_updated" db/events.php classes/
+grep -rnE "delete_course\(" --include=*.php .
+# Markup and selectors
+grep -rnE "\.moremenu|primary-navigation .*\.nav-link|h5\.modal-title|drawerheadercontent|collapsesections|form-switch" --include=*.{css,scss,mustache,js,feature} .
 ```
 
-`duration` element fix:
+Then run the plugin's PHPUnit and Behat suites on 5.3 with `DEBUG_DEVELOPER`, and read the notes for every core
+function the plugin calls: a return value or default can change with no deprecation (the `queue_adhoc_task()` row
+below). The method is `moodle-upgrade-migration`.
 
-```php
-$mform->addElement('duration', 'timelimit', get_string('timelimit', 'quiz'),
-    ['units' => [HOURSECS, DAYSECS], 'defaultunit' => HOURSECS]);
-```
+## Removed, or now fatal
 
-## Deprecations (with replacements)
+| Change | Symptom | Fix | MDL |
+|---|---|---|---|
+| `FEATURE_GROUPMEMBERSONLY` supported by a module | `plugin_supports()` throws; install/upgrade throws `plugin_defective_exception` | Delete the `case FEATURE_GROUPMEMBERSONLY:` | MDL-83231 |
+| `external_format_text()`, `external_format_string()`, `external_validate_format()`, `external_generate_token()` and four more | Throw `coding_exception` (5.2: worked silently) | `\core_external\util::format_text()` etc. (exist on 5.2) | MDL-81225, MDL-76583 |
+| `login/token.php` credentials in the query string; `appsitecheck` | Throws; parameter gone | POST credentials | MDL-87010 |
+| `duration` element whose `units` exclude the effective `defaultunit` | `coding_exception` building the form | `'defaultunit' => HOURSECS` from your `units` | MDL-89434 |
+| `set_main_table('table')` without alias | `ArgumentCountError` | `set_main_table('table', 't')` | MDL-88397 |
+| AI token columns on `ai_action_*` child tables | Unknown column in direct SQL | Read `ai_action_register.prompttokens`, `completiontokens` | MDL-89123 |
+| `block_timeline\output\main`, `\renderer` | Fatal in a theme renderer that extends it | Delete the override | MDL-88287 |
+| `theme_boost\output\core_renderer::render_login()` | `parent::render_login()` gets core's context | Re-diff against core's `core/loginform` | MDL-89196 |
+| Classic theme | Themes with `classic` as a parent cannot work; settings migrate to Boost only when Classic was the site default | Re-parent on Boost (`moodle-theme-boost-child`) or install Classic before upgrading | MDL-88351 |
+| `public/lib/fonts/` | Hand-built paths to core fonts 404 | `[[font:core\|fa-solid-900.woff2]]` in CSS | `theme_config.php` |
 
-Still working in 5.3 but emitting notices (or scheduled for removal):
+Details, including the quiz report and Classic migration rules: [reference/removed-and-breaking.md](../moodle-skill-files/moodle-5-3-changes/reference/removed-and-breaking.md).
+
+## Moved and renamed
+
+| Old | New | Old name still works? |
+|---|---|---|
+| 25 `user/lib.php` functions (`user_create_user()`, `user_get_user_details()`, `user_can_view_profile()` ...) | `\core\user::create_user()` etc. (drop the `user_` prefix); `user_update_device_public_key()` to `\core_user\devicekey` | Yes, with a notice |
+| `\external_api`, `\external_value`, `\external_single_structure` and nine more global names | `\core_external\...` | Yes, notice on first use |
+| About 110 `admin_setting_*` and admin tree classes | `\core_admin\setting\...` | Yes, no notice; new names 5.3 only |
+| `theme_boost/bootstrap/*`, `theme_boost/index` AMD modules | `bootstrap` ESM package | Yes until 7.0 (RequireJS-to-ESM map) |
+| `core/loginform` in Boost | core `public/lib/templates/loginform.mustache` | Child overrides still win |
+| Section collapse toggle in `content\section` | `core_courseformat\output\local\content` and `local/content` | Still exported |
+| Default font system-ui | self-hosted Noto Sans | n/a |
+
+## Deprecated (works, emits a notice)
 
 | Deprecated | Replacement | MDL |
 |---|---|---|
-| 25 `user/lib.php` functions (`user_create_user()`, `user_update_user()`, `user_delete_user()`, `user_get_user_details()`, `user_can_view_profile()` …) | `\core\user::create_user()` etc. (name without `user_` prefix); `user_update_device_public_key()` → `\core_user\devicekey::update_device_public_key()` | MDL-82650 |
-| `theme_boost/bootstrap/*` AMD imports | `import {Tooltip} from 'bootstrap';` (5.3+) or `from 'theme_boost/index'` (5.2-compatible, until 7.0) | MDL-88766 |
-| `core_courseformat\base::get_return_section()` | `get_page_section()` | MDL-86284 |
-| `get_view_url()` option `'sr'` | `'pagesectionid' => $section->id` (docblock-only, no notice) | MDL-86284 |
-| report builder `get_main_table()` | `get_main_table_sql()` (includes `{braces}`) | MDL-88397 |
-| `extend_user_menu::add_navitem()` / `get_navitems()` | `add_menu_item(\core_user\output\user_action_menu\link ...)` / `get_menu_items()` | MDL-88938 |
-| `grade_item::update_deducted_mark()` | none — `\core_grades\penalty_manager` applies penalties | MDL-88407 |
-| `\core\hub\registration::get_dataroot_size()` | `get_filepool_usage()` | MDL-88805 |
-| `core/external_content_banner` template | `core_admin/notification_ctas` | MDL-89290 |
-| `core_admin_renderer::admin_notifications_page()` | `notifications_page()` (three banner args removed) | MDL-89290 |
-| `core_admin_renderer` `campaign_content()`, `services_and_support_content()`, `userfeedback_encouragement()`, `marketplace_integration_notice()` | customise `core_admin/notification_ctas` | MDL-89290 |
-| `core_admin_renderer::upgradekey_form_page()` | `upgradekey_form_page_with_validation($url, false)` | MDL-87896 |
-| `$CFG->showcampaigncontent` | no effect; hide cards with `$CFG->disablenotificationctas` | MDL-89290 |
-| `assign::delete_override()`, `assign::delete_all_overrides()`; global `move_group_override()`, `reorder_group_overrides()` (removal in 6.0, MDL-87324) | `\mod_assign\override_manager` (`delete_overrides_by_id()`, …) | MDL-86513 |
-| `assign::get_allocated_markers()` / `update_allocated_markers()` | `get_marker_allocations()` / `update_marker_allocations()` (different 2nd arg) | MDL-87709 |
-| `ASSIGN_MULTIMARKING_MAX_MARKERS` | `ASSIGN_MULTIMARKING_DEFAULT_MAX_MARKERS` | MDL-87709 |
-| `enrol_manual_plugin::enrol_cohort()` | none (use enrol_cohort) | MDL-89439 |
-| `\core\task\manager::task_is_scheduled()` | `get_queued_adhoc_task_record($task, false)` | MDL-86422 |
-| Old grade action bar templates | `core/navigation_action_bar`, `core/action_bar` | MDL-81096 |
-| Behat `I set portfolio instance "X" to "Y"` | `I set the portfolio instance "X" to "Y"` | MDL-89069 |
+| The 25 `user/lib.php` functions | `\core\user::*` (typed: cast arrays with `(object)`) | MDL-82650 |
+| `get_return_section()` | `get_page_section()` | MDL-86284 |
+| `sr` URL parameter on `course/modedit.php`, `course/mod.php`, `course/editsection.php` | `returnoptions[pagesectionid]` (5.2 knows only `sr`) | MDL-86284 |
+| `get_view_url()` option `'sr'` | `'pagesectionid' => $section->id` (no notice here) | MDL-86284 |
+| `extend_user_menu::add_navitem()`, `get_navitems()` | `add_menu_item()` with `\core_user\output\user_action_menu\link` etc. | MDL-88938 |
+| `get_main_table()` | `get_main_table_sql()` | MDL-88397 |
 | `NO_MOODLE_COOKIES` checks | `\core\session\manager::supports_cookies()` | MDL-87174 |
+| `assign::delete_override()`, `delete_all_overrides()`, `get_allocated_markers()`, `update_allocated_markers()` | `\mod_assign\override_manager`, `get_marker_allocations()`, `update_marker_allocations()` | MDL-86513, MDL-87709 |
+| `core_admin_renderer::admin_notifications_page()` and the banner methods; `core/external_content_banner` | `notifications_page()`; `core_admin/notification_ctas` | MDL-89290 |
+| `theme_boost/bootstrap/*` imports | `theme_boost/index` (5.2 and 5.3) or `bootstrap` (5.3+) | MDL-88766 |
+| `grade_item::update_deducted_mark()`, `get_dataroot_size()`, `enrol_cohort()`, `task_is_scheduled()` | `penalty_manager`, `get_filepool_usage()`, none, `get_queued_adhoc_task_record()` | MDL-88407, MDL-88805, MDL-89439, MDL-86422 |
 
-Renamed without notices (old names keep working): ~110 adminlib classes moved
-to `\core_admin\setting\...` (MDL-81935), e.g. `admin_setting_configtext` →
-`\core_admin\setting\setting\configtext`. Keep the old names while you
-support 5.2.
+Full list, with the admin setting rename map: [reference/deprecations.md](../moodle-skill-files/moodle-5-3-changes/reference/deprecations.md).
 
-A version-spanning replacement:
+## Changed behaviour (no notice)
 
-```php
-// Moodle 5.3+ only.
-$userid = \core\user::create_user((object) $data);
-// Supporting 5.2 too: keep user_create_user() (with require_once of
-// user/lib.php) until your minimum is 5.3; it still works, with a notice.
-```
+| Change | Symptom | Fix | MDL |
+|---|---|---|---|
+| `queue_adhoc_task($task, true)` returns the existing task's id, not `false` | "Already queued" branch never taken; tests asserting `false` fail | Do not read the result as "new"; compare ids | MDL-86422 |
+| Report builder columns sortable by default | Sort links on columns that cannot sort | `->set_is_sortable(false)` | MDL-87404 |
+| `mod_assign\event\marker_updated` not triggered | Observer never runs | Observe `marker_added`, `marker_removed` | MDL-87709 |
+| Custom quiz reports: no group selector from `print_header_and_tabs()` | Group selector missing | `$this->print_action_bar('myreport', null, $cm, $reporturl);` | MDL-81096 |
+| Exporter text uses numeric entities (`&#38;`) | String assertions fail | Update expectations | MDL-79755 |
+| Block uninstall deletes instances in an ad-hoc task | Contexts still present after uninstall | Keep cleanup in `instance_delete()`; run ad-hoc tasks in tests | MDL-89289 |
+| Linear navigation footer on by default for formats that opt in | Unexpected previous/next footer | `format_<name>/enablelinearnav` setting, or `$PAGE->set_show_navigation_footer(false)` | MDL-89406 |
+| Courses with penalised grades frozen on upgrade | Grades held until a manager decides | Warn admins; re-test penalty code | MDL-89497 |
+| `delete_course()` gains `$asyncpreferred = true`; asynchronous when `moodlecourse/enablecourseasyncdeletion` is on | Shortname still taken right after delete | `delete_course($course, false, false)` (safe on 5.2) | `public/lib/moodlelib.php` |
 
-## New capabilities by area
+## Site and UI changes a port meets
 
-| Area | What's new | MDL |
+- **Dark colour mode** (experimental `theme_boost/enablecolourmodes`) applies to every Boost-based theme when on;
+  literal colours in plugin CSS lose contrast. Use `var(--bs-body-bg)`, `var(--bs-body-color)`,
+  `var(--bs-border-color)`, `var(--bs-tertiary-bg)` and `bg-body*` / `text-body*` utilities; `--mds-*` tokens
+  exist only on 5.3. Font Awesome icons follow the text colour; a plugin's `pix/icon.svg` rendered as `<img>` does
+  not. MDL-68037.
+- **Navigation is React**: primary (`core/primarymoremenu`) and secondary (`core/secondarymoremenu`) navigation
+  render `a.mds-nav-pill` without `.moremenu`; the edit switch uses `mds-switch*`. Retarget CSS, JS and Behat.
+  MDL-89294, MDL-87830, MDL-89814.
+- **Modal titles are `<h2 class="modal-title fs-5">`**; headings in modal bodies start at `<h3>`. MDL-75699.
+- **Course index and drawer templates**: `drawercontrols` replaces `drawerheadercontent`; subsection ARIA moved to
+  the activity `treeitem`; the collapse-all toggle lost its `collapsesections` id (`[data-toggle="toggleall"]`).
+  MDL-89050, MDL-88949, MDL-89496.
+- **Fresh installs have `enablemyhome = 0`** (also on a fresh 5.2 install): `/` and Behat "I am on site homepage"
+  land on the user's start page. Set `enablemyhome = 1` and `defaulthomepage = 0` where a test needs the site home.
+- **A wide table on a `report` layout page inside an activity** sat under the course index on 5.3; use `incourse`
+  (`moodle-theme-layouts-templates`).
+- **Stylelint** rejects `container-type`, `@container` and `clamp()` in `font-size` through `csstree/validator`.
+  Not new in 5.3 (`.stylelintrc` is identical in the 5.2 and 5.3.0 trees), but a port often meets it while
+  restyling for dark mode; rule and workaround in `moodle-theme-scss`.
+
+Markup, selectors and editor detail: [reference/ui-and-templates.md](../moodle-skill-files/moodle-5-3-changes/reference/ui-and-templates.md). Theme work for
+5.3 starts at `moodle-theme-development`.
+
+## Added (5.3 only unless noted)
+
+| Area | Addition | MDL |
 |---|---|---|
-| Theming | Boost dark colour mode (experimental `theme_boost/enablecolourmodes`), `data-bs-theme` on `<html>`, `theme_boost\colour_mode`; TinyMCE follows the mode | MDL-68037 |
-| Theming | Self-hosted Noto Sans default font (+ cyrillic, Noto Sans JP for `:lang(ja)`); inline navbar search | MDL-88412, MDL-89024 |
-| React | `html_writer::react_component()`, `react_component_renderable`, AMD `core/import` and `core/component`, `scripts/swizzle.mjs` | MDL-89296, MDL-88505, MDL-88509 |
-| Output | `$PAGE->set_show_navigation_footer()`, `set_has_sticky_footer()`, `set_supplementary_content()`; `core\output\submenu`; `subpanel` URL; `notification_base` `headinglevel` | MDL-87575, MDL-87302, MDL-88601, MDL-88312, MDL-88458 |
-| Hooks | `\core\hook\email\before_email_to_user` — edit, add headers, or block outgoing mail | MDL-69724 |
-| DI | `#[\DI\Attribute\Inject]` properties; `\core\authentication`, `\core\authentication\password`, `\core_auth\validate_user`, `\core\composer` services | MDL-89528, MDL-88580, MDL-88576 |
-| REST API | Personal access tokens (`\core\api\token_manager`, `moodle/api:createtoken`), OAuth2 server clients, route scopes `#[scopeset]` / `#[unscoped_resource]` | MDL-87706, MDL-89181, MDL-89089 |
-| Web services | `'allowcorsrequests' => true` for no-login AJAX functions; `mod_assign_*_overrides`, `mod_forum_set_read_state`, `mod_quiz_get_users_in_report` | MDL-87150, MDL-86513, MDL-87887, MDL-81096 |
+| React | `html_writer::react_component()`, `react_component_renderable`, AMD `core/import`, `core/component`, `scripts/swizzle.mjs` | MDL-89296, MDL-88505, MDL-88509 |
+| Page | `set_show_navigation_footer()`, `set_has_sticky_footer()`, `set_supplementary_content()` | MDL-87575, MDL-87302, MDL-88601 |
+| Hooks | `\core\hook\email\before_email_to_user`; `before_import_map_config`, `before_requirejs_config` | MDL-69724 |
+| DI and auth | `#[\DI\Attribute\Inject]`; `\core\authentication`, `\core\authentication\password`, `\core_auth\validate_user`, `\core\composer` | MDL-89528, MDL-88580, MDL-88576 |
+| REST API | Personal access tokens (`\core\api\token_manager`, `moodle/api:createtoken`), OAuth2 server clients, route scopes | MDL-87706, MDL-89181, MDL-89089 |
+| Web services | `'allowcorsrequests' => true` for no-login functions; assign override, forum read state, quiz report user functions | MDL-87150, MDL-86513, MDL-87887, MDL-81096 |
 | Exceptions | `new moodle_exception(..., previous: $e)` | MDL-88579 |
-| Tasks | `adhoc_task::set_soft_retry_delay()` (also 5.2.2+); `set_scheduled_task_nextruntime()` returns bool | MDL-79763, MDL-89200 |
-| Course formats | `uses_linear_navigation()`, `inline_help` option key, disabled activity chooser items | MDL-87302, MDL-88669, MDL-87373 |
-| Report builder | `week`/`month`/`year` aggregations, `set_main_table_sql()`, auto `prepend_joins`, `add_fields(array)` | MDL-84635, MDL-88397, MDL-87405, MDL-89004 |
-| Accessibility | `core/imagedetails/modal` `getImageDetails(file)`; Behat `I set the focus on`, `--colourmode=dark` runs | MDL-89214, MDL-84065, MDL-68037 |
-| Testing | PHPUnit `util.php --snapshot`, `--restore=NAME`, `--upgrade` | MDL-88495 |
-| Grades | Scale-less outcomes linked to course modules | MDL-88881 |
+| Tasks | `set_soft_retry_delay()` (also 5.2.2+); `set_scheduled_task_nextruntime()` returns bool | MDL-79763, MDL-89200 |
+| Course formats | `uses_linear_navigation()`, `inline_help`, disabled chooser items | MDL-87302, MDL-88669, MDL-87373 |
+| Report builder | `week`/`month`/`year` aggregations, `set_main_table_sql()`, `prepend_joins()`, `add_fields(array)` | MDL-84635, MDL-88397, MDL-87405, MDL-89004 |
+| Testing | Behat `--colourmode`, `I set the focus on`; PHPUnit `util.php --snapshot`, `--restore`, `--upgrade` | MDL-68037, MDL-84065, MDL-88495 |
 
-Dark-mode-safe plugin CSS:
+The 5.3 OAuth2 server is an authorization server for Moodle's REST API, not an OpenID Connect provider (no
+`id_token`, userinfo, discovery or JWKS in `public/lib/classes/oauth2/server/`, read in 5.3.0): it does not replace an
+OIDC provider plugin for single sign-on. Signatures and samples:
+[reference/new-apis.md](../moodle-skill-files/moodle-5-3-changes/reference/new-apis.md).
 
-```css
-.local_myplugin-status {
-    background-color: var(--bs-tertiary-bg);
-    color: var(--bs-body-color);
-    border: 1px solid var(--bs-border-color);
-}
-[data-bs-theme="dark"] .local_myplugin-status {
-    /* only genuine per-mode differences here */
-}
-```
+## Supporting 5.2 and 5.3 from one codebase
 
-Email hook listener (`db/hooks.php`):
+- Keep the 5.2 call and add the 5.3 one behind a feature test; never the reverse:
 
 ```php
-$callbacks = [
-    [
-        'hook' => \core\hook\email\before_email_to_user::class,
-        'callback' => [\local_myplugin\hook_listener::class, 'before_email'],
-    ],
-];
-```
-
-```php
-public static function before_email(\core\hook\email\before_email_to_user $hook): void {
-    if (str_ends_with($hook->email->user->email, '@example.invalid')) {
-        $hook->email->add_block_reason('Recipient domain is blocked');
-    }
+if (method_exists(\core\user::class, 'create_user')) {
+    $userid = \core\user::create_user((object) $record);      // 5.3+
+} else {
+    require_once($CFG->dirroot . '/user/lib.php');
+    $userid = user_create_user((object) $record);             // 5.2
 }
 ```
+
+- Feature tests: `class_exists(\theme_boost\colour_mode::class)`, `class_exists(\core\output\react_component_renderable::class)`,
+  `method_exists(\core_courseformat\base::class, 'get_page_section')`, `method_exists($hook, 'add_menu_item')`.
+- `db/hooks.php` may name a 5.3-only hook; it is never dispatched on 5.2 (`moodle-hooks-api`).
+- What breaks on removals (external functions, `FEATURE_GROUPMEMBERSONLY`, `set_main_table()` alias, `duration`
+  units) has a fix that is valid on 5.2 too: apply it unconditionally.
+- Plugins that override core templates or style navigation usually need a branch per version; theme skills explain.
 
 ## Upgrade checklist
 
-1. Grep for `FEATURE_GROUPMEMBERSONLY` — remove it.
-2. Grep for `external_generate_token`, `external_format_`, `external_validate_format`, `external_delete_descriptions`, `external_log_token_request` — replace with `\core_external\util::`.
-3. Grep for bare `external_api`, `external_value`, `external_single_structure`, `external_multiple_structure`, `external_function_parameters` — switch to `use core_external\...`.
-4. Grep for the 25 `user/lib.php` functions — migrate or plan to when your minimum is 5.3.
-5. Grep `'duration'` form elements with `'units'` — check `defaultunit`.
-6. Report builder: pass an alias to `set_main_table()`; audit sortability; replace `get_main_table()`.
-7. Quiz report subplugins: call `print_action_bar()`; implement `has_permission()`.
-8. Grep AMD `src/` for `theme_boost/bootstrap/`; rebuild with grunt.
-9. Themes: remove Classic parentage; check `drawerheadercontent`, `.nav-link`/`.moremenu`, `h5.modal-title`, `core/loginform`, courseindex and `local/content` overrides.
-10. Styles: replace `bg-white`, `text-dark`, literal colours with `--bs-*` variables; run Behat once with `--colourmode=dark`.
-11. Event observers on `mod_assign\event\marker_updated` → `marker_added` / `marker_removed`.
-12. Callers of `queue_adhoc_task($task, true)` that test the return value.
-13. Course formats using linear navigation: add `format_<name>/enablelinearnav` if needed.
-14. CI: add MOODLE_503_STABLE with PHP 8.3+, PostgreSQL 17 / MariaDB 11.4.
-15. qbank plugins with bulk actions: override `get_action_icon()` (base returns `i/empty`) — MDL-73051.
-16. Run with `DEBUG_DEVELOPER` and fix every deprecation notice from your component.
+1. Run the greps above; fix every removal first, unconditionally.
+2. Replace `external_*()` functions and global `\external_*` class names; drop `require_once($CFG->libdir .
+   '/externallib.php')`.
+3. Migrate or guard the `user/lib.php` calls, `get_return_section()`, `sr`, `add_navitem()`.
+4. Report builder: alias in `set_main_table()`; audit sortability; replace `get_main_table()`.
+5. Quiz report subplugins: `print_action_bar()`; implement `has_permission()`.
+6. Event observers on `marker_updated`; callers of `queue_adhoc_task($task, true)` that test the result.
+7. AMD: replace `theme_boost/bootstrap/` imports; rebuild with `grunt amd`.
+8. Styles: replace literal colours, `bg-white`, `text-dark`; run Behat once with `--colourmode=dark`.
+9. Templates and selectors: `.moremenu`, `.nav-link`, `h5.modal-title`, `drawerheadercontent`, `collapsesections`,
+   courseindex and `local/content` overrides, `core/loginform`.
+10. qbank plugins with bulk actions: override `get_action_icon()` (the base returns `i/empty`).
+11. Course formats with linear navigation: add `format_<name>/enablelinearnav` if an off switch is needed.
+12. CI: add `MOODLE_503_STABLE` with PHP 8.3+, PostgreSQL 17 or MariaDB 11.4 ([reference/testing-and-ci.md](../moodle-skill-files/moodle-5-3-changes/reference/testing-and-ci.md)).
+13. Run PHPUnit and Behat on 5.3 with `DEBUG_DEVELOPER`; treat every "Unexpected debugging() call" as a failure.
+14. Set `$plugin->supported` to include `503` only after the suites pass on 5.3.
 
 ## Common mistakes
 
-| Mistake | Fix |
+| Mistake | What happens | Fix |
+|---|---|---|
+| `\core\user::create_user($array)` | `TypeError`: the method takes `stdClass` | `(object) $array` |
+| Raising `$plugin->requires` to 5.3 just to use `\core\user::` or `bootstrap` imports while claiming 5.2 | 5.2 sites cannot install | Feature-test, or `theme_boost/index` |
+| Treating `set_columnheadersattributes()`, `add_header_attributes()`, soft retry delay as 5.3-only | Unneeded guards | They are also on the 5.2 branch (5.2.2 and later builds); guard only for older 5.2 releases |
+| `\core\router\attributes\route` (from the notes) | Class not found | `\core\router\route` (`cookies:` option) |
+| `\core\authentication::get_plugin()` statically | Error: non-static method | `\core\di::get(\core\authentication::class)->get_plugin($auth)` |
+| `json_encode()`-ing props for `html_writer::react_component()` | Props double-encoded | Pass the array or object |
+| `ai_action_register.courseid` treated as always a course | Wrong reports | `0` = not backfilled, `-1` = not in a course |
+| Assuming a route without `#[scopeset]` is rejected | Open route | Declare scopes; test with `assert_route_is_scoped()` |
+| `'allowcorsrequests' => true` on a login-required function | No effect, false sense of access | Only for `loginrequired => false` functions safe cross-origin |
+| `override_manager::delete_override()` | Undefined method | `delete_overrides_by_id([$id])` |
+| Expecting `user_convert_text_to_menu_items()` to return typed items | Code written for objects that are not there | It still returns `stdClass` with `itemtype` (read in 5.3.0) |
+| Counting on `delete_course()` being synchronous in a setup script | Shortname collision on sites with async deletion | `delete_course($course, false, false)` |
+| Using the 5.3 OAuth2 server as an SSO identity provider | No `id_token`; relying party fails | An OIDC provider plugin |
+| Fixing only PHPUnit failures | Behat fails on deprecation debugging | Fix every notice |
+
+## Reference files
+
+| File | Read it when |
 |---|---|
-| Replacing `user_create_user($arr)` with `\core\user::create_user($arr)` | New methods are typed: cast with `(object) $arr` |
-| Setting `$plugin->requires` to 5.3 just to use `\core\user::` or `bootstrap` imports while claiming 5.2 support | Keep old calls (or `theme_boost/index`) until the minimum really is 5.3 |
-| Treating `set_columnheadersattributes()`, `add_header_attributes()`, soft retry delay as 5.3-only | They are also in 5.2.x: soft retry delay from 5.2.2, `set_columnheadersattributes()`/`add_header_attributes()` from 5.2.3 |
-| Using `\core\router\attributes\route` from the notes | The attribute class is `\core\router\route` (`cookies:` option) |
-| Calling `\core\authentication::get_plugin()` statically | Instance methods: `\core\di::get(\core\authentication::class)->get_plugin($auth)` |
-| `json_encode()`-ing props for `html_writer::react_component()` | Pass the array/object; the method encodes it |
-| Assuming `ai_action_register.courseid` is always a course | `0` = not yet backfilled, `-1` = context not in a course |
-| Assuming routes without `#[scopeset]` are rejected | Runtime applies no scope restriction; declare scopes explicitly |
-| Adding `'allowcorsrequests' => true` broadly | Only for `loginrequired => false` functions safe cross-origin |
-| Looking for `override_manager::delete_override()` | The method is `delete_overrides_by_id()` |
-| Hard-coding `fill` in SVGs shown via `<img>` | Use the pix/icon API so icons inherit `currentColor` in dark mode |
+| [reference/removed-and-breaking.md](../moodle-skill-files/moodle-5-3-changes/reference/removed-and-breaking.md) | something throws, fails to install, disappears or behaves differently on 5.3 and the tables above are not enough to fix it (quiz reports, Classic migration, linear navigation, block uninstall, hub registration) |
+| [reference/deprecations.md](../moodle-skill-files/moodle-5-3-changes/reference/deprecations.md) | a 5.3 deprecation notice names your code, you need the full `user/lib.php` or `external_*` mapping, or you meet a `\core_admin\setting\...` class |
+| [reference/ui-and-templates.md](../moodle-skill-files/moodle-5-3-changes/reference/ui-and-templates.md) | CSS, a template override, JS or Behat selectors stopped matching, or the plugin must look right in dark mode |
+| [reference/new-apis.md](../moodle-skill-files/moodle-5-3-changes/reference/new-apis.md) | you want to use a 5.3 API (React rendering, DI attributes, auth services, tokens, OAuth2 server, route scopes, email hook, soft retries, report builder or format additions) and need its signature |
+| [reference/testing-and-ci.md](../moodle-skill-files/moodle-5-3-changes/reference/testing-and-ci.md) | adding `MOODLE_503_STABLE` to CI, or PHPUnit, Behat or a setup script fails only on 5.3 |
 
 ## References
 
-- https://moodledev.io/docs/5.3/devupdate
+- Root `UPGRADING.md` of the 5.3.0 tree, section `## 5.3`; `public/theme/boost/UPGRADING.md`
 - https://moodledev.io/general/releases/5.3
-- Root `UPGRADING.md` in the Moodle 5.3 codebase (section `## 5.3beta`)
-- https://tracker.moodle.org/browse/MDL-82650 (user/lib.php → `\core\user`)
+- https://moodledev.io/docs/5.3/devupdate
+- https://moodledev.io/general/development/policies/deprecation
+- https://tracker.moodle.org/browse/MDL-82650 (user/lib.php to `\core\user`)
 - https://tracker.moodle.org/browse/MDL-81225 (legacy external classes)
 - https://tracker.moodle.org/browse/MDL-68037 (colour modes)
 - https://tracker.moodle.org/browse/MDL-88351 (Classic removal)
 - https://tracker.moodle.org/browse/MDL-88766 (Bootstrap imports)
-- https://tracker.moodle.org/browse/MDL-86887 (5.3 environment requirements)
-- [reference.md](reference.md) — full per-component catalogue

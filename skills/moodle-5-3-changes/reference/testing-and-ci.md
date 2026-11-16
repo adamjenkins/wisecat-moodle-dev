@@ -19,8 +19,10 @@ Sources: the 5.3.0 tree (`public/admin/environment.xml`, `public/admin/tool/beha
 | SQL Server | 2019 (15.0) or later | same |
 
 A job pairing `MOODLE_503_STABLE` with PostgreSQL 16 or MariaDB 10.11 fails at the environment check during
-install. After checkout, core needs `composer install` at the Moodle root; confirm in the install step's log that
-your CI ran it (not checked here for `moodle-plugin-ci`).
+install. After checkout, core needs `composer install` at the Moodle root. `moodle-plugin-ci install` runs it in
+the Moodle directory only when the plugin has PHPUnit tests or Behat features (moodle-plugin-ci
+`src/Installer/VendorInstaller.php`, read, not run); for a plugin with neither, or in a hand-written workflow, core's
+Composer packages are not installed unless the workflow runs the command. Confirm it in the install step's log.
 
 ## Deprecations fail Behat, not PHPUnit
 
@@ -37,14 +39,8 @@ the PHPUnit line as a failure and fix the call.
   a fresh 5.2 install; it shows up in a 5.3 port because CI and new test sites are fresh installs.
 - Symptom: Behat "I am on site homepage" lands on `/my/` (or the configured start page), and steps that expect the
   site home blocks or the "Site home" link fail.
-- Fix in the feature's Background, when the scenario needs the site home:
-
-```gherkin
-Background:
-  Given the following config values are set as admin:
-    | enablemyhome    | 1 |
-    | defaulthomepage | 0 |
-```
+- Fix: where a scenario needs the site home, set `enablemyhome` to 1 and `defaulthomepage` to 0 in the feature's
+  Background with `the following config values are set as admin:`. The rule is owned by `moodle-behat-testing`.
 
 ## `delete_course()` can be asynchronous
 
@@ -66,15 +62,15 @@ delete_course($course, false, false);
 
 | Change | Use | MDL |
 |---|---|---|
-| `--colourmode=<light\|dark>` on `admin/tool/behat/cli/init.php`, `util.php`, `util_single_run.php` (5.3 only); `behat_get_colour_mode()` exposes it | Run the suite once in dark mode. The option also turns colour modes on, so a scenario that assumes they are off starts with `Given the run is not using a colour mode`. Precedence: user preference, then run option, then site setting. Reference feature: `public/theme/boost/tests/behat/colour_mode_accessibility.feature` | MDL-68037 |
-| `--scss-deprecations` (5.2 and 5.3) | Fails any JavaScript step on a page that uses a Bootstrap 4 compatibility class; worth running now because the layer goes in 6.0 | |
+| `--colourmode=<light\|dark>` on `public/admin/tool/behat/cli/init.php`, `util.php`, `util_single_run.php` (5.3 only); `behat_get_colour_mode()` exposes it | Run the suite once in dark mode. The option also turns colour modes on, so a scenario that assumes they are off starts with `Given the run is not using a colour mode`. Precedence: user preference, then run option, then site setting. Reference feature: `public/theme/boost/tests/behat/colour_mode_accessibility.feature` | MDL-68037 |
+| `--scss-deprecations` (5.2 and 5.3) | Fails any JavaScript step on a page that uses a Bootstrap 4 compatibility class (read in `public/lib/behat/classes/behat_session_trait.php`, not run); worth running now because the layer goes in 6.0 | |
 | `I set the focus on the "<element>" "<selector>"` | Move keyboard focus without activating; JavaScript scenarios only, throws otherwise | MDL-84065 |
 | `the course linear navigation should be visible` / `should not be visible` | Assert the previous/next footer | MDL-87575 |
 | `I set portfolio instance "X" to "Y"` deprecated | `I set the portfolio instance "X" to "Y"` | MDL-89069 |
 | Navigation markup is React (`.mds-nav-pill`), search box is inline, modal titles are `<h2>` | Replace raw CSS/XPath selectors with named selectors or navigation steps | MDL-89294, MDL-87830, MDL-75699 |
 
 ```sh
-php admin/tool/behat/cli/init.php --colourmode=dark
+php public/admin/tool/behat/cli/init.php --colourmode=dark
 ```
 
 ## PHPUnit
@@ -103,5 +99,5 @@ php public/admin/tool/phpunit/cli/util.php --upgrade
 
 - Rebuild AMD after replacing `theme_boost/bootstrap/*` imports (`grunt amd`); `moodle-plugin-ci grunt` fails when
   `amd/build` is out of date.
-- 5.3's stylelint rejects `container-type`, `@container` and `clamp()` in `font-size` through `csstree/validator`;
-  the per-line workaround is in `moodle-theme-scss`.
+- Stylelint rejects `container-type`, `@container` and `clamp()` in `font-size` through `csstree/validator`, on 5.2
+  and 5.3 alike (`.stylelintrc` is identical in both trees); the per-line workaround is in `moodle-theme-scss`.

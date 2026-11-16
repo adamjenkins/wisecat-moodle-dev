@@ -1,6 +1,6 @@
 ---
 name: moodle-5-3-changes
-description: Use when porting a plugin or theme to Moodle 5.3 (branch 503, MOODLE_503_STABLE, $version 2026100500), adding 5.3 to $plugin->supported or CI, or fixing what 5.3 broke or deprecated — user/lib.php functions moved to \core\user, external_* functions that now throw, FEATURE_GROUPMEMBERSONLY, set_main_table() alias, duration units, queue_adhoc_task returning an id, the sr parameter, Classic theme removal, React primary/secondary navigation, dark colour mode, theme_boost/bootstrap imports, block_timeline renderer removal, quiz report action bar, assign overrides and marker events, enablemyhome on fresh sites, delete_course async. Skip when the plugin supports only 5.2 (moodle-upgrade-migration) or the task is a theme recipe rather than what changed (moodle-theme-development).
+description: Use when porting a plugin or theme to Moodle 5.3 (branch 503, MOODLE_503_STABLE, $version 2026100500), adding 5.3 to $plugin->supported or CI, or fixing what 5.3 broke or deprecated — user/lib.php functions moved to \core\user, external_* functions that now throw, FEATURE_GROUPMEMBERSONLY, set_main_table() alias, duration units, queue_adhoc_task returning an id, the sr parameter, Classic theme removal, React primary/secondary navigation, dark colour mode, theme_boost/bootstrap imports, block_timeline renderer removal, quiz report action bar, assign overrides and marker events, enablemyhome on fresh sites, delete_course async. Skip when the plugin supports only 5.2 or the port starts from a version before 5.2, or when the question is the porting method (version guards, db/upgrade.php steps, PHP versions) rather than the 5.3 list (moodle-upgrade-migration), or the task is a theme recipe rather than what changed (moodle-theme-development).
 ---
 
 # Moodle 5.3 Changes
@@ -141,7 +141,9 @@ Full list, with the admin setting rename map: [reference/deprecations.md](refere
   land on the user's start page. Set `enablemyhome = 1` and `defaulthomepage = 0` where a test needs the site home.
 - **A wide table on a `report` layout page inside an activity** sat under the course index on 5.3; use `incourse`
   (`moodle-theme-layouts-templates`).
-- **5.3 stylelint** rejects `container-type`, `@container`, `clamp()` in `font-size` (`moodle-theme-scss`).
+- **Stylelint** rejects `container-type`, `@container` and `clamp()` in `font-size` through `csstree/validator`.
+  Not new in 5.3 (`.stylelintrc` is identical in the 5.2 and 5.3.0 trees), but a port often meets it while
+  restyling for dark mode; rule and workaround in `moodle-theme-scss`.
 
 Markup, selectors and editor detail: [reference/ui-and-templates.md](reference/ui-and-templates.md). Theme work for
 5.3 starts at `moodle-theme-development`.

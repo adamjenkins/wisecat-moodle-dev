@@ -45,10 +45,10 @@ keeps the traps those recipes do not spell out. Samples are valid on Moodle 5.2 
   $block->init();
   ```
 
-- **Assorted traps:** `$cm->id` is a numeric string (use `assertEquals` or cast); `$PAGE->cm` is a magic property, so
-  `empty($PAGE->cm)` is always true (read it into a variable first); `CLI_SCRIPT` is true under PHPUnit, so a CLI-only guard
-  short-circuits every positive-path test, and a suite of only `assertFalse` then passes vacuously; your own
-  observers (for example on `course_deleted`) may delete fixtures the test built.
+- **Assorted traps:** `$cm->id` is a numeric string (use `assertEquals` or cast); `$PAGE->cm` is a magic property,
+  so `empty($PAGE->cm)` is always true (read it into a variable first); `CLI_SCRIPT` is true under PHPUnit, so a
+  CLI-only guard short-circuits every positive-path test, and a suite of only `assertFalse` then passes
+  vacuously; your own observers (for example on `course_deleted`) may delete fixtures the test built.
 - **Some module generators need a real user**: call `$this->setAdminUser()` before `create_module('workshop', ...)`
   ("No guests here!"). `mod_workshop` creates two grade items per instance, a ready multi-grade-item fixture.
 - **Generators append modules to the end of a section.** To test another order, set `course_sections.sequence`
@@ -85,8 +85,9 @@ keeps the traps those recipes do not spell out. Samples are valid on Moodle 5.2 
   test files too.
 - **Core's `phpunit.xml.dist` sets `failOnWarning="true"`** (root of the Moodle tree, 5.3.0), so a run that "passes
   with warnings" is a failing run locally as well as in CI.
-- **More PHPUnit traps with their own home:** PostgreSQL's per-test transaction and `preventResetByRollback()`,
-  `MODE_GENERAL` backups in tests, quiz attempt previews, `contextlist` ids as strings: `moodle-phpunit-testing`.
+- **More PHPUnit traps with their own home:** the per-test transaction on PostgreSQL and SQL Server and
+  `preventResetByRollback()`, `MODE_GENERAL` backups in tests, quiz attempt previews, `contextlist` ids as
+  strings: `moodle-phpunit-testing`.
 
 ## Security regression tests
 
@@ -130,8 +131,8 @@ See also `moodle-behat-testing`.
 
 See also `moodle-ci-matrix` and `moodle-definition-of-done`.
 
-- **Derive every matrix cell** (Moodle x PHP x DB) from each branch's `public/admin/environment.xml`; never cross current
-  PHP or database versions with old branches. Check service images, `include` entries missing axes, and
+- **Derive every matrix cell** (Moodle x PHP x DB) from each branch's `public/admin/environment.xml`; never cross
+  current PHP or database versions with old branches. Check service images, `include` entries missing axes, and
   artifact-name characters.
 - **Vacuous passes:** an empty `tests/` passes phpunit and behat; `phpmd` exits 0 with violations; `mustache`
   needs an `Example context (json):` block per template; `.mustachelintignore` silences only HTML validation;

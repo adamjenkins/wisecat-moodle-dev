@@ -32,8 +32,8 @@ developer docs, not run; **seen** means observed in a running app against a site
    installed language (`public/admin/tool/mobile/classes/api.php:160-230`, read 5.3.0). The result is cached in the
    `tool_mobile/plugininfo` MUC cache: after editing `db/mobile.php`, purge caches and log in again in the app.
 2. When the user opens a handler, the app calls `tool_mobile_get_content(component, method, args)`. Core calls
-   `\<component>\output\mobile::<method>(array $args)` directly (`public/admin/tool/mobile/classes/external.php:411-455`,
-   read 5.2 and 5.3). The method is not a web service: do not declare it in `db/services.php`.
+   `\<component>\output\mobile::<method>(array $args)` directly (`external::get_content()` in
+   `public/admin/tool/mobile/classes/external.php`, read 5.2 and 5.3). The method is not a web service: do not declare it in `db/services.php`.
 3. The method returns `templates`, `javascript`, `otherdata`, `files`, and for `init` methods `restrict` and
    `disabled`. The app renders the first template, runs the JavaScript in the component's scope, and exposes
    `otherdata` as `CONTENT_OTHERDATA` (`INIT_OTHERDATA` for `init`).

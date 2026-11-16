@@ -262,8 +262,9 @@ Reference: [reference/modals-forms-editors.md](reference/modals-forms-editors.md
 - Import Bootstrap components as `import {Tooltip} from 'theme_boost/index'` on 5.2 and 5.3. **5.3+:**
   `import {Tooltip} from 'bootstrap'` is the new name and `theme_boost/bootstrap/*` is deprecated
   (`public/theme/boost/UPGRADING.md`, MDL-88766; old names are mapped in `theme_boost\hook_listener`, read 5.3.0).
-- Markup built in JavaScript uses Bootstrap 5 classes (`visually-hidden`, `me-2`, `fw-bold`): Bootstrap 4 names fail
-  CI Behat run with `--scss-deprecations` on 5.2 and 5.3.
+- Markup built in JavaScript uses Bootstrap 5 classes (`visually-hidden`, `me-2`, `fw-bold`): a Bootstrap 4 name
+  fails every JavaScript step of a Behat run initialised with `--scss-deprecations`, on 5.2 and 5.3 (read in
+  `public/lib/behat/classes/behat_session_trait.php` `look_for_deprecated_styles()`, not run).
 - The `hidden` attribute loses to `d-flex` and other `d-*` utilities (they are `!important`): toggle `d-none`.
 - Code that scrolls an element into view on a phone treats the bottom of Boost's fixed navbar (`$navbar-height: 60px`,
   `public/theme/boost/scss/moodle/variables.scss:28`, read 5.3.0) as the top of the visible area.

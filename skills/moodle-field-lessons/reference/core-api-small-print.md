@@ -15,11 +15,12 @@ Samples are valid on Moodle 5.2 and 5.3; source lines were read in 5.3.0 unless 
   token you mint so you can revoke it (`moodle-web-services`).
 - **Another user's timezone:** if `empty($tz) || $tz == 99`, use `core_date::get_server_timezone()`;
   `get_user_timezone(99)` resolves through the viewer's `$USER->timezone`, not the other user's.
-- **The enrolment welcome message throws for a user with no email address** when the enrolment runs outside a
-  database transaction: `send_course_welcome_message_to_user()` calls `message_send()`, the email processor
-  fails, and the message manager throws `moodle_exception` "Message was not sent."; inside a transaction the
-  message is buffered until the commit instead (`public/lib/enrollib.php`,
-  `public/lib/classes/message/manager.php`, `send_message_to_processors()`; read in 5.3.0, not run). An importer
+- **The manual enrolment welcome message throws for a user with no email address** when the enrolment runs
+  outside a database transaction: `send_course_welcome_message_to_user()` calls `message_send()`, the email
+  processor fails, and the message manager throws `moodle_exception` "Message was not sent."; inside a
+  transaction the message is buffered until the commit instead (`public/lib/enrollib.php`,
+  `public/enrol/manual/classes/user_enrolment_callbacks.php`, `public/lib/classes/message/manager.php`,
+  `send_message_to_processors()`; read in 5.3.0, not run). An importer
   that enrols users without email first sets the enrol instance's `customint1` to `ENROL_DO_NOT_SEND_EMAIL`.
 - **`$USER` is cached in the session**: a database change to the current user's record is not visible to sessions
   already logged in.

@@ -1,6 +1,6 @@
 ---
 name: moodle-theme-boost-child
-description: Use when building or fixing a Moodle theme whose config.php has $THEME->parents = ['boost'] (a Boost child) or ['boost_union', 'boost'] (a grandchild) - the minimal config.php, lib.php, version.php and lang file, which $THEME keys must be restated (rendererfactory, haseditswitch, usescourseindex, requiredblocks), theme_boost_get_main_scss_content and presets, why brandcolor, scsspre or the background image is ignored, "my theme looks like plain Boost", screenshot, favicon and privacy provider, and what breaks when Boost changes between 5.2 and 5.3. Skip when the question is the SCSS itself (moodle-theme-scss), layouts or templates (moodle-theme-layouts-templates), renderers or hooks (moodle-theme-renderers-output), the settings page (moodle-theme-settings), or choosing between a child and a stand-alone theme (moodle-theme-development).
+description: Use when building or fixing a Moodle theme whose config.php has $THEME->parents = ['boost'] (a Boost child) or ['boost_union', 'boost'] (a grandchild) - the minimal config.php, lib.php, version.php and lang file, which $THEME keys must be restated (rendererfactory, haseditswitch, usescourseindex, requiredblocks), theme_boost_get_main_scss_content and presets, why brandcolor, scsspre or the background image is ignored, a child that lost the edit switch, the course index or its renderer overrides, screenshot, favicon and the null privacy provider, and what breaks when Boost changes between 5.2 and 5.3. Skip when the question is the SCSS itself or a theme that renders as plain Boost (moodle-theme-scss), layouts or templates (moodle-theme-layouts-templates), renderers or hooks (moodle-theme-renderers-output), the settings page (moodle-theme-settings), or choosing between a child and a stand-alone theme (moodle-theme-development).
 ---
 
 # Moodle Boost child theme
@@ -17,11 +17,11 @@ so every 5.2 statement is "read in the 5.2 source".
 
 - Starting a theme that should look like Boost with a different brand, extra SCSS, a few settings or overrides
 - A child theme ignores a Boost setting, loses the edit switch or course index, or shows navigation blocks again
-- A child theme renders as plain Boost after an SCSS change
 - Building on top of another Boost child (a grandchild), or making a child safe to be a parent
 - Moving a child theme between Moodle versions
 - **Skip when:** you are deciding what kind of theme to build, or need the selection order, caches and purge
-  commands (use `moodle-theme-development`); the work is inside one area, where the sibling owns the detail:
+  commands (use `moodle-theme-development`); the theme renders as plain Boost after an SCSS change
+  (`moodle-theme-scss`); the work is inside one area, where the sibling owns the detail:
   `moodle-theme-scss`, `moodle-theme-layouts-templates`, `moodle-theme-renderers-output`, `moodle-theme-settings`,
   `moodle-theme-testing-release`
 

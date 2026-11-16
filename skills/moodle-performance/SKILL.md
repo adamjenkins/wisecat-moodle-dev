@@ -228,7 +228,8 @@ $task->set_userid($USER->id);                       // Runs as this user; must b
   task's id where 5.2 returned `false`; see [versions/moodle-5.3.md](versions/moodle-5.3.md).
 - **Re-check permissions in `execute()`.** The user's capabilities may have changed between queueing and running.
 - **Throwing from `execute()` marks the task failed** and cron retries it with a growing delay. To wait for something
-  without counting a failure, call `$this->set_soft_retry_delay()` and return (5.2.2+ and 5.3).
+  without counting a failure, call `$this->set_soft_retry_delay()` and return (present from 5.2.2 and on 5.3; guard
+  with `method_exists()` if `requires` is 5.2.0).
 
 Scheduled tasks, `db/tasks.php`, locks, concurrency limits, retries and running tasks from the CLI:
 [reference/tasks.md](reference/tasks.md).
@@ -266,7 +267,7 @@ Scheduled tasks, `db/tasks.php`, locks, concurrency limits, retries and running 
 | `ttl` instead of invalidation | Stale data until expiry, wrapper cost | `invalidationevents` and `\core_cache\helper::invalidate_by_event()` |
 | Mail or external calls on POST | Slow page, timeouts, duplicate sends on retry | Ad-hoc task |
 | Lock released outside `finally` | Lock held until it expires after an exception | `try { ... } finally { $lock->release(); }` |
-| Truthiness test on `queue_adhoc_task($t, true)` | "Already queued" never detected on 5.3 | Check the queue with `get_adhoc_tasks()` (5.3 version notes) |
+| Truthiness test on `queue_adhoc_task($t, true)` | "Already queued" never detected on 5.3 | Ask the queue first with `get_queued_adhoc_task_record($t, false)` (5.3 version notes) |
 | Grade, modinfo or course APIs in `db/upgrade.php` | Upgrade slow or broken on large sites | Queue an ad-hoc task (`moodle-upgrade-migration`) |
 
 ## Reference files

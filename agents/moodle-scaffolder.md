@@ -217,10 +217,13 @@ generator are in the `moodle-phpunit-testing` skill.
    ```bash
    php admin/cli/upgrade.php --non-interactive
    php admin/cli/purge_caches.php
-   vendor/bin/phpcs --standard=moodle public/<typedir>/<name>
+   phpcs --standard=moodle public/<typedir>/<name>
    php public/admin/tool/phpunit/cli/init.php
    vendor/bin/phpunit --testsuite <component>_testsuite
    ```
+   `phpcs` with the `moodle` standard comes from `moodlehq/moodle-cs` (`composer global require
+   moodlehq/moodle-cs`); core's own `composer.json` in 5.2 and 5.3 does not install it.
+   `moodle-plugin-ci phpcs --max-warnings 0` is the same check as CI runs.
    Select tests by `--testsuite` or by a test file, not by a bare directory: a directory finds no Moodle test
    files and reports "No tests executed!" with exit status 0.
    For a theme, add how to try it without making it the site theme and how to see a compile error

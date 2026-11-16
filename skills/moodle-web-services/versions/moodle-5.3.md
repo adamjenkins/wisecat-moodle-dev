@@ -1,7 +1,11 @@
 # Web services on Moodle 5.3
 
-What differs on 5.3 against the 5.2 baseline. Read in the 5.3.0 source and its `UPGRADING.md`; the full upgrade
-catalogue is in `moodle-5-3-changes`.
+Read this when the plugin's `supported` range includes 503 and it defines or calls external functions, when a
+global `external_*` name fails or warns on 5.3, or when a client uses `login/token.php`, cross-origin AJAX or the
+routed REST API.
+
+This file says what differs on 5.3 against the 5.2 baseline. Read in the 5.3.0 source and its `UPGRADING.md`, not
+run; the full upgrade catalogue is in `moodle-5-3-changes`.
 
 ## Legacy global names are deprecated
 
@@ -18,7 +22,7 @@ The global classes and functions that `lib/externallib.php` aliased on 5.2 are d
 
 - The old class names now resolve through the renamed-classes list, and the autoloader emits a developer
   `debugging()` notice ("Class 'external_api' has been renamed for the autoloader and is now deprecated"), which
-  fails a PHPUnit or Behat run (`public/lib/classes/component.php`, read in 5.3.0, not run).
+  fails a PHPUnit or Behat run (`public/lib/classes/component.php`, `classloader()`, read in 5.3.0, not run).
 - The old functions are final deprecations on 5.3: they are stubs marked `final: true`, so calling one throws a
   `coding_exception` (`public/lib/externallib.php` and `public/lib/classes/deprecation.php`,
   `emit_deprecation_notice()`, 5.3.0). Code that still calls `external_format_string()` breaks.
@@ -51,7 +55,8 @@ Core and module functions that return course modules (`core_course`, forum, h5p,
 `standard_coursemodule_elements`. A plugin's own `mod_*_get_*_by_courses` function should build its course-module
 fields with `\core_course\external\helper_for_get_mods_by_courses` (`standard_coursemodule_element_values()` and
 `standard_coursemodule_elements_returns()`) so the app sees the same shape (`UPGRADING.md`, MDL-87241;
-`public/course/classes/external/helper_for_get_mods_by_courses.php`, 5.3.0).
+`public/course/classes/external/helper_for_get_mods_by_courses.php`, 5.3.0). The helper and both methods are in
+5.2 as well, so the same code serves both versions.
 
 ## The REST API (routing engine) and personal access tokens
 

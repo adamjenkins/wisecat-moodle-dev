@@ -11,16 +11,17 @@ files; not run.
   a GET worked, so test scripts and CI helpers written for 5.2 break.
 - The service is checked before the user is authenticated, so an unknown or disabled service fails before any login
   attempt.
-- The `appsitecheck` parameter is gone (5.2 answered `{"appsitecheck": "ok"}` before authenticating,
-  `login/token.php:39-40` on 5.2).
+- The `appsitecheck` parameter is gone (5.2 answered `{"appsitecheck": "ok"}` before authenticating; read in
+  `public/login/token.php` of 5.2).
 
 Source: `public/lib/UPGRADING.md` 5.3, MDL-87010.
 
 ## Deep-link auto-login
 
 `tool_mobile/enabledeeplinkautologin` (new, default off) controls whether a deep link that carries a token and
-private token logs the user in automatically (`public/admin/tool/mobile/settings.php:577`, MDL-88924; not in the 5.3.0 upgrade notes). A plugin that
-generates app deep links for automatic login needs that setting on, and should say so in its documentation.
+private token logs the user in automatically (`public/admin/tool/mobile/settings.php`, MDL-88924; the setting is not
+in the 5.3.0 upgrade notes, it was read in the source). A plugin that generates app deep links for automatic login
+needs that setting on, and should say so in its documentation.
 
 ## Web services returning course modules
 

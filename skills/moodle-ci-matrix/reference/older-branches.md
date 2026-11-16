@@ -13,8 +13,10 @@ the branch itself before relying on it (main file, section 3).
 | `MOODLE_501_STABLE` (5.1) | 8.2 to 8.4 | 10.11.0 | 15 | 8.4 |
 
 How they were read: the minimums from the `<MOODLE version="X.Y">` blocks of `public/admin/environment.xml` in the
-5.3.0 tree, which agree with each branch's own file as last read; the maximum PHP from each branch's core
-`.github/workflows/push.yml` ("highest PHP supported"), read on the branches and not re-read for this file.
+5.2 and 5.3.0 trees, which hold a block for every earlier release; the PHP range from core's
+`.github/workflows/push.yml` at each branch's `vX.Y.0` tag ("lowest PHP supported" on the MySQL job, "highest PHP
+supported" on the PostgreSQL job). A later point release on a branch can raise its highest PHP, so read the
+branch head when it matters.
 
 - **The file moved in 5.1.** On 5.0 and earlier it is `admin/environment.xml`; on 5.1 and later
   `public/admin/environment.xml`. A script that reads one path for every branch fails on the other half.

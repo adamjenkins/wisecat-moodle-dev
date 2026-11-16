@@ -103,8 +103,8 @@ sort -u used.txt | comm -23 - have.txt        # keys used but not defined: must 
 Also check the strings core asks for without a literal call: `pluginname`; `cachedef_<area>` for each
 definition in `db/caches.php`; `messageprovider:<name>` for each provider in `db/messages.php`; one string per
 capability in `db/access.php` (`myplugin:view` for `local/myplugin:view`); `privacy:metadata...` keys the
-provider names; and, for a theme, `choosereadme`. Dynamic keys (`'status_' . $state`) are found only by rendering every state and looking
-for `[[`.
+provider names; and, for a theme, `choosereadme`. Dynamic keys (`'status_' . $state`) are found only by
+rendering every state and looking for `[[`.
 
 ## moodlecheck docblock rules
 

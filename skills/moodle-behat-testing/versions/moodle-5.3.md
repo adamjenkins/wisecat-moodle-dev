@@ -14,9 +14,10 @@ Against the 5.2 baseline. Read in the 5.3.0 and 5.2 source, not run for this fil
 A custom step or `css_element` locator written against the 5.2 markup (`h5.modal-title`, `.nav-link.active`) finds
 nothing on 5.3. Fix: use the named selectors, `"Delete item" "dialogue"` for modals and the link text for navigation,
 which work on both; for the selected item use the steps `I should see "Grades" is active in navigation` and
-`... is active in secondary navigation`, which Boost's own Behat context implements on each branch. The Mustache navigation templates still
-exist on 5.3 as the fallback without JavaScript, so a scenario without `@javascript` can still see `.nav-link`. A step that must open the search field copies core's check: click "togglesearch" only when the
-button is visible.
+`... is active in secondary navigation`, which Boost's own Behat context implements on each branch. The Mustache
+navigation templates still exist on 5.3 as the fallback without JavaScript, so a scenario without `@javascript`
+can still see `.nav-link`. A step that must open the search field copies core's check: click "togglesearch" only
+when the button is visible.
 
 ## Steps and options that exist only on 5.3
 
@@ -28,6 +29,9 @@ button is visible.
   (`public/course/format/tests/behat/behat_courseformat.php`). Course formats that opt in show linear navigation by
   default, so text such as "Next activity" can appear on 5.3 pages and not on 5.2.
 - The run banner gains "Colour mode:" under "Run optional tests:" (`public/lib/behat/classes/util.php`).
+- The named selector `"<aria-label>" "navigation"`, which matches a `<nav>` or `role="navigation"` element by its
+  `aria-label` (`public/lib/behat/classes/partial_named_selector.php`). On 5.2 it is an unknown selector, so scope
+  with `"css_element"` or a `"region"` there.
 
 ## A step renamed
 

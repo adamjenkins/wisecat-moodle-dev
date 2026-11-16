@@ -94,7 +94,8 @@ Sources: `.grunt/tasks/react.js` (5.2), `.grunt/tasks/esm.js` (5.3.0), `.grunt/t
 
 ## Jest
 
-**5.3+:** `npm test` at the Moodle root runs Jest (`package.json` `"test": "jest"`) over the ESM tree. 5.2 has no
+**5.3+:** `npm test` at the Moodle root runs Jest (`package.json` `"test": "jest"`) over the ESM tree: it picks up
+`<plugin>/js/esm/tests/**/*.test.ts` and `*.test.tsx` (`jest.config.js` `testMatch`, read 5.3.0, not run). 5.2 has no
 Jest set-up and no `grunt jest` task exists on either version, so AMD modules have no unit-test runner: test them
 through a JavaScript Behat scenario (`moodle-behat-testing`).
 

@@ -57,9 +57,12 @@ cd .. && zip -r myplugin.zip myplugin -x 'myplugin/.git/*' 'myplugin/node_module
 Never upload GitHub's "Source code (zip)" asset or a `/archive/refs/tags/...zip` download: its root is
 `<repository>-<version>/`.
 
-Releases published by the `moodlehq/moodle-plugin-release` workflow are built by that workflow, not by you, and
-how it builds the ZIP was not read for this file. After the first workflow release, download that version's ZIP
-from the plugin's page once and list it the same way, so you know what users receive.
+Releases published by the `moodlehq/moodle-plugin-release` workflow are built by that workflow, not by you. It
+checks out the tag, reads `$plugin->component` from `version.php`, strips the type prefix and runs
+`git archive --format=zip --prefix="<name>/" -o "<name>.zip" HEAD` (workflow revision 2026091801, read, not
+run): the same command as above, so the root folder is right by construction and `export-ignore` applies. It
+does not check for `LICENSE`, `amd/build` or stray files. After the first workflow release, download that
+version's ZIP from the plugin's page once and list it the same way, so you know what users receive.
 
 ## Listing it: the pass condition
 

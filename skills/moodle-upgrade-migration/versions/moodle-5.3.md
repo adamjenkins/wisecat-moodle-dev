@@ -12,13 +12,10 @@ with fixes, is the `moodle-5-3-changes` skill; this file covers only the migrati
 |---|---|
 | Branch | `503`, `MOODLE_503_STABLE`; the LTS of the 5.x series |
 | 5.3.0 `$version` | `2026100500`, so `$plugin->requires = 2026100500;` for a 5.3-only release |
-| PHP | 8.3.0 minimum; 8.4 supported |
-| Databases | PostgreSQL 17, MariaDB 11.4, MySQL 8.4, SQL Server 2019 (15.0) |
-| Upgrade from | 4.4 or later |
-| Composer | run `composer install` at the Moodle root after upgrading; OAuth2 server features need `league/oauth2-server` |
 
-Because 5.3 is the LTS, what it deprecates is removed in 7.0, not 6.0. What 4.5 to 5.2 deprecated (including the
-Bootstrap 4 compatibility layer) is due to go in 6.0.
+PHP and database minimums, the upgrade path and the Composer step are in the release facts table of
+`moodle-5-3-changes`. Because 5.3 is the LTS, what it deprecates is removed in 7.0, not 6.0. What 4.5 to 5.2
+deprecated (including the Bootstrap 4 compatibility layer) is due to go in 6.0.
 
 ## One codebase for 5.2 and 5.3, or a branch each
 

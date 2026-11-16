@@ -57,8 +57,10 @@ committed build that is not byte-identical to a fresh build is a failure, not a 
 export {fetchItems, saveItem} from 'local_example/net/client';
 ```
 
-- Import your own modules by their full id (`'local_example/net/client'`), not by a relative path; the id is what
-  RequireJS resolves at run time.
+- Import your own modules by their full id (`'local_example/net/client'`). A relative path (`'./client'`) also
+  works, because RequireJS resolves it against the importing module's id, and core's TinyMCE plugins use it
+  (`public/lib/editor/tiny/plugins/h5p/amd/src/plugin.js`, read 5.3.0); the full id is easier to grep and survives
+  moving the file.
 
 ## Vendoring a third-party browser library
 

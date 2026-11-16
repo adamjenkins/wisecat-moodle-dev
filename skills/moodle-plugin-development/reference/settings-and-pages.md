@@ -15,12 +15,16 @@ while `public/admin/settings/plugins.php` builds the admin tree (5.3.0). What ex
 
 | Type | In scope | What you do |
 |---|---|---|
-| `mod`, `block`, `filter`, `format`, `auth`, `enrol`, `repository`, `qtype`, `tiny`, most others | `$settings`, an `admin_settingpage` core created; `$ADMIN`; `$hassiteconfig` | Add settings to `$settings` inside `if ($ADMIN->fulltree)` |
+| `mod`, `block`, `filter`, `format`, `auth`, `enrol`, `qtype`, `tiny`, most others | `$settings`, an `admin_settingpage` core created; `$ADMIN`; `$hassiteconfig` | Add settings to `$settings` inside `if ($ADMIN->fulltree)` |
 | `local` | `$ADMIN`, `$hassiteconfig`; no `$settings` | Create a page and add it to `localplugins` (or any category) |
 | `tool` | `$ADMIN`, `$hassiteconfig`; no `$settings` | Create a page and add it under `tools` (or the category that fits) |
 | `report` | `$ADMIN`; a `$settings` page core created, added under Plugins > Reports (`reportplugins`) only if still set after the include (`public/admin/settings/plugins.php`, 5.3.0) | Add settings to `$settings`, or add an `admin_externalpage` for the report and set `$settings = null;` |
 
 Calling `$settings->add()` where no `$settings` exists is a fatal error during upgrade.
+
+A `repository` plugin has no `settings.php`: core links its admin entry to `admin/repository.php`
+(`public/lib/classes/plugininfo/repository.php`, 5.3.0), and the plugin's options come from
+`type_config_form()` and `get_type_option_names()` in its `repository_<name>` class (`public/repository/lib.php`).
 
 ```php
 // mod, block, filter and similar types.
@@ -60,9 +64,9 @@ Rules that hold for every type:
   change. Until then `get_config()` returns `false` and the form shows the first choice of a select next to
   "Default: ...". Traps of individual setting classes (multicheckbox defaults, `configtext` regex paramtypes,
   `filetypes` labels): `moodle-field-lessons` (its forms and settings reference).
-- An `admin_settingpage` or `admin_externalpage` can name a capability other than `moodle/site:config` as its
-  fourth argument; then it must be added outside `if ($hassiteconfig)`, or the non-admin holders of that
-  capability get "Access denied". Core precedent: `public/report/log/settings.php`.
+- A page can name a capability other than `moodle/site:config`: the third argument of `admin_settingpage`, the
+  fourth of `admin_externalpage`. Such a page must be added outside `if ($hassiteconfig)`, or the non-admin
+  holders of that capability get "Access denied". Core precedent: `public/report/log/settings.php`.
 
 ```php
 $ADMIN->add('reports', new admin_externalpage(

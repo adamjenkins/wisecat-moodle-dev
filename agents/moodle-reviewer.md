@@ -74,12 +74,18 @@ shows it, never assumed.
   and stores another.
 - **Restore and import as input**: `process_*()` in `backup/moodle2/restore_*` cleans as the form does; imports
   land as drafts; a stored definition cannot name an arbitrary setting for `get_config()`.
-- **Data lifecycle**: privacy provider drift (declared but not exported or deleted, old table names), the course
-  reset triad, `db/uninstall.php` when the plugin writes outside its own tables, backup of course-keyed tables.
+- **A capability whose writes are shown to other users** carries `RISK_XSS`; authored definitions and imports
+  that reach other users are treated as input.
+- **Data lifecycle**: no privacy provider at all (the plugin's own CI run does not report it), privacy provider
+  drift (declared but not exported or deleted, old table names), the course reset triad, `db/uninstall.php` when
+  the plugin writes outside its own tables, user preferences left behind by uninstall, backup of course-keyed
+  tables (an activity without backup and restore is an approval blocker).
 - **Vacuous tests**: test steps that run over an empty `tests/`, or a regression test that never fails.
 - **Plugins directory review checks**: strings core asks for by convention, frankenstyle prefixes on global
   functions, classes and constants (including helpers in page and `cli/` scripts), `PARAM_RAW` without a reason,
-  `mkdir()` with `0777`, `curl_init()` instead of `\curl`, per-call queries on a hot path.
+  `mkdir()` with `0777`, `curl_init()` instead of `\curl`, a caveat stated in the README but not in the setting's
+  description, per-call queries on a hot path. Run that skill's greps and quote their output: no CI step covers
+  these.
 - **Minor gates**: `error_log()` left in, scaffolding placeholders in file headers, test helpers in production
   code, admin-facing messages in literal English, another user's timezone resolved as the viewer's.
 - **Extended security checklist** for any plugin with request entry points: the reference file of that name in
@@ -97,6 +103,7 @@ a failed SCSS compile leaves a working page that looks like stock Boost, so "the
    equals the directory name. A child restates the keys that are not inherited (`rendererfactory`,
    `haseditswitch`, `usescourseindex`, `requiredblocks`, `addblockposition`, `activityheaderconfig`,
    `yuicssmodules`, `usefallback`). No key outside core's whitelist. `editor_scss` is not set without the file.
+   No `styles.php` in the theme root. **5.3+:** `classic` is not a parent core ships.
 2. **Doubled SCSS callbacks** (`moodle-theme-boost-child`, `moodle-theme-scss`). Every parent's pre and extra
    SCSS callbacks already run for a child. A child callback that repeats what Boost's emits (the brand colour,
    the raw SCSS settings, the background images) puts it in the stylesheet twice.
@@ -120,8 +127,10 @@ a failed SCSS compile leaves a working page that looks like stock Boost, so "the
    or Boost has an untouched twin and a header that names the source and the Moodle version; compare the twin
    with the same file in the Moodle version under review. A layout entry is whole (`file`, `regions`,
    `defaultregion`, options). A copied `drawers.mustache` or `navbar.mustache` handles both versions or the theme
-   declares one. Overrides sit at `templates/<component>/` and keep the docblock. **5.3+:** overrides aimed at
-   React-rendered parts are dead files.
+   declares one. Overrides sit at `templates/<component>/` and keep the docblock; one that only wraps the
+   original uses the `!` include instead of a copy. **5.3+:** an override of a React-mounted template changes
+   only its wrapper, and overrides of the Timeline block's templates or renderer are dead files or a fatal error
+   (`moodle-theme-renderers-output`).
 8. **Settings plumbing** (`moodle-theme-settings`). The settings page replaces the one core supplies and has the
    name core expects; a tab is added after its settings; a setting that feeds CSS has the cache-reset callback; a
    value is validated before it is written into SCSS; the theme reads its own values with `get_config()`; stored
@@ -135,6 +144,9 @@ a failed SCSS compile leaves a working page that looks like stock Boost, so "the
     `pix/screenshot`, `pix/favicon.ico` and `pix/icon.svg`; `pluginname`, `choosereadme` and the privacy strings;
     a privacy provider; `thirdpartylibs.xml` for bundled fonts and libraries; boilerplate and the original
     `@copyright` line in copied files, including `.mustache` and `.scss`.
+
+Every theme finding carries a `file:line` in the theme, or the command and its output, like any other finding.
+The `/moodle-theme-check` command lists the greps for these ten checks.
 
 Say which Moodle versions the review covered. If only one version's source was available, say that statements
 about the other version were not checked against its source.

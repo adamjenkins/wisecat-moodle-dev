@@ -17,8 +17,9 @@ catalogue is in `moodle-5-3-changes`.
 ## Routed controllers
 
 `\core\tests\router\route_testcase` adds assertions for the 5.3 route scope attributes (`#[scopeset]`,
-`#[unscoped_resource]` in `\core\router\scope`): `assert_route_is_unscoped()`, `assert_route_is_scoped()`, `assert_route_required_scopes()`,
-`assert_route_authorized_with_scopes()` and `assert_route_not_authorized_with_scopes()`
+`#[unscoped_resource]` in `\core\router\scope`): `assert_route_is_unscoped()`, `assert_route_is_scoped()`,
+`assert_route_required_scopes()`, `assert_route_authorized_with_scopes()` and
+`assert_route_not_authorized_with_scopes()`
 (`public/lib/tests/classes/router/route_testcase.php`). A test that calls them cannot run on 5.2; put it in a file
 that is skipped there, for example by checking `method_exists()` in `setUp()` and calling `markTestSkipped()`.
 
@@ -37,6 +38,3 @@ that is skipped there, for example by checking `method_exists()` in `setUp()` an
 The `admin_settingpage`, `admin_setting_*` and related classes moved out of `public/lib/adminlib.php` into the
 `core_admin` component and autoload under their old names (`public/lib/db/legacyclasses.php`). `admin_get_root()`
 and the other functions stay in `adminlib.php`, so a test still requires that file.
-
-The numeric-entity change in `block_myoverview` output (MDL-79755) is not 5.3-specific: it is in 5.2.2 too, so it is
-in the skill body.

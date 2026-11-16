@@ -56,9 +56,9 @@ public static function execute(int $itemid): array {
 
 ## Mobile methods (`classes/output/mobile.php`)
 
-The app calls them through `tool_mobile_get_content`, which validates only the component and method names and
-passes `$args` through without a `PARAM_*` type or any access check (`public/admin/tool/mobile/classes/external.php`,
-5.3.0). Each method does all of it itself:
+The app calls them through `tool_mobile_get_content`, which validates only the component and method names,
+takes every argument value as `PARAM_RAW`, and makes no course or activity access check
+(`public/admin/tool/mobile/classes/external.php`, 5.3.0). Each method does all of it itself:
 
 ```php
 public static function mobile_view($args) {
@@ -79,8 +79,10 @@ Never interpolate an `$args` value into SQL; bind it as a placeholder after `cle
 The client posts the form's arguments, including any `contextid` or record id. In
 `get_context_for_dynamic_submission()`, load the record named by the id and return its context; in
 `check_access_for_dynamic_submission()`, call `require_capability()` on that context. Both are abstract on
-`public/lib/form/classes/dynamic_form.php` (5.3.0), and both run on every load and submit, so a check placed
-only in the page that opens the modal is bypassed by posting to the form directly.
+`public/lib/form/classes/dynamic_form.php` (5.3.0). The form's constructor calls `validate_context()` on the
+returned context and then the access check each time the form web service loads or submits the form, so these
+two methods are the only gate: a check placed only in the page that opens the modal is bypassed by calling the
+web service directly.
 
 ```php
 protected function get_context_for_dynamic_submission(): \context {

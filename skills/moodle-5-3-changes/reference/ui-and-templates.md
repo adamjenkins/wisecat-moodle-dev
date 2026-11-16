@@ -73,7 +73,7 @@ cited files, read, not run, unless stated.
 | `core/search_input_auto` wraps its `role="search"` in a `{{$searchrole}}` block | Empty the block when the input already sits in another search landmark: `{{< core/search_input_auto }}{{$searchrole}}{{/searchrole}}{{/ core/search_input_auto }}` (also on the 5.2 branch) | MDL-88833 |
 | `core/user_action_menu_items` split into `user_action_menu_item_{link,header,text,divider}` | Re-diff user-menu overrides | MDL-88938 |
 | `core/loginform` moved from Boost to `public/lib/templates/loginform.mustache`, new markup (icons in `login-input-wrapper`, OAuth2 block) | A child override at `templates/core/loginform.mustache` still wins; re-diff its content | MDL-89196 |
-| `core/toggle` `dataattributes` | Use `extraattributes`; removal in 6.0 | MDL-86619 |
+| `core/toggle` `dataattributes` (deprecated since 5.1, so not new; a port still meets the notice) | Use `extraattributes`; removal in 6.0 | MDL-85990, MDL-86619 |
 | Icon map: `core:i/notifications` is `fa-regular fa-bell`, `core:t/message` is `fa-regular fa-message`; new `core:t/collapseall`, `core:t/expandall` | Re-check themes that restyle these | MDL-87836 |
 | Grade action bars render `core/navigation_action_bar` and `core/action_bar` | Move overrides to the core templates | MDL-81096 |
 | Admin notifications page grouped by severity; campaign, support, Marketplace and feedback banners merged into `core_admin/notification_ctas` | Themes that styled the old banners re-test `/admin/index.php` | MDL-89290 |
@@ -101,8 +101,8 @@ cited files, read, not run, unless stated.
   unless the site setting `format_<name>/enablelinearnav` is 0; a format with no such setting counts as enabled.
   An activity page that shows its own previous/next controls calls `$PAGE->set_show_navigation_footer(false)`; a
   page that renders its own sticky footer calls `$PAGE->set_has_sticky_footer(true)` so a second is not added.
-- **Report pages inside an activity**: a wide `flexible_table` on a page with layout `report` was seen sitting under
-  the course index drawer on 5.3; choosing the layout is covered in `moodle-theme-layouts-templates`.
+- **Report pages inside an activity**: a wide `flexible_table` on a page with layout `report` sat under the course
+  index drawer (run on 5.3.0); choosing the layout is covered in `moodle-theme-layouts-templates`.
 
 ## Boost appearance changes a plugin notices
 
@@ -137,6 +137,7 @@ cited files, read, not run, unless stated.
 
 ## CSS linting
 
-5.3's stylelint configuration rejects some valid modern CSS in plugin `styles.css` (`container-type`, `@container`,
-`clamp()` in `font-size`) through `csstree/validator`, which fails `moodle-plugin-ci grunt`; the rule and its
-per-line workaround are in `moodle-theme-scss`.
+Core's stylelint configuration rejects some valid modern CSS in plugin `styles.css` (`container-type`, `@container`,
+`clamp()` in `font-size`) through `csstree/validator`, which fails `moodle-plugin-ci grunt`. This is not new in 5.3:
+`.stylelintrc` is identical in the 5.2 and 5.3.0 trees (read), so the same CSS fails on both branches. A port meets
+it when it rewrites styles for dark mode. The rule and its per-line workaround are in `moodle-theme-scss`.

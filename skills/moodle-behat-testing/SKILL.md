@@ -1,6 +1,6 @@
 ---
 name: moodle-behat-testing
-description: Use when writing, running or debugging Behat acceptance tests for a Moodle plugin - tests/behat/*.feature, behat_<component>.php step definitions, tests/generator/behat_<component>_generator.php and the "the following ... exist" step, admin/tool/behat/cli/init.php and run.php, @javascript scenarios, --scss-deprecations, "Deprecated style in use", gherkinlint failures in moodle-plugin-ci grunt, "I set the field" matching the wrong field, "I should not see" passing for the wrong reason, a new feature or step not being picked up, faildumps, accessibility steps failing with "No data", or user tours blocking clicks. Covers the Behat site's mental model, the default feature and step recipe, locator and assertion traps from shipped plugins, and pointers to steps, generators and debugging. Skip when testing business logic without a browser (moodle-phpunit-testing) or building the CI workflow (moodle-ci-matrix).
+description: Use when writing, running or debugging Behat acceptance tests for a Moodle plugin - tests/behat/*.feature, behat_<component>.php step definitions, tests/generator/behat_<component>_generator.php and the "the following ... exist" step, public/admin/tool/behat/cli/init.php and run.php, @javascript scenarios, --scss-deprecations, "Deprecated style in use", "Deprecated styles found", gherkinlint failures in moodle-plugin-ci grunt, "I set the field" matching the wrong field, "I should not see" passing for the wrong reason, a new feature or step not being picked up, faildumps, or user tours blocking clicks. Covers the Behat site's mental model, the default feature and step recipe, and locator and assertion traps. Skip when testing business logic without a browser (moodle-phpunit-testing), building the CI workflow (moodle-ci-matrix), writing or fixing the axe accessibility steps (moodle-accessibility), or running a theme's own suite (moodle-theme-testing-release).
 ---
 
 # Moodle Behat testing
@@ -12,9 +12,8 @@ built for testing. Features live in `<plugin>/tests/behat/*.feature`; custom ste
 `tests/behat/behat_<component>.php`. Most failures that waste time are not in the scenario: the run used a stale copy,
 a locator matched another field, or a negative step passed because the text was never going to be on the page.
 
-How sure each statement is: rules marked "seen in practice" were observed on real plugins or on a Boost child theme
-run on 5.3.0; everything else was read in the 5.2 and 5.3.0 source (paths relative to the Moodle root) and not run
-for this skill.
+How sure each statement is: rules marked "seen in practice" were observed on real plugins and themes; everything
+else was read in the 5.2 and 5.3.0 source (paths relative to the Moodle root) and not run for this skill.
 
 ## When to Use
 
@@ -38,7 +37,8 @@ for this skill.
    keeps old timestamps can run the old scenario; `touch` the copied features. Seen in practice.
 3. **Run options are fixed at init.** `init.php --scss-deprecations`, `--no-axe`, `--no-icon-deprecations` and
    (**5.3+:**) `--colourmode=dark` are stored for the site; `run.php` has no such options. The run header prints them
-   under "Run optional tests:" (`public/lib/behat/classes/util.php`, 5.3.0). Read that banner before trusting a run.
+   under "Run optional tests:" (`public/lib/behat/classes/util.php`, 5.2 and 5.3). Read that banner before trusting
+   a run.
 4. **Suites follow themes.** The default theme's suite is `default`; every other installed theme gets a suite named
    after it holding only that theme's features (`public/lib/behat/classes/behat_config_util.php`). A plugin's
    features run in `default`.
@@ -136,8 +136,8 @@ class behat_local_example_generator extends behat_generator_base {
 
 `switchids` turns a `course` column (shortname) and a `user` column (username) into ids through `get_course_id()`
 and `get_user_id()` of `behat_generator_base` (`public/lib/behat/classes/behat_generator_base.php`). Custom steps go
-in `tests/behat/behat_local_example.php`, class `behat_local_example extends behat_base`. The full step template, page resolvers and
-named selectors are in [reference/generators-and-steps.md](reference/generators-and-steps.md).
+in `tests/behat/behat_local_example.php`, class `behat_local_example extends behat_base`. The full step template,
+page resolvers and named selectors are in [reference/generators-and-steps.md](reference/generators-and-steps.md).
 
 ## Rules for locating and asserting
 

@@ -68,13 +68,11 @@ class get_items extends external_api {
 - Verify registration on the site, not in a unit test that calls the class directly:
   `\core_external\external_api::external_function_info('local_example_get_items', IGNORE_MISSING)` returns false
   until a version bump has run the upgrade.
-- `self::validate_context()` ends in `require_login()`. A function declared `'loginrequired' => false` must set
-  `$PAGE->set_context()` itself instead, or anonymous callers are refused.
-- `validate_parameters()` rejects a value that cleaning would change (`invalid_parameter_exception`), so free text
-  declared `PARAM_TEXT` fails on input such as `if a<b then c>d`, where `strip_tags()` removes `<b then c>`.
-  Declare free text `PARAM_RAW` and escape it at every sink (`moodle-web-services`).
-- The course context check enforces enrolment. If the page this function backs is gated on ownership or another
-  capability, gate the function the same way, or unenrolled owners get `requireloginerror`.
+- Three rules owned by `moodle-web-services`, which has the samples and sources: a `'loginrequired' => false`
+  function calls `$PAGE->set_context()` and not `self::validate_context()` (it ends in `require_login()`); free
+  text is declared `PARAM_RAW` and escaped at every sink, because `validate_parameters()` rejects a value that
+  cleaning would change (`if a<b then c>d` fails as `PARAM_TEXT`); and the function is gated like the page it
+  backs, since a course context check enforces enrolment.
 
 ## db/tasks.php and task classes
 
@@ -109,8 +107,8 @@ class cleanup extends \core\task\scheduled_task {
 - Check registration with `php admin/cli/scheduled_task.php --list | grep local_example` (core CLI, Moodle root).
 - An ad-hoc task extends `\core\task\adhoc_task`, carries data with `set_custom_data()`, the acting user with
   `set_userid()`, and is queued with `\core\task\manager::queue_adhoc_task($task, true)`. Do not branch on the
-  return value: on 5.2 it is false when an identical task is already queued, and **5.3+:** it is the id of the
-  new or the existing task (`public/lib/classes/task/manager.php` of each).
+  return value to learn whether a task was added: on 5.2 it is false when an identical task is already queued,
+  and **5.3+:** it is the id of the new or the existing task (`public/lib/classes/task/manager.php` of each).
 
 ## db/events.php
 
@@ -125,9 +123,9 @@ $observers = [
 
 - Observers are `internal` by default: they run inside the transaction that triggered the event. Declare
   `'internal' => false` for work that must run only after the commit (default read in
-  `public/lib/classes/event/manager.php`, 5.3.0). PHPUnit on PostgreSQL wraps each test in a transaction, so
-  a non-internal observer does not run inside a test there, while it runs at once on MySQL and MariaDB
-  (`moodle-phpunit-testing` has the fix).
+  `public/lib/classes/event/manager.php`, 5.2 and 5.3). PHPUnit on PostgreSQL and SQL Server wraps each test in
+  a transaction (`public/lib/phpunit/classes/advanced_testcase.php`), so a non-internal observer does not run
+  inside a test there, while it runs at once on MySQL and MariaDB (`moodle-phpunit-testing` has the fix).
 - Your own `course_deleted` observer runs in your tests too and may delete fixtures a test built.
 
 ## db/caches.php

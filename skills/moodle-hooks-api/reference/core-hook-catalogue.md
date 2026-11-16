@@ -41,7 +41,6 @@ Where each output hook lands in the page, and the theme-specific rules for using
 |---|---|---|---|
 | `\core\hook\after_config` | `after_config` | `()` | none; runs at the end of `lib/setup.php` on every request |
 | `\core\hook\di_configuration` | none | `(ContainerBuilder $builder)` | `add_definition()` |
-| `\core\hook\composer\composer_di` (5.3+) | none | `()` | `configure()` |
 | `\core\hook\navigation\primary_extend` (stoppable) | none | `(primary $primaryview)` | `get_primaryview()` |
 | `\core\hook\navigation\secondary_extend` | none | `(secondary $secondaryview)` | `get_secondaryview()` |
 | `\core\hook\access\after_role_assigned` | none | `(context $context, int $userid)` | none |
@@ -49,6 +48,9 @@ Where each output hook lands in the page, and the theme-specific rules for using
 | `\core\hook\access\after_role_switched` | none | `(context $context, int $roleid)` | none |
 | `\core\hook\task\after_failed_task_max_delay` | none | `(task_base $task)` | `get_task()` |
 | `\core\hook\email\before_email_to_user` (5.3+) | none | `(\core\email $email)` | edit `$hook->email` fields; `$hook->email->add_additional_header()`, `add_block_reason()` |
+
+`\core\hook\composer\composer_di` (5.3+) lives in the hook namespace but is not a hook: it is core's callback on
+`di_configuration` that defines the `\core\composer` service.
 
 `secondary_extend` is dispatched only when the secondary navigation view is built
 (`public/lib/classes/navigation/views/secondary.php`, 5.3.0). To add a node to an activity's More menu from a

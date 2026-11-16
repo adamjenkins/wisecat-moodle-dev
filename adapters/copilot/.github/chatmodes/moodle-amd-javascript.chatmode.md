@@ -1,261 +1,331 @@
 ---
-description: Use when writing JavaScript for Moodle — AMD modules, ES6 source, grunt build, RequireJS loading, core/ajax + core/str + core/templates + core/modal + core/notification, Mustache template hydration, and AMD unit tests.
+description: Use when writing or debugging JavaScript for a Moodle plugin - amd/src ES modules and the amd/build output, `grunt amd`, `js_call_amd()`, core/ajax, core/str, core/templates, core/modal and ModalEvents, core/notification and core/toast, core/pending for Behat, core/fragment, core/form-autocomplete ajax handlers, TinyMCE (editor_tiny) plugins, localStorage, Bootstrap imports, 5.3 core/import and React mounting, or errors such as "No define call for", "is not a function" on `.finally`, a named import that is undefined, "Too much data passed as arguments to js_call_amd", "The theme has already been set up". Skip when the work is server-side only (moodle-web-services for external functions) or theme-wide styling (moodle-theme-scss).
 tools: ['codebase', 'search', 'editFiles', 'runCommands']
 ---
 # Moodle AMD JavaScript
 
 ## Overview
 
-Moodle uses AMD (RequireJS) for browser JS. Source goes in `<plugin>/amd/src/*.js` (ES6+), built into minified AMD in `amd/build/*.min.js` via `grunt`. Never edit `amd/build/` directly. Modules import Moodle core helpers via string IDs (`core/ajax`, `core/str`, `core/templates`).
+Plugin JavaScript is written as ES modules in `amd/src/`, transpiled by Moodle's `grunt amd` into AMD modules in
+`amd/build/*.min.js`, and loaded by RequireJS. This skill gives the build model, a module recipe that works on 5.2 and
+5.3, and the traps that pass every linter and still break the page.
+
+Evidence tags: **read** means read in the source of the named version, not run; **run 5.3.0** means observed on 5.3.0.
 
 ## When to Use
 
-- Adding interactive JS to a plugin
-- Calling a web service from the browser (`core/ajax`)
-- Rendering a Mustache template client-side
-- Showing a modal, notification, or toast
-- Building a custom AMD module + grunt config
-- Debugging "module not found" / "build out of date" warnings
+- Adding or changing a module in `amd/src/`, or calling one from PHP with `js_call_amd()`
+- Calling an external function from the browser, rendering a Mustache template client-side, showing a modal or toast
+- Building, linting or committing `amd/build/`, or reading a CI failure from `moodle-plugin-ci grunt`
+- Writing a TinyMCE plugin, an autocomplete AJAX handler, a fragment callback, or anything that stores browser state
+- **Skip when:** declaring the external function itself (`moodle-web-services`), making the UI accessible
+  (`moodle-accessibility`, which owns ARIA, focus and contrast rules), styling a theme (`moodle-theme-scss`), or
+  writing the Behat scenario (`moodle-behat-testing`).
 
-**Skip when:** writing pure backend PHP — use `moodle-plugin-development`.
+## The model in five facts
 
-## File layout
+1. **Module id = component + path under `amd/src`, no extension.** `local/example/amd/src/marker.js` is
+   `local_example/marker`; `amd/src/net/client.js` is `local_example/net/client`. The loader fetches exactly
+   `amd/build/<path>.min.js`; there is no `index` fallback (`core_requirejs::find_one_amd_module()`,
+   `public/lib/classes/requirejs.php`, read 5.3.0).
+2. **The build is Babel plus a Moodle plugin**: `.grunt/babel-plugin-add-module-to-define.js` names the module and,
+   when the file has `export default`, makes the module return only that value (line 92, read 5.2 and 5.3).
+3. **Core's AJAX layer still speaks jQuery Deferred.** `core/ajax` `call()` returns one jQuery promise per request
+   (`public/lib/amd/src/ajax.js:69,95`, read 5.3.0); `core/str` `get_string()` is jQuery, `getString()` is native;
+   `core/templates` `render()` is jQuery, `renderForPromise()` resolves `{html, js}`.
+4. **`js_call_amd()` JSON-encodes its third argument** and calls `init(...args)`. Over 1024 characters of arguments
+   raises a developer debugging message (`page_requirements_manager.php`, `$toomanyparamslimit`, read 5.2 and 5.3):
+   pass ids and read the rest from `data-*` attributes or a web service.
+5. **5.3+:** several core AMD names (`core/pending`, `core/config`, `core/log`, `core/url`, `core/localstorage`,
+   `core/sessionstorage`, `core/storagewrapper`, `bootstrap/*`) are served from ES modules through a RequireJS map,
+   so imports keep working although `public/lib/amd/src/pending.js` and friends no longer exist
+   (`get_requirejs_static_esm_map()` in `page_requirements_manager.php`, read 5.3.0). Details in
+   [versions/moodle-5.3.md](../moodle-skill-files/moodle-amd-javascript/versions/moodle-5.3.md).
 
-```
-<plugin>/
-  amd/
-    src/
-      foo.js              # ES6 source — edit this
-      bar.js
-    build/                # generated; commit but never hand-edit
-      foo.min.js
-      foo.min.js.map
-```
-
-Module ID at runtime = `<component>/<filename>` (no extension):
-- `local/example/amd/src/marker.js` → `local_example/marker`
-- `mod/quiz/amd/src/preflight.js` → `mod_quiz/preflight`
-
-## Module skeleton
+## Default recipe
 
 ```javascript
-// amd/src/marker.js
+// amd/src/marker.js (GPL header)
+/**
+ * Mark attendance from the session page.
+ *
+ * @module     local_example/marker
+ * @copyright  2026 Your Name <you@example.com>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 import Ajax from 'core/ajax';
 import Notification from 'core/notification';
-import {get_string as getString} from 'core/str';
+import Pending from 'core/pending';
 import Templates from 'core/templates';
+import {getString} from 'core/str';
+import {add as addToast} from 'core/toast';
 
 const SELECTORS = {
-    BUTTON: '[data-action="mark-present"]',
-    ROW: '[data-region="attendance-row"]',
+    BUTTON: '[data-action="local_example/mark-present"]',
+    ROW: '[data-region="local_example/attendance-row"]',
 };
 
+let initialised = false;
+
+const markPresent = (sessionid, userid) => Promise.resolve(Ajax.call([{
+    methodname: 'local_example_mark_present',
+    args: {sessionid, userid},
+}])[0]);
+
 /**
- * Initialise: bind click handlers.
+ * Bind one delegated click handler for the page.
  *
- * @param {number} sessionid
+ * @param {number} sessionid The session id
  */
 export const init = (sessionid) => {
-    document.addEventListener('click', async (e) => {
-        const btn = e.target.closest(SELECTORS.BUTTON);
-        if (!btn) {
+    if (initialised) {
+        return;
+    }
+    initialised = true;
+    document.addEventListener('click', async(e) => {
+        const button = e.target.closest(SELECTORS.BUTTON);
+        if (!button) {
             return;
         }
         e.preventDefault();
-        const userid = parseInt(btn.dataset.userid, 10);
+        const pending = new Pending('local_example/marker:mark');
+        button.disabled = true;
         try {
-            const result = await markPresent(sessionid, userid);
-            const html = await Templates.render('local_example/row', result);
-            const row = btn.closest(SELECTORS.ROW);
-            Templates.replaceNode(row, html, '');
-        } catch (err) {
-            Notification.exception(err);
+            const row = await markPresent(sessionid, Number(button.dataset.userid));
+            const {html, js} = await Templates.renderForPromise('local_example/row', row);
+            Templates.replaceNode(button.closest(SELECTORS.ROW), html, js);
+            addToast(await getString('marked', 'local_example'));
+        } catch (error) {
+            Notification.exception(error);
+        } finally {
+            button.disabled = false;
+            pending.resolve();
         }
     });
 };
-
-const markPresent = (sessionid, userid) => {
-    const request = Ajax.call([{
-        methodname: 'local_example_mark_present',
-        args: {sessionid, userid},
-    }]);
-    return request[0];
-};
 ```
-
-## Loading from PHP
 
 ```php
-$PAGE->requires->js_call_amd('local_example/marker', 'init', [$sessionid]);
+$PAGE->requires->js_call_amd('local_example/marker', 'init', [$session->id]);
 ```
 
-The third argument array is JSON-encoded and passed to your `init` function.
+Why each piece is there: `Promise.resolve()` turns the jQuery promise into a native one so `finally` exists;
+`Pending` makes Behat wait for the request and the render; `renderForPromise()` returns the template's `{{#js}}` so
+`replaceNode()` can run it; the `initialised` guard stops a second `js_call_amd()` on the same page from binding twice;
+a `data-action` namespaced with the component cannot collide with core's selectors. The web service must be
+declared with `'ajax' => true` in `db/services.php` (`moodle-web-services`); `core/ajax` adds the sesskey itself.
 
-## grunt build
+## Build, lint and commit
 
-Moodle ships a root `Gruntfile.js`. From Moodle root:
+Run grunt from a Moodle checkout of the lowest branch you support, with Node from the checkout's `.nvmrc`
+(`lts/jod` in 5.2 and 5.3), with the plugin installed in it:
 
 ```bash
-nvm use                # uses .nvmrc — match Moodle's required Node
-npm ci
-npx grunt amd          # build all AMD
-npx grunt amd --root=local/example   # only your plugin
-npx grunt watch        # rebuild on change
+cd /path/to/moodle && nvm use && npm ci
+cd public/local/example && npx grunt amd     # inside the plugin: builds and lints only this component
+npx grunt amd --root=public/local/example     # same, from the Moodle root
 ```
 
-Build also runs ESLint + minification. `amd/build/*.min.js` and `*.min.js.map` are commit-required (Moodle plugin policy).
+- Since 5.1 plugins live under `public/`; `--root=local/example` is fatal ("Setting root to ... failed - path does
+  not exist", `Gruntfile.js` `getCwd()`, read 5.3.0).
+- `grunt amd` is `ignorefiles, eslint:amd, rollup` (**5.3+:** plus `amdtypes`, which writes `.d.ts` files under the
+  Moodle root's `.types/`, not into the plugin) (`.grunt/tasks/javascript.js:62`, read 5.2 and 5.3).
+- Commit `amd/build/*.min.js` and `*.min.js.map` with the source. `moodle-plugin-ci grunt` rebuilds and fails when a
+  committed `.js`, `.js.map` or `.css` differs, so a stale build is a CI failure, not a warning.
+- Lint the way CI does: `moodle-plugin-ci grunt --max-lint-warnings 0`. A warning fails it.
+- `grunt --force` skips failures it was meant to report: under `--force` eslint lints nothing while still printing its
+  banner, and a failed write leaves the old build behind "Done, but with warnings". Never judge a build or a lint
+  from a `--force` run; check the `amd/build` files are newer than `amd/src` (`moodle-definition-of-done`).
 
-## Common core modules
+Reference: [reference/build-and-lint.md](../moodle-skill-files/moodle-amd-javascript/reference/build-and-lint.md).
 
-| Module | Use |
-|--------|-----|
-| `core/ajax` | Call web services |
-| `core/str` | Load lang strings (`getString('foo', 'local_example')`) |
-| `core/templates` | Render Mustache (`render`, `renderForPromise`, `replaceNode`, `appendNodeContents`) |
-| `core/notification` | Toasts, alerts, exception handling (`Notification.exception(err)`) |
-| `core/modal` (Moodle 4.3+) | Replaces `core/modal_factory` |
-| `core/modal_factory` | (deprecated 4.3+) — use `core/modal` |
-| `core/toast` | Bootstrap-style ephemeral toasts (`add(msg, {type})`) |
-| `core/pending` | Mark async work pending — required for Behat to wait |
-| `core/event` | Custom DOM events for cross-module pub/sub |
-| `core/log` | Console logging (silenced in production) |
-| `core/fragment` | Server-rendered HTML fragments via `mod_x_output_fragment_*` |
-| `core/url` | Build Moodle URLs |
-| `core/config` | Access `M.cfg` (wwwroot, sesskey) safely |
+## Traps that pass every gate
 
-## Mustache template + JS pair
+Each is silent in eslint, grunt and PHPUnit; only a page load or a JavaScript Behat run shows it.
 
-```php
-// PHP
-$data = ['items' => $items, 'sesskey' => sesskey()];
-echo $OUTPUT->render_from_template('local_example/list', $data);
-$PAGE->requires->js_call_amd('local_example/list', 'init');
-```
+**`.finally()` on a `core/ajax` promise throws while the chain is built.** jQuery Deferred has no `finally`, so the
+`.then` already attached runs once and the button stays disabled ("works exactly once"; console
+`TypeError: ....finally is not a function`). Wrap: `Promise.resolve(Ajax.call([...])[0])`. Find them:
+`grep -rn '\.finally(' amd/src/`.
 
-```mustache
-{{! templates/list.mustache }}
-<ul data-region="item-list">
-  {{#items}}
-  <li data-id="{{id}}">{{name}}</li>
-  {{/items}}
-</ul>
-```
+**`export default` plus named exports loses the named ones.** The build returns `_exports.default` only, so
+`import {thing} from 'local_example/util'` is `undefined` and the page dies at load. One style per module:
+`grep -l '^export default' -r amd/src` and check those files export nothing else.
+
+**A dynamic `import()` in `amd/src` is rewritten** into a RequireJS call by `system-import-transformer`
+(`.grunt/tasks/javascript.js`, read 5.3.0), which fails for a bare ES module URL. **5.3+:** use
+`import nativeImport from 'core/import'` and `await nativeImport('@moodle/lms/local_example/viewer')`. On 5.2, load
+the ES module from a plain `.js` file outside `amd/` with `<script type="module">`.
+
+**Vendored browser files: `.js`, not `.mjs`, and never under `vendor/`, `node_modules/`, `fixtures/` or `behat/`.**
+Web servers often serve `.mjs` as `application/octet-stream`, which the browser refuses for a module. Core's own
+security check `core\check\environment\publicpaths` expects the web server to deny those four path segments
+(`public/lib/classes/check/environment/publicpaths.php`, read 5.2 and 5.3), so a correctly configured site 404s them.
+Put third-party code in `amd/src/local/<lib>/` or `js/<lib>/` and list it in `thirdpartylibs.xml`.
+
+**`localStorage` is wiped for the whole site** on every new login and every `jsrev` change (every cache purge).
+5.2: `core/storage_validation` calls `LocalStorage.clean()` (`public/lib/amd/src/storage_validation.js`) and
+`storagewrapper.js` clears on a `jsrev` change. 5.3: both checks live in `public/lib/js/esm/src/Storage.ts:98-120`,
+and the login check also clears `sessionStorage`. Both call the browser's `Storage.clear()`, so keys a plugin wrote
+directly are lost too. Durable state goes in a user preference (declare it in the privacy provider) or a cookie;
+`core_user_set_user_preferences` cannot unset a value, so store `0` to mean "forget".
+
+**An awaited browser promise with no timeout can hang for ever.** An ES module that throws while running fires no
+`error` event on its `<script>`; `AudioContext.resume()` and `speechSynthesis` can stay pending in Firefox. Race
+each one with a timeout and show a message, and check every screen in Firefox and a Chromium browser:
 
 ```javascript
-// amd/src/list.js
-import {get_strings as getStrings} from 'core/str';
-
-export const init = async () => {
-    const [confirmTitle, confirmBody] = await getStrings([
-        {key: 'confirm', component: 'core'},
-        {key: 'confirmdelete', component: 'local_example'},
-    ]);
-    // ...
-};
-```
-
-## Pending — make Behat wait
-
-Whenever JS does async work, mark it pending so Behat's `I wait until the page is ready` actually waits:
-
-```javascript
-import Pending from 'core/pending';
-
-const pending = new Pending('local_example/marker:save');
-try {
-    await markPresent(...);
-} finally {
-    pending.resolve();
-}
-```
-
-Without `Pending`, Behat scenarios are flaky.
-
-## Modal (Moodle 4.3+)
-
-```javascript
-import Modal from 'core/modal';
-import ModalEvents from 'core/modal_events';
-
-const modal = await Modal.create({
-    title: 'Confirm',
-    body: Templates.render('local_example/confirm', data),
-    show: true,
-    removeOnClose: true,
-});
-modal.getRoot().on(ModalEvents.save, () => { /* handler */ });
-```
-
-## ESLint / coding style
-
-Moodle ships `.eslintrc` in root. Run:
-
-```bash
-npx grunt eslint --root=local/example
-```
-
-Rules:
-- ES2018+ source, transpile via grunt
-- Prefer `const`/`let`, never `var`
-- Arrow functions for callbacks
-- JSDoc on every exported function (`@param`, `@return`)
-- 4-space indent
-- Single quotes for strings
-- Semicolons mandatory
-- No `console.log` (use `core/log`)
-
-## Common Mistakes
-
-| Mistake | Fix |
-|---------|-----|
-| Editing `amd/build/*.min.js` | Edit `amd/src/*.js`, run `npx grunt amd` |
-| Forgetting to commit `amd/build/` | Plugin policy — commit both src + build |
-| Wrong module ID (`local_example/amd/marker`) | Use `local_example/marker` (no `amd/`) |
-| `require(['jquery'], ...)` syntax | Use ES6 imports — grunt transpiles to AMD |
-| No `Pending` around async | Behat scenarios flake — wrap with `core/pending` |
-| Hard-coded strings | Load via `core/str` so they translate |
-| `core/modal_factory` in 4.3+ | Switch to `core/modal` |
-| Not passing args to `js_call_amd` | Args become `init(arg1, arg2)` parameters |
-| Building with wrong Node version | `nvm use` from Moodle root respects `.nvmrc` |
-| `M.cfg.wwwroot` directly | Import `core/config` for safe access |
-
-## Calling web services
-
-```javascript
-import Ajax from 'core/ajax';
-
-const requests = Ajax.call([
-    {methodname: 'local_example_get_items', args: {courseid: 5}},
-    {methodname: 'local_example_get_users', args: {courseid: 5}},
+const withTimeout = (promise, ms) => Promise.race([
+    promise,
+    new Promise((resolve, reject) => setTimeout(() => reject(new Error('Timed out')), ms)),
 ]);
-const [items, users] = await Promise.all(requests);
 ```
 
-Methods must be declared `'ajax' => true` in `db/services.php`. The web service token is auto-attached from session (no manual sesskey for AJAX).
+**`core/templates` overwrites a context key named `uniqid`** with its own counter
+(`public/lib/amd/src/local/templates/renderer.js:522`, read 5.3.0). Rename it. Template authoring rules (example
+context, comments, partial roots) are in `moodle-theme-layouts-templates`.
 
-## Testing AMD
+**User text in a modal title, toast or `Notification` string is HTML.** `setTitle()` uses jQuery `.html()`
+(`public/lib/amd/src/modal.js:495-505`, read 5.3.0). Pass lang strings, and put user data in through `textContent`
+or escape it server-side; the full sink list is in `moodle-release-preflight`.
 
-Moodle's AMD has limited unit-test infrastructure. Options:
-- **Manual** — load page, interact, watch console (`Notification.exception` surfaces errors)
-- **Behat with `@javascript`** — full browser testing
-- **Jest** (Moodle 4.4+) — `npx grunt jest` runs `tests/jest/*.test.js` if present
+**An `output_fragment_*` callback must not call `require_login()`** or anything that sets `$PAGE->course`:
+`core_external::get_fragment()` has already run `validate_context()` and printed the header
+(`public/lib/external/externallib.php:404-415`, read 5.3.0), so the call throws "The theme has already been set up".
+Check capabilities only, and test through `core/fragment` `loadFragment()` in a JavaScript Behat step; calling the
+callback directly from PHPUnit passes.
 
-## Moodle 5.3 notes (beta — re-verify at 5.3.0)
+## Modals
 
-- Do not import `theme_boost/bootstrap/*`: use `import {Tooltip} from 'bootstrap'` (5.3+) or `'theme_boost/index'` for multi-version plugins, then rebuild; exception: `util`/`dom` helpers still load directly (`bootstrap/dom/event-handler` on 5.3+, `theme_boost/bootstrap/dom/event-handler` on ≤5.2) ([MDL-88766](https://tracker.moodle.org/browse/MDL-88766)).
-- Modal title is `<h2 class="modal-title fs-5">` (selectors on `h5.modal-title` break) ([MDL-75699](https://tracker.moodle.org/browse/MDL-75699)); nav items are React `.mds-nav-pill`, not `.nav-link`/`.moremenu` ([MDL-87830](https://tracker.moodle.org/browse/MDL-87830), [MDL-89294](https://tracker.moodle.org/browse/MDL-89294)).
-- React mounting: `core/import` (native dynamic `import()` for `@moodle/lms/...` specifiers) and `core/component` `appendToDom()`/`prependToDom()` ([MDL-88505](https://tracker.moodle.org/browse/MDL-88505)); PHP side `\core\output\html_writer::react_component($module, $props)`, do not pre-`json_encode` props ([MDL-89296](https://tracker.moodle.org/browse/MDL-89296)).
-- block_timeline is now ESM/React; its AMD modules and templates are gone ([MDL-88287](https://tracker.moodle.org/browse/MDL-88287)).
-- `core/imagedetails/modal` `getImageDetails(file)` resolves `{alt, presentation, width, height}` or `null` ([MDL-89214](https://tracker.moodle.org/browse/MDL-89214)).
-- TinyMCE picks its skin from `data-bs-theme` at setup; plugin dialogs/content CSS should use theme colour tokens ([MDL-68037](https://tracker.moodle.org/browse/MDL-68037)).
-- Full 5.3 catalogue: `moodle-5-3-changes`.
+`core/modal` and its subclasses (`core/modal_save_cancel`, `core/modal_delete_cancel`, `core/modal_cancel`) exist on
+5.2 and 5.3; `core/modal_factory` is gone (no `public/lib/amd/src/modal_factory.js` in either).
+
+```javascript
+import ModalSaveCancel from 'core/modal_save_cancel';
+import ModalEvents from 'core/modal_events';
+import Notification from 'core/notification';
+import Templates from 'core/templates';
+import {getString} from 'core/str';
+
+const modal = await ModalSaveCancel.create({
+    title: getString('confirmtitle', 'local_example'),
+    body: Templates.render('local_example/confirm', {name: 'A'}),
+    removeOnClose: true,
+    show: true,
+});
+modal.getRoot().on(ModalEvents.save, (e) => {
+    e.preventDefault();
+    save().then(() => modal.destroy()).catch(Notification.exception);
+});
+```
+
+- `removeOnClose` defaults to `false` (`configure()` in `modal.js`, read 5.2 and 5.3): without it every open adds
+  another hidden modal to the DOM.
+- **Cleanup must cover every close path.** Cancel, Escape and a backdrop click never run the save handler.
+  `ModalEvents.destroyed` bound on `modal.getRoot()` never fires: `destroy()` calls `this.root.remove()` (which unbinds
+  jQuery handlers) and then triggers the event (`modal.js:1011-1012`, read 5.2 and 5.3). Test
+  `modal.getRoot()[0].isConnected` where code must know the modal is gone. `ModalEvents.hidden` is triggered by
+  `hide()`, which `destroy()` calls before removing the root, so it covers every close path of a modal that has been
+  shown. `hide()` triggers it from the backdrop promise's callback, so on a modal destroyed before its first `show()`
+  finished the event can come after the root is removed and is lost (`modal.js:963-1013`, read 5.2 and 5.3, not
+  run).
+- `core/modal` traps focus and returns it to the opener (`returnElement`, else the active element at `show()`); the
+  heading level and labelling rules are in `moodle-accessibility`.
+- A form in a modal: `core_form/modalform` with a `\core_form\dynamic_form` class. A dynamic form must
+  `require_once` any library that is not autoloaded and request its AMD from `render()`, not `definition()`
+  (`moodle-field-lessons`).
+
+Reference: [reference/modals-forms-editors.md](../moodle-skill-files/moodle-amd-javascript/reference/modals-forms-editors.md).
+
+## TinyMCE (editor_tiny) and form JavaScript
+
+- **A Tiny plugin button appears only through `configuration.js`.** `addButton()` / `addMenuItem()` in `commands.js`
+  only make it referenceable; `plugin.js` must resolve `[`${component}/plugin`, Configuration]` and
+  `configuration.js` must export `configure()` returning the toolbar and menu with the button added
+  (`public/lib/editor/tiny/plugins/h5p/amd/src/{plugin,configuration}.js`, read 5.3.0). This holds with zero
+  settings.
+- **TinyMCE writes back to its textarea on blur and on the form's submit event** (`editor_tiny/editor`
+  `setupForTarget()`, read 5.3.0). Code that serialises the form itself (`new FormData(form)`, `$(form).serialize()`)
+  without a submit gets the old `name[text]`. Before reading: `getInstanceForElement(textarea)?.save()` from
+  `editor_tiny/editor`, then `notifyFormSubmittedByJavascript(form)` from `core_form/events`, as core's modal forms
+  do, so the autosave plugin drops its draft.
+- Behat: generator-created rich text needs an HTML format (`contentformat` / `introformat` `1`), or the field is a
+  plain textarea and no `tox-tinymce` element exists (`moodle-behat-testing`).
+- `core/form-autocomplete` with `ajax` or `tags` does not check submitted values against the options, so validate
+  them in the form's `validation()` and in the web service. The AJAX handler module exports `transport()` and
+  `processResults()`; template in [reference/modals-forms-editors.md](../moodle-skill-files/moodle-amd-javascript/reference/modals-forms-editors.md).
+- Read a dropped or pasted `File` inside the event handler; the `DataTransfer` is emptied after it returns.
+
+## Bootstrap and markup built in JavaScript
+
+- Import Bootstrap components as `import {Tooltip} from 'theme_boost/index'` on 5.2 and 5.3. **5.3+:**
+  `import {Tooltip} from 'bootstrap'` is the new name and `theme_boost/bootstrap/*` is deprecated
+  (`public/theme/boost/UPGRADING.md`, MDL-88766; old names are mapped in `theme_boost\hook_listener`, read 5.3.0).
+- Markup built in JavaScript uses Bootstrap 5 classes (`visually-hidden`, `me-2`, `fw-bold`): a Bootstrap 4 name
+  fails every JavaScript step of a Behat run initialised with `--scss-deprecations`, on 5.2 and 5.3 (read in
+  `public/lib/behat/classes/behat_session_trait.php` `look_for_deprecated_styles()`, not run).
+- The `hidden` attribute loses to `d-flex` and other `d-*` utilities (they are `!important`): toggle `d-none`.
+- Code that scrolls an element into view on a phone treats the bottom of Boost's fixed navbar (`$navbar-height: 60px`,
+  `public/theme/boost/scss/moodle/variables.scss:28`, read 5.3.0) as the top of the visible area.
+
+## ESLint
+
+Moodle's root `.eslintrc` applies; rules are scoped by path, so lint inside a Moodle checkout, not a copy elsewhere.
+JSDoc on every exported function, `const`/`let`, no `console.log` (use `core/log`), Moodle-style `async(e) =>` with
+no space. A deliberate no-op satisfies `no-empty-function` with a comment as its body:
+`const noop = () => { /* Intentionally empty. */ };`.
+
+## Testing
+
+AMD modules have no unit-test runner on 5.2 or 5.3: no `grunt jest` task exists, and **5.3+:** `npm test` runs Jest
+over the `js/esm` tree only (`package.json`). Test AMD behaviour with an `@javascript` Behat scenario
+(`moodle-behat-testing`), which is also the only gate that catches the traps above; keep logic that needs unit
+tests in PHP or in a `js/esm` module.
+
+## Common mistakes
+
+| Mistake | What happens | Fix |
+|---|---|---|
+| Editing `amd/build/*.min.js` | Overwritten at next build; CI's stale-build check fails | Edit `amd/src`, run `npx grunt amd` |
+| Committing `amd/src` without `amd/build` | Sites load the old code; CI fails | Rebuild, commit both |
+| `--root=local/example` on 5.1+ | Grunt fatal: path does not exist | `--root=public/local/example`, or run inside the plugin |
+| `.finally()` on `Ajax.call()[0]` | Works once, then throws | `Promise.resolve(...)` first |
+| `export default` and named exports in one file | Named import is `undefined` at load | One export style per module |
+| `import()` in `amd/src` | Rewritten to RequireJS; fails | **5.3+:** `core/import`; 5.2: plain `.js` outside `amd/` |
+| No `Pending` around async work | Flaky Behat | `new Pending(key)`, `resolve()` in `finally` |
+| `import ModalFactory from 'core/modal_factory'` | Module not found on 5.2 and 5.3 | `core/modal` or a subclass's `create()` |
+| Teardown on `ModalEvents.destroyed` bound on the root | Never runs | `ModalEvents.hidden`, or check `isConnected` |
+| User text into `setTitle()` / toast | Stored XSS | Lang strings; user data via `textContent` |
+| Big arrays in `js_call_amd()` args | Debugging notice, slow page | Ids only; fetch the rest |
+| State in `localStorage` | Lost at next login or purge | User preference or cookie |
+| Vendored file under `vendor/` or as `.mjs` | 404 or refused MIME type on production | `.js` under `amd/src/local/` or `js/` |
+| `require_login()` in a fragment callback | "The theme has already been set up" | Capability checks only |
+| `FormData` from a form with TinyMCE, no submit | Stale editor text saved | `editor.save()` first |
+| Context key `uniqid` in a JS-rendered template | Value replaced by a counter | Rename the key |
+
+## Reference files
+
+| File | Read it when |
+|---|---|
+| [reference/core-modules.md](../moodle-skill-files/moodle-amd-javascript/reference/core-modules.md) | You need the exact API of a core module (`core/ajax`, `core/str`, `core/templates`, `core/notification`, `core/toast`, `core/pending`, `core/fragment`, `core/url`, `core/config`, `core/storagewrapper`, `core/local/aria/focuslock`) or whether it returns a jQuery or a native promise |
+| [reference/modals-forms-editors.md](../moodle-skill-files/moodle-amd-javascript/reference/modals-forms-editors.md) | Writing a modal subclass, a modal or dynamic form, a TinyMCE plugin, or a `core/form-autocomplete` AJAX handler |
+| [reference/build-and-lint.md](../moodle-skill-files/moodle-amd-javascript/reference/build-and-lint.md) | Grunt or `moodle-plugin-ci grunt` fails, the build looks stale, you vendor a third-party library, or you split code into sub-folders of `amd/src` |
+| [reference/esm-react.md](../moodle-skill-files/moodle-amd-javascript/reference/esm-react.md) | Writing TypeScript or React in `js/esm/src`, mounting a React component from PHP or Mustache, loading an ES module from AMD, or running Jest |
+
+## Version notes
+
+| Moodle | File |
+|---|---|
+| 5.2 | [versions/moodle-5.2.md](../moodle-skill-files/moodle-amd-javascript/versions/moodle-5.2.md) |
+| 5.3 | [versions/moodle-5.3.md](../moodle-skill-files/moodle-amd-javascript/versions/moodle-5.3.md) |
 
 ## References
 
-- JavaScript modules: https://moodledev.io/docs/apis/subsystems/javascript-modules
-- AMD: https://moodledev.io/docs/apis/subsystems/javascript-modules#amd-modules
-- Templates JS: https://moodledev.io/docs/apis/subsystems/output/templates#using-templates-from-javascript
-- core/ajax: https://moodledev.io/docs/apis/subsystems/external/writing-a-service#calling-from-javascript
-- Modal: https://moodledev.io/docs/apis/subsystems/output/modal
-- Coding style: https://moodledev.io/general/development/policies/codingstyle/javascript
-- See also: `moodle-field-lessons` (generalized field lessons for this area)
+- JavaScript modules: https://moodledev.io/docs/guides/javascript/modules
+- JavaScript guide: https://moodledev.io/docs/guides/javascript
+- Templates from JavaScript: https://moodledev.io/docs/guides/templates
+- Modal dialogues: https://moodledev.io/docs/guides/javascript/modal
+- TinyMCE plugins: https://moodledev.io/docs/apis/plugintypes/tiny
+- React in Moodle (5.3): https://moodledev.io/docs/5.3/guides/javascript/react
+- JavaScript coding style: https://moodledev.io/general/development/policies/codingstyle/javascript
+- Related skills: `moodle-web-services`, `moodle-accessibility`, `moodle-behat-testing`, `moodle-field-lessons`

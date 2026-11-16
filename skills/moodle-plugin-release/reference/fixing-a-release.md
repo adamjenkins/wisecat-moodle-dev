@@ -50,8 +50,12 @@ When the branch was pushed first (the normal order) and the tag is to be added a
 - Read the run's log. The common causes are a missing or expired `MOODLE_MARKETPLACE_TOKEN` secret and a
   version the directory rejects (a `version` not higher than the last release, or a validation error in the
   ZIP).
-- Token problem: create a new token on the moodle.org "Plugins > API access" page, update the repository
-  secret, and re-run the workflow with `workflow_dispatch` and the existing tag. Do not re-tag.
+- Token problem: create a new token on the Moodle Marketplace under "Account Settings > Security"
+  (https://marketplace.moodle.com/account/security; it is shown once), update the repository secret, and
+  re-run the workflow with `workflow_dispatch` and the existing tag. Do not re-tag.
+- The workflow's last step prints the HTTP status and the response body, and fails on anything but 201; a
+  rejected version lists its reasons under "Validation Violations" in that step's log
+  (`moodlehq/moodle-plugin-release`, workflow revision 2026091801, read, not run).
 - Package or version problem: the tag's tree is wrong, so fix it in a new commit and release a new version.
 - The tag-push run uses the workflow file in the tagged tree, so a tag cut while that file was broken or
   missing gets no good run from the push. A `workflow_dispatch` run uses the workflow file on the branch you

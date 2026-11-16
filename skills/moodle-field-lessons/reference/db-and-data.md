@@ -22,8 +22,10 @@ in `moodle-upgrade-migration`. Samples are valid on Moodle 5.2 and 5.3.
   ```
 
 - **`get_records()` has six parameters and is keyed by the first field in `$fields`** (`id` for `*`). A seventh
-  "key by" argument is silently ignored, and rows with a duplicate key overwrite each other (with only a `debugging()` notice). Put the key column first in
-  `$fields`, or use `get_records_menu()`.
+  "key by" argument is silently ignored, and rows with a duplicate key overwrite each other with only a
+  `debugging()` notice ("Did you remember to make the first column something unique",
+  the `*_native_moodle_database.php` drivers in `public/lib/dml/`, 5.3.0). Put the key column first in `$fields`, or use
+  `get_records_menu()`.
 - **Read a returned array's keys from the function's `return` statement**, not from memory: a wrong key reads as
   `null` with at most a warning.
 - **Order rows written in the same request by `id`, not by a time column**: they share the same second, so

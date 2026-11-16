@@ -1,6 +1,6 @@
 ---
 name: moodle-upgrade-migration
-description: Use when moving a Moodle plugin to a newer Moodle or PHP version, widening or raising $plugin->requires and $plugin->supported, guarding an API that differs between supported branches, fixing deprecation debugging ("has been deprecated", "Call to undefined function print_error", "Undefined constant"), writing db/upgrade.php steps that must survive a failed upgrade, or porting old code (print_error, add_to_log, external_api without namespace, lib.php callbacks, Bootstrap 4 classes, /public directory). Skip when the question is the full list of what changed in one release (moodle-5-3-changes) or writing a plugin from scratch (moodle-plugin-development).
+description: Use when porting a Moodle plugin written for 3.x, 4.x, 5.0 or 5.1 up to 5.2, moving it to a newer PHP version, or needing the porting method for any version: raising $plugin->requires and $plugin->supported, one codebase or a branch per Moodle version, guarding an API that differs between supported branches, fixing deprecation debugging ("has been deprecated", "Call to undefined function print_error", "Undefined constant"), writing db/upgrade.php steps that must survive a failed upgrade, or porting old code (print_error, add_to_log, external_api without namespace, lib.php callbacks, Bootstrap 4 classes, /public directory). Skip when the question is what Moodle 5.3 removed, moved, deprecated or added (moodle-5-3-changes) or writing a plugin from scratch (moodle-plugin-development).
 ---
 
 # Moodle Upgrade and Migration
@@ -15,7 +15,8 @@ is the method and the cross-version rules.
 
 ## When to Use
 
-- Raising `$plugin->requires`, adding a branch to `$plugin->supported`, or adding a branch to CI
+- Raising `$plugin->requires`, adding a branch to `$plugin->supported`, or adding a branch to CI (when the branch
+  is 5.3, the list of what to fix is `moodle-5-3-changes`)
 - A deprecation `debugging()` notice, an "undefined function/constant/class" fatal, or a changed return value
   after a core upgrade
 - Writing or reviewing `db/upgrade.php`

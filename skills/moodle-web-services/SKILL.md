@@ -25,8 +25,8 @@ the same `external_api::call_external_function()` path: look up the function, va
 ## Mental model
 
 - **Registration is stored, flags are read live.** `db/services.php` is copied into the `external_functions` and
-  `external_services` tables during an upgrade. The keys `ajax`, `loginrequired`, `readonlysession`, `type`,
-  `description` (and on 5.3 `allowcorsrequests`) are re-read from the file on every call
+  `external_services` tables during an upgrade. The keys `ajax`, `loginrequired`, `readonlysession`, `type` and
+  `description` (**5.3+:** also `allowcorsrequests`) are re-read from the file on every call
   (`public/lib/external/classes/external_api.php`, `external_function_info()`, 5.2 and 5.3). A new function or a
   changed service list needs a version bump; a changed flag does not.
 - **Validation rejects, it does not clean.** `validate_parameters()` calls `validate_param()`, which throws when
@@ -279,7 +279,7 @@ or `\require_login_exception::class`. PHPUnit details: `moodle-phpunit-testing`.
 | Function not in the token's service | `accessexception` over REST | Add it to the service, or call through a service that has it |
 | `restrictedusers => 1`, user not authorised | `accessexception` | Site administration > Server > Web services > External services > Authorised users |
 | Unformatted user text in the result | Filters and multilang not applied; XSS in the caller | `util::format_string()` / `util::format_text()` with the context |
-| Using a client-sent id without re-checking | IDOR | `moodle-release-preflight` section 1 |
+| Using a client-sent id without re-checking | Any user can read or change another user's data | Re-check it against the context and user; checklist in `moodle-release-preflight` |
 | Global `\external_api` or `external_format_string()` | Deprecation notice or exception on 5.3 | `use core_external\...`; `\core_external\util::*` |
 
 ## Reference files

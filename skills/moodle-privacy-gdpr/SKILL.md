@@ -1,6 +1,6 @@
 ---
 name: moodle-privacy-gdpr
-description: Use when writing, reviewing or testing a Moodle plugin's privacy provider (classes/privacy/provider.php), adding a table, user preference, file area or external API call that holds personal data, or when the Plugin privacy registry says "Requires attention" or "Userlist provider missing". Covers null_provider vs metadata provider plus request\plugin\provider, get_metadata (add_database_table, add_subsystem_link, add_external_location_link, add_user_preference), get_contexts_for_userid, get_users_in_context, export_user_data, delete_data_for_all_users_in_context, delete_data_for_user, delete_data_for_users, core_userlist_provider, user_preference_provider, exporting and deleting files, comments, ratings and tags through core's helpers, activity and subplugin providers, and provider_testcase tests. Skip when auditing request handling for security (moodle-security-audit) or running the whole pre-release audit (moodle-release-preflight).
+description: Use when writing, reviewing or testing a Moodle plugin's privacy provider (classes/privacy/provider.php), adding a table, user preference, file area or external API call that holds personal data, or when the Plugin privacy registry says "Requires attention" or "Userlist provider missing". Covers null_provider vs metadata provider plus request\plugin\provider, get_metadata (add_database_table, add_subsystem_link, add_external_location_link, add_user_preference), get_contexts_for_userid, get_users_in_context, export_user_data, delete_data_for_all_users_in_context, delete_data_for_user, delete_data_for_users, core_userlist_provider, user_preference_provider, exporting and deleting files, comments, ratings and tags through core's helpers, activity and subplugin providers, and provider_testcase tests. Skip when auditing request handling for security (moodle-security-audit), running the whole pre-release audit (moodle-release-preflight), or declaring a theme's user preferences (moodle-theme-settings).
 ---
 
 # Moodle Privacy / GDPR
@@ -43,8 +43,9 @@ apply retention. The privacy API is the same on 5.2 and 5.3 (`public/privacy/` i
   - `delete_data_for_all_users_in_context(\context)`: everything in a context (retention expiry of the context).
     The manager calls it **for every component** on that context (`manager::delete_data_for_all_users_in_context()`),
     so a context that is not yours arrives here too.
-- **After your method, core removes what it owns for you:** activity completion and similar data for module
-  contexts (`request\helper::delete_data_for_user()`, `public/privacy/classes/local/request/helper.php`, 5.3.0).
+- **After your method, core removes what it owns for you:** the activity completion data of module contexts,
+  and nothing else (`request\helper::delete_data_for_user()`, `public/privacy/classes/local/request/helper.php`,
+  5.3.0).
   Your own tables, files, comments, ratings and tags are yours to remove.
 
 ## Choose the interfaces
@@ -246,10 +247,11 @@ core's forum does by blanking authored fields.
 ### Ids come back as strings
 
 **Fact:** `contextlist::get_contextids()` after `add_from_sql()` returns the values as the database driver gave
-them, uncast (`public/privacy/classes/local/request/contextlist.php`, 5.3.0), which is a string on the MySQL and
-PostgreSQL drivers, and `$context->instanceid` is not cast either, while `$context->id` is an int
-(`public/lib/classes/context.php`, 5.3.0). Read in the source, not run. **Symptom:** `$this->assertContains($context->id, $list->get_contextids())`
-fails (PHPUnit's `assertContains` is strict) and `===` comparisons in provider code are silently false. **Fix:**
+them, uncast (`public/privacy/classes/local/request/contextlist.php`, 5.3.0), which is a string on the MySQL,
+MariaDB and PostgreSQL drivers, and `$context->instanceid` is not cast either, while `$context->id` is an int
+(`public/lib/classes/context.php`, 5.3.0). Read in the source, not run. **Symptom:**
+`$this->assertContains($context->id, $list->get_contextids())` fails (PHPUnit's `assertContains` is strict) and
+`===` comparisons in provider code are silently false. **Fix:**
 `array_map('intval', ...)` before comparing, or `assertEqualsCanonicalizing()`. `userlist::get_userids()` is
 built from array keys and is int.
 
@@ -260,8 +262,8 @@ preferences are declared one by one. `export_user_preferences(int $userid)` read
 `get_user_preferences($name, null, $userid)` and writes it with
 `writer::export_user_preference('local_example', $name, $value, get_string(...))`, skipping a null value: the
 writer's `$value` is typed `string`, so an unset preference passed through is a `TypeError`. Site-wide preferences
-need no delete method. **Symptom:** a preference that is set but not declared is undeclared personal data; core's uninstall
-does not remove a plugin's preferences (`uninstall_plugin()`, `public/lib/adminlib.php`, 5.3.0; the uninstall
+need no delete method. **Symptom:** a preference that is set but not declared is undeclared personal data; core's
+uninstall does not remove a plugin's preferences (`uninstall_plugin()`, `public/lib/adminlib.php`, 5.3.0; the uninstall
 recipe is in `moodle-definition-of-done`). **Fix:** declare and export each; a child theme declares only the
 preferences it adds, not its parent's. Source: `public/theme/boost/classes/privacy/provider.php` (5.2 and 5.3).
 

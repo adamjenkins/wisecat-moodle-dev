@@ -1,276 +1,279 @@
 # moodle-accessibility
 
-> Use when ensuring Moodle plugin UI meets WCAG 2.1 AA — semantic HTML in Mustache, ARIA via core helpers, keyboard navigation, color contrast in SCSS, focus management in modals, screen reader testing, and Pa11y/axe automation.
+> Use when building or reviewing Moodle plugin UI for WCAG 2.2 AA - semantic Mustache markup, headings and landmarks, formslib labels, {{#pix}} icon alt text and aria-hidden, accessible names for buttons, row checkboxes and icon links, ARIA only where HTML has no equivalent, live regions and core/toast, focus in core/modal and core/local/aria/focuslock, keyboard support, colour contrast in light and dark colour modes (data-bs-theme, --mds-* tokens), page titles, and the Behat axe steps ("the page should meet accessibility standards", @accessibility, --colourmode=dark, "No data"). Skip when styling a whole theme (moodle-theme-scss) or writing JavaScript mechanics (moodle-amd-javascript).
 
-# Moodle Accessibility (WCAG 2.1 AA)
+# Moodle Accessibility (WCAG 2.2 AA)
 
 ## Overview
 
-Moodle targets WCAG 2.1 AA. UI in plugins must follow same standard for inclusion. Boost theme + Bootstrap 5 + Moodle's component library do most of the heavy lifting — your job is to use them correctly.
+Moodle's accessibility policy targets WCAG 2.2 AA, and core's Behat accessibility step checks WCAG 2.0, 2.1 and 2.2
+A and AA by default (`public/lib/tests/behat/behat_accessibility.php`, 5.2 and 5.3). Boost, Bootstrap 5, formslib
+and the core output components do most of the work when they are used as intended. This skill gives the markup
+recipe, the places where plugins usually break it, and how to prove the result.
+
+Evidence tags: **read** means read in the named version's source or moodledev.io, not run; **run 5.3.0** means
+observed on 5.3.0.
 
 ## When to Use
 
-- Building any UI (Mustache template, modal, custom form element)
-- Reviewing PR for accessibility regression
-- Submission to moodle.org plugin directory (a11y is reviewed)
-- Responding to a user-reported a11y bug
+- Writing a Mustache template, a renderer, a form, a modal, or any markup built in JavaScript
+- Choosing colours in a plugin's `styles.css`, or checking a page in Boost's dark colour mode
+- Reviewing a pull request or a Plugins directory submission for accessibility
+- Adding `@accessibility` Behat scenarios, or making them pass
+- **Skip when:** setting a whole theme's palette, tokens or dark-mode SCSS (`moodle-theme-scss`), testing a theme
+  (`moodle-theme-testing-release`), wiring modals, TinyMCE or autocomplete in JavaScript (`moodle-amd-javascript`),
+  or writing Behat steps in general (`moodle-behat-testing`).
 
-## Top rules
+## The model
 
-1. **Use semantic HTML**: `<button>` for actions, `<a>` for navigation, `<h1>`–`<h6>` in order
-2. **Every interactive element keyboard-reachable** with visible `:focus`
-3. **Every image** has `alt`; decorative images: `alt=""`
-4. **Color contrast** ≥ 4.5:1 (text), 3:1 (UI components)
-5. **Forms**: `<label for>` linked to every input
-6. **Don't use color alone** to convey meaning
-7. **Modals trap focus**, restore on close
+1. **Native HTML first, ARIA second.** A `<button>`, `<a href>`, `<label for>`, `<table>` with `<th scope>` and a
+   heading hierarchy give screen readers everything. ARIA is for widgets HTML does not have (tabs, tree, combobox),
+   and wrong ARIA is worse than none (moodledev.io accessibility policy).
+2. **Every interactive element has an accessible name** that a screen reader announces and a voice-control user can
+   say: visible text, a `<label for>`, or `aria-label` when there is no room for text. Behat locates fields by id,
+   name, `<label>` or placeholder, not by `aria-label`, so a visible or visually hidden `<label>` serves both.
+3. **Keyboard is the baseline**: reachable with Tab in reading order, operable with Enter and Space, visible focus,
+   and no trap except a modal that Escape closes.
+4. **Colour carries no meaning alone**, and text meets 4.5:1 (3:1 for large text), components and focus indicators
+   3:1, against whatever surface they end up on in either colour mode. **5.3+:** Boost has a dark colour mode, so a
+   literal colour that passes on white can fail on `#1d2125`.
+5. **Prove it twice**: axe through Behat catches roughly a third to a half of issues (moodledev.io accessibility
+   testing page); keyboard and screen-reader passes catch the rest.
 
-## Semantic Mustache
+## Default recipe: markup
 
 ```mustache
-{{! BAD }}
-<div class="btn" onclick="...">Save</div>
+{{!
+    @template local_example/attendance
 
-{{! GOOD }}
-<button type="submit" class="btn btn-primary">{{#str}}save, core{{/str}}</button>
+    Example context (json):
+    {
+        "headingid": "att-h", "sessionname": "Week 1",
+        "rows": [{"userid": 3, "fullname": "Ana Lee", "present": true, "checkboxid": "att-3"}]
+    }
+}}
+<section aria-labelledby="{{headingid}}">
+    <h3 id="{{headingid}}">{{#str}}attendancefor, local_example, {{sessionname}}{{/str}}</h3>
+    <table class="table">
+        <caption class="visually-hidden">{{#str}}attendancetable, local_example{{/str}}</caption>
+        <thead>
+            <tr>
+                <th scope="col">{{#str}}fullnameuser, core{{/str}}</th>
+                <th scope="col">{{#str}}present, local_example{{/str}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#rows}}
+            <tr>
+                <th scope="row">{{fullname}}</th>
+                <td>
+                    <input type="checkbox" id="{{checkboxid}}" name="present[{{userid}}]" value="1"
+                        {{#present}}checked{{/present}}>
+                    <label for="{{checkboxid}}" class="visually-hidden">
+                        {{#str}}markpresent, local_example, {{fullname}}{{/str}}
+                    </label>
+                </td>
+            </tr>
+            {{/rows}}
+        </tbody>
+    </table>
+    <button type="submit" class="btn btn-primary">{{#str}}savechanges, core{{/str}}</button>
+</section>
 ```
 
-Headings:
+Why each piece is there: the section is named by its heading; the heading level follows the page (an activity
+page's content usually starts at `<h3>` under the page's `<h2>`); every row checkbox has its own label naming the
+person, so "Mark Ana Lee present" is announced instead of twelve unnamed checkboxes, and Behat's
+`I set the field "Mark Ana Lee present" to "1"` finds it; `{{#str}}` keeps every word translatable.
 
-```mustache
-<h2 id="ann-heading">{{#str}}announcements, local_example{{/str}}</h2>
-<section aria-labelledby="ann-heading">...</section>
-```
+- `visually-hidden` and `visually-hidden-focusable` are the Bootstrap 5 classes. `sr-only` is Bootstrap 4: Boost keeps
+  it only in `scss/moodle/bs4-compat.scss` with the `deprecated-styles()` mixin, which outlines it in red on Behat
+  sites and in theme designer mode, and a Behat run initialised with `--scss-deprecations` fails every JavaScript
+  step on a page that uses it (read in 5.2 and 5.3, not run). `accesshide` still exists in core SCSS.
+- A partial is one self-contained element. A template whose root is a bare `<li>` fails CI's HTML validation of the
+  example context; put the `<ul>` and its items in the same template, or render the list in the parent. A role
+  such as `role="log"` goes on a `<div>` wrapper, not on an `<ol>`, which already has the list role.
+- Template structure, example contexts and comment syntax belong to `moodle-theme-layouts-templates`.
 
-Skip levels = WCAG fail. `<h2>` then `<h4>` is wrong.
-
-## Forms — formslib
-
-`MoodleQuickForm` outputs `<label for>` automatically. Don't bypass:
-
-```php
-$mform->addElement('text', 'name', get_string('name', 'local_example'));
-$mform->setType('name', PARAM_TEXT);
-$mform->addRule('name', null, 'required', null, 'client');
-
-// Help button — adds aria-described relationship
-$mform->addHelpButton('name', 'name', 'local_example');
-```
-
-For required fields, `addRule('required')` adds `aria-required="true"`.
-
-## Buttons / links
+## Buttons and links
 
 | Element | Use for |
-|---------|---------|
-| `<button type="submit">` | Form submit |
-| `<button type="button">` | JS action |
-| `<a href="...">` | Navigation to a URL |
+|---|---|
+| `<button type="button">` | An action handled by JavaScript |
+| `<button type="submit">` | Submitting a form |
+| `<a href="...">` | Going to a URL |
 
-Never `<a href="#" onclick>` — use `<button>`. Never `<div role="button">` unless you also handle keyboard (Enter + Space) and focus.
+Never `<a href="#">` with a click handler, and never `<div role="button">` unless it also has `tabindex="0"`,
+Enter and Space handlers and a focus style; a `<button>` gives all of that for free. Link text says where it goes
+("Edit Ana Lee's attendance"), not "click here". Icon-only links and buttons need a name; targets in a row of icons
+should be at least 44 by 44 CSS pixels (moodledev.io accessibility policy, Icons).
 
 ## Icons
 
 ```mustache
-{{#pix}}t/edit, core, {{#str}}edit, core{{/str}}{{/pix}}
+{{! An icon on its own: the third argument is the accessible name. }}
+<a href="{{editurl}}">{{#pix}}t/edit, core, {{#str}}edituser, local_example, {{fullname}}{{/str}}{{/pix}}</a>
+
+{{! An icon next to text that says the same thing: no third argument, so it is hidden. }}
+<button type="button" class="btn btn-secondary">{{#pix}}t/edit, core{{/pix}} {{#str}}edit, core{{/str}}</button>
 ```
 
-Pix renderer outputs `<img alt="...">` with the title as alt. For decorative icons accompanying visible text:
+With the Font Awesome icon system (Boost's default) a mapped icon renders as `<i class="icon fa ..." role="img"
+aria-label="...">` when it has alt text, and with `aria-hidden="true"` when it has none
+(`public/lib/templates/pix_icon_fontawesome.mustache`; `public/lib/classes/output/pix_icon.php:93-95`, read 5.2 and
+5.3). Only an icon with no Font Awesome mapping renders as `<img alt>`. So: pass alt text when the icon is the only
+content, pass none when text beside it says the same. `{{#pix}}` is sized for icons; use `<img>` with real `alt` for
+pictures.
 
-```mustache
-<button>
-  {{#pix}}t/edit, core{{/pix}}<span class="visually-hidden"></span>
-  {{#str}}edit, core{{/str}}
-</button>
+## Forms
+
+- formslib gives every element a `<label for>`, marks required fields with `aria-required="true"`, and points an
+  invalid field at its error with `aria-describedby` (`public/lib/form/templates/element-text.mustache:12-17`, read
+  5.2 and 5.3). Do not rebuild these by hand; add elements with a label string.
+- `placeholder` is not a label. A search box with only a placeholder has no stable accessible name.
+- Custom JavaScript form widgets must set `aria-invalid="true"` on an invalid field and associate the message with
+  `aria-describedby` (policy page, Forms). Boost's `theme_boost/form-display-errors` does this for formslib.
+- `core/form-autocomplete` is keyboard-accessible as shipped; keep its label (`$mform->addElement('autocomplete',
+  'x', get_string('label', ...))`) and do not hide its input. Its AJAX handler is in `moodle-amd-javascript`.
+- Checkboxes outside an mform can join it with `form="<formid>"`; give each its own label.
+
+## ARIA, live regions and dynamic content
+
+- Prefer a native element or a Bootstrap component that already carries roles (tabs, collapse, dropdown); Boost's
+  `theme_boost/aria` adds the missing keyboard support to Bootstrap menus. Patterns for building your own widget
+  are in [reference/widget-patterns.md](../moodle-skill-files/moodle-accessibility/reference/widget-patterns.md).
+- Status messages after an AJAX action: `core/toast` `add()` writes into a `role="status" aria-live="polite"`
+  region (`public/lib/templates/local/toast/wrapper.mustache`). `core/notification` `addNotification()` shows an
+  alert in the page. Use `aria-live="assertive"` only for errors that block the user.
+- Content that JavaScript replaces (`Templates.replaceNode()`) loses focus if the focused element was inside it.
+  Move focus to the new content's heading or the control that replaced the old one.
+- `aria-hidden="true"` on anything focusable hides it from screen readers while Tab still reaches it. Remove it from
+  the tab order too, or do not hide it.
+- `aria-label` on a `<div>` or `<span>` with no role is ignored by most screen readers; give it a role or use text.
+- The `hidden` attribute loses to Bootstrap's `d-*` utilities (`!important`): an element with `hidden` and `d-flex`
+  stays visible and announced. Toggle `d-none` instead (`moodle-amd-javascript`).
+
+## Modals and overlays
+
+- Use `core/modal` or a subclass. It sets `role="dialog"`, `aria-modal="true"`, `aria-labelledby` pointing at the
+  title (`public/lib/templates/modal.mustache:43`), traps focus while open, closes on Escape, and returns focus to
+  `returnElement` or to the element that had focus when it opened.
+- The title is a heading: **5.2 only:** `<h5>`; **5.3+:** `<h2 class="modal-title fs-5">`. Headings inside the body
+  start at `<h3>` so the outline holds on 5.3 and is harmless on 5.2.
+- Always give a modal a title, even a short one: it is the dialog's accessible name.
+- Your own overlay (not `core/modal`) uses `core/local/aria/focuslock`:
+
+```javascript
+import {trapFocus, untrapFocus} from 'core/local/aria/focuslock';
+
+trapFocus(panel);     // returns nothing; focuses the first focusable element in panel
+// ... on close, including Escape:
+untrapFocus();        // releases the most recent trap
+opener.focus();
 ```
 
-Bootstrap 5: `.visually-hidden` (was `.sr-only` in BS4).
+Traps stack, so every `trapFocus()` needs its `untrapFocus()` on every close path
+(`public/lib/amd/src/local/aria/focuslock.js:328,363`, read 5.2 and 5.3). There is no `focusmanager` module and no
+release function returned by `trapFocus()`.
 
-## Color contrast
+## Colour, contrast and colour modes
 
-Boost defines `$primary`, `$secondary`, etc. Don't override to low-contrast values.
+- A plugin's `styles.css` takes colours from the theme: utility classes (`text-body`, `text-body-secondary`,
+  `bg-body`, `bg-body-tertiary`, `border`, `text-bg-*`) or custom properties (`--mds-text-default`,
+  `--mds-bg-surface-default`, `--mds-border-default`, `--bs-body-bg`, `--bs-body-color`). These follow the colour
+  mode; `bg-white`, `bg-light`, `text-dark` and `#fff` do not (moodledev.io Colour modes guide; `public/lib/UPGRADING.md`
+  5.3).
+- **5.3+:** where a colour must differ in dark mode, scope it with `[data-bs-theme="dark"] .local-example-x { ... }`,
+  never with `@media (prefers-color-scheme: dark)`: the user's or the site's choice overrides the device, so the
+  media query applies on the wrong pages. On 5.2 the attribute selector simply never matches, so the same CSS is
+  safe on both.
+- A colour that carries meaning (status tint, diff highlight) keeps its hue and gets a darker shade for dark mode;
+  status shown by colour also gets an icon or text.
+- An SVG shown through `<img>` cannot inherit `currentColor` and stays black on a dark page. Render icons with
+  `{{#pix}}` or `$OUTPUT->pix_icon()` so a mapped Font Awesome glyph follows the text colour; for your own image,
+  choose a mid-tone that has contrast on white and on `#1d2125`, or ship a second file.
+- Before checking contrast, confirm the custom property exists: an undefined `var(--x, #fallback)` silently uses the
+  fallback on every theme (`getComputedStyle(el).getPropertyValue('--x')` returns `""`).
+- SCSS variables (`$primary`, `$danger`) belong to the theme and must be set in pre-SCSS, before Bootstrap compiles;
+  setting them in a theme's post-SCSS changes nothing already emitted. Palette and dark-mode SCSS are owned by
+  `moodle-theme-scss`.
 
-```scss
-// theme/yourtheme/scss/post.scss
-$primary: #0f6fc5;     // contrast vs white = 5.13:1 ✓
-$danger:  #d9534f;     // contrast vs white = 3.34:1 ✗ — fails AA for text
-```
+## Page titles and landmarks
 
-Test: https://webaim.org/resources/contrastchecker/
-
-Don't rely on color only:
-
-```mustache
-{{! BAD — color only }}
-<span class="text-danger">{{name}}</span>
-
-{{! GOOD — icon + color }}
-<span class="text-danger">
-  {{#pix}}t/error, core, {{#str}}invalid, local_example{{/str}}{{/pix}}
-  {{name}}
-</span>
-```
-
-## Tables
-
-```mustache
-<table class="table">
-  <caption>{{#str}}attendance, local_example{{/str}}</caption>
-  <thead>
-    <tr>
-      <th scope="col">{{#str}}user, core{{/str}}</th>
-      <th scope="col">{{#str}}status, core{{/str}}</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{#rows}}
-    <tr>
-      <th scope="row">{{name}}</th>
-      <td>{{status}}</td>
-    </tr>
-    {{/rows}}
-  </tbody>
-</table>
-```
-
-`html_table` from `lib/outputcomponents.php` renders accessibly:
+- `$PAGE->set_title()` takes the most specific part first, joined with `moodle_page::TITLE_SEPARATOR`
+  (`' | '`, `public/lib/pagelib.php:130`); core appends the site name, so do not add it.
 
 ```php
-$table = new \html_table();
-$table->head = [get_string('name'), get_string('status')];
-$table->headspan = [1, 1];
-$table->caption = get_string('attendance', 'local_example');
-echo \html_writer::table($table);
+$PAGE->set_title(format_string($cm->name) . ': ' . get_string('report', 'local_example') .
+    moodle_page::TITLE_SEPARATOR . format_string($course->fullname));
 ```
 
-## ARIA — minimal use
+- Landmarks come from the theme's layout. Do not add `<main>` or `role="main"` in plugin output: the page already
+  has one, and two fail axe's `landmark-no-duplicate-main`. A plugin `<nav>` or `role="search"` needs a unique
+  `aria-label`. `core/search_input_auto` exposes a `{{$searchrole}}` block to drop its `role="search"` when it sits
+  inside another search landmark (`public/lib/templates/search_input_auto.mustache:40`; read in 5.3.0 and 5.2.2,
+  absent from 5.2.0 and 5.2.1, where the block is ignored and the role stays).
 
-Native HTML > ARIA. Only add ARIA when no native equivalent.
+## Testing
 
-```mustache
-{{! tab pattern — needs ARIA }}
-<div role="tablist" aria-label="{{#str}}sections, local_example{{/str}}">
-  <button role="tab" aria-selected="true" aria-controls="panel-1" id="tab-1">One</button>
-  <button role="tab" aria-selected="false" aria-controls="panel-2" id="tab-2">Two</button>
-</div>
-<div role="tabpanel" id="panel-1" aria-labelledby="tab-1">...</div>
+```gherkin
+@local_example @javascript @accessibility
+Scenario: The attendance page meets accessibility standards
+  # "local_example > Attendance" is a page type resolved by behat_local_example::resolve_page_instance_url().
+  Given I am on the "C1" "local_example > Attendance" page logged in as "teacher1"
+  Then the page should meet accessibility standards with "best-practice" extra tests
+  And the "region-main" "region" should meet accessibility standards
 ```
 
-Bootstrap 5 tab JS handles arrow keys. Don't reimplement.
+- The step throws a DriverException unless the scenario or feature has `@accessibility`, needs `@javascript`, and
+  does nothing at all on a run initialised with `--no-axe` (`behat_accessibility.php:101-111`, read 5.2 and 5.3).
+- It loads `/lib/behat/axe/axe.min.js` from the site. A web server rule that denies paths containing `/behat/` makes
+  every such step fail with "No data" locally while CI passes; allow `/lib/behat/axe/` on the test vhost.
+- **5.3+:** run the suite twice, once plain and once after `php public/admin/tool/behat/cli/init.php --colourmode=dark`;
+  do not pin a mode in accessibility scenarios.
+- axe does not enter iframes and does not test most non-text contrast (borders, focus rings, icons). Those, keyboard
+  operation and screen-reader output are manual checks: [reference/testing.md](../moodle-skill-files/moodle-accessibility/reference/testing.md).
 
-## Modals
+## Common mistakes
 
-Use `core/modal` — handles focus trap, ESC key, focus restore on close.
+| Mistake | What happens | Fix |
+|---|---|---|
+| `<div onclick>` or `<a href="#">` for an action | Not focusable or announced as a link | `<button type="button">` |
+| `{{#pix}}` with no alt as the only content of a link | Link has no accessible name; axe `link-name` | Pass the alt as the third argument |
+| `{{#pix}}` with alt next to the same text | Name read twice | Drop the alt |
+| Row checkboxes with only `aria-label` | Behat cannot set them by name; voice users cannot say them | `id` plus a `visually-hidden` `<label for>` |
+| `sr-only` in new markup | Red deprecation outline on Behat sites; `--scss-deprecations` runs fail | `visually-hidden` |
+| Heading levels skipped | Broken outline; axe best-practice `heading-order` | Follow the page's level; modal body starts at `<h3>` |
+| `placeholder` as the only label | No stable name | `<label for>` |
+| `outline: 0` with no replacement | Focus invisible | Keep Boost's focus style |
+| `aria-hidden="true"` on a focusable element | Silent tab stop | Remove from tab order or unhide |
+| Literal `#fff` or `bg-white` in plugin CSS | **5.3+:** light island or unreadable text in dark mode | `--mds-*` tokens or `bg-body*` utilities |
+| `@media (prefers-color-scheme: dark)` | Applies on the wrong pages | `[data-bs-theme="dark"]` |
+| SCSS colour variables set in post-SCSS | No effect | Pre-SCSS, in the theme (`moodle-theme-scss`) |
+| Own overlay without `trapFocus()`/`untrapFocus()` | Focus escapes behind it, or stays trapped after close | `core/modal`, or `focuslock` on every close path |
+| `import {trapFocus} from 'core/local/aria/focusmanager'` | Module not found | `core/local/aria/focuslock` |
+| `@accessibility` steps pass on a `--no-axe` site | Nothing was checked | Check the init options of the run |
+| A second `<main>` in plugin output | axe `landmark-no-duplicate-main` | Use `<section>` with a heading |
 
-```javascript
-import Modal from 'core/modal';
+## Reference files
 
-const modal = await Modal.create({
-    title: await getString('confirm', 'core'),
-    body: await Templates.render('local_example/confirm', {}),
-    show: true,
-    removeOnClose: true,
-});
-// focus auto-traps inside; on close, focus returns to trigger element
-```
+| File | Read it when |
+|---|---|
+| [reference/widget-patterns.md](../moodle-skill-files/moodle-accessibility/reference/widget-patterns.md) | Building a custom interactive widget (tabs, disclosure, menu, listbox, tree, drag and drop), a live region, or managing focus after JavaScript replaces content |
+| [reference/testing.md](../moodle-skill-files/moodle-accessibility/reference/testing.md) | Writing or debugging `@accessibility` Behat scenarios, running axe outside Behat, or doing the manual keyboard, screen-reader, zoom and colour-mode checks before a release |
 
-Custom focus management:
+## Version notes
 
-```javascript
-import {trapFocus} from 'core/local/aria/focusmanager';
-const release = trapFocus(modalEl);
-// ... when closing:
-release();
-triggerEl.focus();
-```
-
-## Live regions (toasts, async updates)
-
-```javascript
-import {add as addToast} from 'core/toast';
-addToast('Saved', {type: 'success'});
-```
-
-`core/toast` uses `aria-live="polite"`. For urgent alerts: `aria-live="assertive"` (sparingly — interrupts screen readers).
-
-## Keyboard
-
-Every interactive control:
-- Focusable in source order (don't `tabindex="0"` everything)
-- Activated with Enter / Space
-- Visible focus ring (don't `outline: 0` without replacement)
-- Custom widgets follow [WAI-ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/patterns/)
-
-## Screen reader testing
-
-| OS | SR | Browser |
-|----|----|---------|
-| Windows | NVDA (free) | Firefox |
-| macOS | VoiceOver | Safari |
-| Linux | Orca | Firefox |
-| iOS | VoiceOver | Safari |
-| Android | TalkBack | Chrome |
-
-Quick checks:
-- Tab through entire UI — every interactive element reachable
-- Use SR-only — does the experience make sense?
-- Resize text 200% — layout still works?
-- Disable CSS — content order still meaningful?
-
-## Automation
-
-```bash
-# axe-core via Puppeteer
-npm install -g @axe-core/cli
-axe http://localhost:8000/local/example/
-
-# Pa11y
-npm install -g pa11y
-pa11y --standard WCAG2AA http://localhost:8000/local/example/
-```
-
-CI integration: run on PRs against staging.
-
-## Common Mistakes
-
-| Mistake | Fix |
-|---------|-----|
-| `<div onclick>` | `<button>` |
-| Missing `alt` on `<img>` | Add — `alt=""` if decorative |
-| `placeholder` as label | Add real `<label for>` |
-| `outline: 0` no replacement | Restore visible focus indicator |
-| Heading level skip | Sequential `<h1>`/`<h2>`/`<h3>` |
-| Link text "click here" / "more" | Descriptive (`Edit user "Alice"`) |
-| `role="button"` without keyboard | Use `<button>` instead |
-| Color-only error indication | Add icon + text |
-| Color contrast < 4.5:1 | Adjust SCSS palette |
-| Modal without focus trap | Use `core/modal` |
-| `aria-label` on a `<div>` with no role | Either add role or use text instead |
-| `aria-hidden="true"` on focusable element | Either unhide or remove from tab order |
-
-## Plugin directory review
-
-moodle.org reviewers run a11y checks. Common rejection reasons:
-- New custom modal without focus trap
-- Hard-coded colors failing AA contrast
-- Custom widgets without ARIA / keyboard
-- Missing `<label>` on form fields
-
-## Moodle 5.3 notes (beta — re-verify at 5.3.0)
-
-- Modal title is now `<h2 class="modal-title fs-5">`; start modal body headings at `<h3>` ([MDL-75699](https://tracker.moodle.org/browse/MDL-75699)).
-- Experimental dark mode: no literal colours, `bg-white` or `text-dark`; use `--bs-*`/`--mds-*` tokens or `bg-body*`/`text-body*` utilities, and icons via the pix API so they inherit `currentColor` ([MDL-68037](https://tracker.moodle.org/browse/MDL-68037)).
-- `core/notification_base` accepts `headinglevel` (1-6) ([MDL-88458](https://tracker.moodle.org/browse/MDL-88458)); override `{{$searchrole}}{{/searchrole}}` in `core/search_input_auto` to drop a nested search landmark ([MDL-88833](https://tracker.moodle.org/browse/MDL-88833)).
-- Course-index subsection ARIA (`aria-owns`/`aria-expanded`) moved to the delegating activity's treeitem; overrides of `courseindex/cm` and `courseindex/section` must change together ([MDL-88949](https://tracker.moodle.org/browse/MDL-88949)).
-- Behat: `I set the focus on the "<element>" "<selector>"` (@javascript only) ([MDL-84065](https://tracker.moodle.org/browse/MDL-84065)); `--colourmode=dark` runs a suite in dark mode ([MDL-68037](https://tracker.moodle.org/browse/MDL-68037)).
-- `core/imagedetails/modal` `getImageDetails(file)` collects alt text / decorative flag for your own image-upload UI ([MDL-89214](https://tracker.moodle.org/browse/MDL-89214)); `flexible_table::set_columnheadersattributes()` (also 5.2.3+) ([MDL-89384](https://tracker.moodle.org/browse/MDL-89384)).
-- Full 5.3 catalogue: `moodle-5-3-changes`.
+| Moodle | File |
+|---|---|
+| 5.3 | [versions/moodle-5.3.md](../moodle-skill-files/moodle-accessibility/versions/moodle-5.3.md) |
 
 ## References
 
-- Accessibility: https://moodledev.io/general/development/policies/accessibility
-- WCAG 2.1: https://www.w3.org/TR/WCAG21/
-- WAI-ARIA APG: https://www.w3.org/WAI/ARIA/apg/
-- Boost a11y: https://docs.moodle.org/dev/Boost_-_Accessibility
-- pix renderer: https://moodledev.io/docs/apis/subsystems/output#pix-icons
-- See also: `moodle-field-lessons` (generalized field lessons for this area)
+- Accessibility policy: https://moodledev.io/general/development/policies/accessibility
+- Accessibility testing: https://moodledev.io/general/development/policies/accessibility/testing
+- Colour modes (5.3): https://moodledev.io/docs/5.3/guides/colourmodes
+- Templates: https://moodledev.io/docs/guides/templates
+- WCAG 2.2: https://www.w3.org/TR/WCAG22/
+- WAI-ARIA Authoring Practices: https://www.w3.org/WAI/ARIA/apg/
+- Related skills: `moodle-amd-javascript`, `moodle-behat-testing`, `moodle-theme-scss`, `moodle-theme-testing-release`

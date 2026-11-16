@@ -70,14 +70,18 @@ Then:
    php admin/cli/upgrade.php --non-interactive
    php admin/cli/build_theme_css.php --themes=<name> --direction=ltr
    php admin/cli/purge_caches.php
-   vendor/bin/phpcs --standard=moodle public/theme/<name>
+   phpcs --standard=moodle public/theme/<name>
    php public/admin/tool/phpunit/cli/init.php
    vendor/bin/phpunit --testsuite theme_<name>_testsuite
    ```
+   (`phpcs` with the `moodle` standard comes from `moodlehq/moodle-cs`; core's own Composer file does not
+   install it. `moodle-plugin-ci phpcs --max-warnings 0` is the same check as CI runs.)
    and how to look at it: select the theme in the theme selector, or enable `allowthemechangeonurl` and open a
    page with `?theme=<name>`.
 8. List what is left for the user: `pix/screenshot.png` (about 500 by 400 px; until it exists the selector shows
    Boost's), real colours and text, and anything marked TODO.
+
+Offer `/moodle-theme-check` as a static check of the result.
 
 Say plainly that the theme was written and not run. A theme whose SCSS does not compile still shows a working
 page that looks like plain Boost, so the compile test or the `build_theme_css.php` command above (with developer

@@ -1,5 +1,5 @@
-name: moodle-dev
-version: 0.3.0
+name: wisecat-moodle-dev
+version: 0.1.0
 schema: v1
 rules:
   - uses: ./rules/moodle-5-3-changes.md
@@ -18,12 +18,18 @@ rules:
   - uses: ./rules/moodle-privacy-gdpr.md
   - uses: ./rules/moodle-release-preflight.md
   - uses: ./rules/moodle-security-audit.md
+  - uses: ./rules/moodle-theme-boost-child.md
   - uses: ./rules/moodle-theme-development.md
+  - uses: ./rules/moodle-theme-layouts-templates.md
+  - uses: ./rules/moodle-theme-renderers-output.md
+  - uses: ./rules/moodle-theme-scss.md
+  - uses: ./rules/moodle-theme-settings.md
+  - uses: ./rules/moodle-theme-testing-release.md
   - uses: ./rules/moodle-upgrade-migration.md
   - uses: ./rules/moodle-web-services.md
 prompts:
   - name: moodle-bump-version
-    description: Bump version.php and add an upgrade.php step for a Moodle plugin.
+    description: Bump $plugin->version in version.php and add an upgrade.php step for a Moodle plugin.
     prompt: ./prompts/moodle-bump-version.md
   - name: moodle-capability-audit
     description: Audit a plugin's capabilities — verifies db/access.php declarations match runtime require_capability/has_capability calls, checks risk bitmasks, default archetypes, and lang strings.
@@ -32,13 +38,16 @@ prompts:
     description: Run phpcs with the Moodle coding standard and fix reported issues.
     prompt: ./prompts/moodle-codestyle.md
   - name: moodle-mustache-lint
-    description: Lint Mustache templates for accessibility, security, hard-coded strings, and Moodle template conventions.
+    description: Lint Mustache templates for accessibility, security, hard-coded strings, Moodle template conventions and, in a theme, template overrides.
     prompt: ./prompts/moodle-mustache-lint.md
   - name: moodle-new-plugin
-    description: Scaffold a new Moodle plugin (asks for type + name).
+    description: Scaffold a new Moodle plugin for Moodle 5.2 and 5.3 (asks for type + name).
     prompt: ./prompts/moodle-new-plugin.md
+  - name: moodle-new-theme
+    description: Scaffold a Boost child theme for Moodle 5.2 and 5.3 (asks for the name and what it must change).
+    prompt: ./prompts/moodle-new-theme.md
   - name: moodle-privacy-audit
-    description: Audit a Moodle plugin's privacy provider for completeness against its DB schema.
+    description: Audit a Moodle plugin's privacy provider for completeness against its DB schema, preferences, files and external services.
     prompt: ./prompts/moodle-privacy-audit.md
   - name: moodle-security-review
     description: Run the Moodle security checklist on a file, directory, or entire plugin.
@@ -46,3 +55,6 @@ prompts:
   - name: moodle-string-check
     description: Find hard-coded English strings that should use get_string() / Mustache {{#str}}.
     prompt: ./prompts/moodle-string-check.md
+  - name: moodle-theme-check
+    description: Static check of a Moodle theme directory against the theme skills' common mistakes; reports file:line for each finding and states what was not checked.
+    prompt: ./prompts/moodle-theme-check.md

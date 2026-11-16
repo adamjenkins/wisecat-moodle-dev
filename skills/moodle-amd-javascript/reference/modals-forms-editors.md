@@ -171,6 +171,9 @@ export const configure = (instanceConfig) => ({
 });
 ```
 
+- `common.js` has one `export default` of an object (`{pluginName, component, buttonName, icon}`), and the other
+  files import its keys by name, as above. That works because the built module returns that object; a module that
+  mixes `export default` with separate named exports does not (the named ones are lost).
 - Without `configuration.js` (or with a `configure()` that returns nothing) the button is registered but never placed:
   the plugin loads, no error is logged, and the toolbar has no button.
 - `PluginManager.add()` does not accept a promise; everything asynchronous (strings, icons, metadata) is awaited

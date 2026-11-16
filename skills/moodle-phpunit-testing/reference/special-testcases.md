@@ -9,7 +9,8 @@ on real plugins. Everything here holds on 5.2 and 5.3 unless tagged.
 ## External functions
 
 - Base class: `\core_external\tests\externallib_testcase` (`public/lib/external/tests/classes/externallib_testcase.php`,
-  autoloaded in tests on 5.2 and 5.3). The old global `externallib_advanced_testcase` was replaced in 5.1.
+  autoloaded in tests on 5.2 and 5.3). It replaced the global `externallib_advanced_testcase`, which remains only
+  as a `class_alias` in `public/webservice/tests/helpers.php` and so exists only after that file is required.
 - Call `execute()` as the user under test, then `clean_returnvalue()` against `execute_returns()`. Without the clean,
   a field the structure does not declare, or a wrong type, passes the test and fails the real web service call.
 - Test the parameter side too: `validate_parameters()` rejects a value that cleaning would change, so free text
@@ -112,8 +113,20 @@ $this->assertSame('POST', $history[0]['request']->getMethod());
 
 ## Hooks
 
-- `$this->redirectHook(\core\hook\output\before_footer_html_generation::class, fn($hook) => $called = true);`
-  replaces every listener for that hook during the test; `stopHookRedirections()` ends it.
+- `redirectHook()` replaces every listener for that hook during the test; `stopHookRedirections()` ends it. Pass a
+  closure that captures by reference. An arrow function (`fn($hook) => $called = true`) assigns to its own copy
+  of the variable, so the assertion after it always fails:
+
+  ```php
+  $called = false;
+  $this->redirectHook(
+      \core\hook\output\before_footer_html_generation::class,
+      function ($hook) use (&$called): void {
+          $called = true;
+      }
+  );
+  ```
+
 - To prove the plugin's own listener is registered, do not redirect: dispatch the hook with
   `\core\di::get(\core\hook\manager::class)->dispatch($hook)` and assert the listener's effect. A unit test of the
   callback method alone passes even when `db/hooks.php` is wrong or the version was not bumped.

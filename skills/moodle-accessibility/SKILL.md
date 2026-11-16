@@ -89,8 +89,8 @@ person, so "Mark Ana Lee present" is announced instead of twelve unnamed checkbo
 
 - `visually-hidden` and `visually-hidden-focusable` are the Bootstrap 5 classes. `sr-only` is Bootstrap 4: Boost keeps
   it only in `scss/moodle/bs4-compat.scss` with the `deprecated-styles()` mixin, which outlines it in red on Behat
-  sites and in theme designer mode, and a Behat run with `--scss-deprecations` fails on any page that uses it (read
-  5.2 and 5.3). `accesshide` still exists in core SCSS.
+  sites and in theme designer mode, and a Behat run initialised with `--scss-deprecations` fails every JavaScript
+  step on a page that uses it (read in 5.2 and 5.3, not run). `accesshide` still exists in core SCSS.
 - A partial is one self-contained element. A template whose root is a bare `<li>` fails CI's HTML validation of the
   example context; put the `<ul>` and its items in the same template, or render the list in the parent. A role
   such as `role="log"` goes on a `<div>` wrapper, not on an `<ol>`, which already has the list role.
@@ -230,7 +230,7 @@ Scenario: The attendance page meets accessibility standards
   does nothing at all on a run initialised with `--no-axe` (`behat_accessibility.php:101-111`, read 5.2 and 5.3).
 - It loads `/lib/behat/axe/axe.min.js` from the site. A web server rule that denies paths containing `/behat/` makes
   every such step fail with "No data" locally while CI passes; allow `/lib/behat/axe/` on the test vhost.
-- **5.3+:** run the suite twice, once plain and once after `php admin/tool/behat/cli/init.php --colourmode=dark`;
+- **5.3+:** run the suite twice, once plain and once after `php public/admin/tool/behat/cli/init.php --colourmode=dark`;
   do not pin a mode in accessibility scenarios.
 - axe does not enter iframes and does not test most non-text contrast (borders, focus rings, icons). Those, keyboard
   operation and screen-reader output are manual checks: [reference/testing.md](reference/testing.md).

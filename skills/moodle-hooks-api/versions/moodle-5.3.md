@@ -10,9 +10,13 @@ Everything here was read in the 5.3.0 source (`public/lib/classes/hook/`, `publi
 | Hook | What a callback can do | Source |
 |---|---|---|
 | `\core\hook\email\before_email_to_user` | Change `$hook->email` (`user`, `from`, `subject`, `messagetext`, `messagehtml`, `attachment`, `attachname`, `usetrueaddress`, `replyto`, `replytoname`, `wordwrapwidth`), add a header with `$hook->email->add_additional_header()`, or stop the send with `$hook->email->add_block_reason()`: any reason means the mail is not sent | MDL-69724 |
-| `\core\hook\output\before_import_map_config` | Add entries to the ES module import map (`$hook->importmap`, `add_import()`) | the class file; not in `UPGRADING.md` |
+| `\core\hook\output\before_import_map_config` | Add entries to the ES module import map with `$hook->add_import()` (the map object itself is a private property) | the class file; not in `UPGRADING.md` |
 | `\core\hook\output\before_requirejs_config` | Map old AMD module names to ESM modules (`add_requirejs_esm_map_entry()`); Boost uses it to keep `theme_boost/bootstrap/*` names working until 7.0 (`public/theme/boost/classes/hook_listener.php`) | the class file; not in `UPGRADING.md` |
-| `\core\hook\composer\composer_di` | Configure DI for Composer-installed packages (`configure()`) | the class file; not in `UPGRADING.md` |
+
+`\core\hook\composer\composer_di` is also new in 5.3 and sits in the hook namespace, but it is not a hook: it is
+core's own callback on `\core\hook\di_configuration` (registered in `public/lib/db/hooks.php`), which defines the
+`\core\composer` service. A plugin that adds DI definitions listens to `di_configuration`, which exists on 5.2 and
+5.3, and calls `$hook->add_definition()`.
 
 Registering any of these in `db/hooks.php` is safe on 5.2: the manager stores the entry under the class name and
 never dispatches it (`manager.php` `add_component_callbacks()`). So one `db/hooks.php` serves both versions; only
@@ -50,7 +54,8 @@ public static function extend_user_menu(\core_user\hook\extend_user_menu $hook):
 
 `link` takes `(url $url, string $title, ?string $titleattribute = null, ?pix_icon $pixicon = null, ?string $imgsrc =
 null, array $classes = [], array $attributes = [])` (`public/user/classes/output/user_action_menu/link.php`,
-5.3.0). The 5.3 `add_navitem()` converts `link` and `divider` objects for you, but emits the deprecation notice.
+5.3.0). The 5.3 `add_navitem()` still accepts the old `stdClass` item and converts it to a typed object when its
+`itemtype` is `link` or `divider` (other item types are dropped), but it emits the deprecation notice.
 
 ## Boost registers hook callbacks on 5.3
 
