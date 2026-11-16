@@ -57,7 +57,8 @@ How the three template-mounted regions behave:
   `\core\navigation\output\more_menu::export_react_props()`), so a subclass can add to it.
 - The pre-5.3 path still ships: `core/moremenu` (template and AMD module) is unchanged and its data is still
   exported. A theme template that still includes `{{> core/moremenu}}` renders the legacy menu on 5.3. No core
-  template includes it any more, and nothing in the 5.3 upgrade notes deprecates it yet.
+  template includes it any more. The 5.3 upgrade notes say it was replaced in Boost's navbar and do not deprecate
+  it (`grep` of `public/lib/UPGRADING.md` and `public/theme/boost/UPGRADING.md`, 5.3.0).
 
 ### Styling without touching React
 

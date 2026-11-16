@@ -3,8 +3,8 @@
 Read this when the theme's parent is itself a child of Boost (for example Boost Union), or when your own child
 theme should be safe for other people to build children on.
 
-Status: read in `public/lib/classes/output/theme_config.php` (5.3.0, same code in 5.2) and in the public Boost
-Union and Boost Union Child repositories. No grandchild was built or run for this file. The single-parent
+Status: read in `public/lib/classes/output/theme_config.php` (5.3.0, same code in 5.2) and in the public source
+of Boost Union and of its published child boilerplate. No grandchild was built or run for this file. The single-parent
 recipe in `SKILL.md` was run on 5.3.0; treat everything below as a traced code path and prove it with one
 compile and one page load.
 
@@ -31,8 +31,10 @@ compile and one page load.
    override does nothing under a grandchild.
 7. **Settings pages are included in theme-name order** (`public/admin/settings/appearance.php` loops the sorted
    plugin list). A grandchild that adds its page to an admin category created by its parent's `settings.php`
-   must sort after the parent, or the category does not exist yet. What the admin tree does in that case was not
-   traced.
+   must sort after the parent, or the category does not exist yet: `$ADMIN->add()` then emits the debugging
+   message "parent does not exist!", returns false, and the page is missing from the admin tree (read in
+   `admin_category::add()`, `public/lib/adminlib.php` on 5.2, `public/admin/classes/setting/tree/category.php` on
+   5.3; not run).
 
 ## config.php
 
@@ -68,7 +70,8 @@ $THEME->prescsscallback = 'theme_example_get_pre_scss';
 $THEME->extrascsscallback = 'theme_example_get_extra_scss';
 ```
 
-This is the pattern of the Boost Union Child boilerplate. If you do not include the parent's config, restate
+This is the pattern of that theme's published child boilerplate (read, not run). If you do not include the
+parent's config, restate
 at least `rendererfactory`, plus every other non-inherited key the parent sets.
 
 A parent in `$CFG->themedir` is not at `$CFG->dirroot . '/theme/...'`. If that matters, find it with

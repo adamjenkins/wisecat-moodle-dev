@@ -129,8 +129,11 @@ if ($theme->name !== 'mytheme' && !in_array('mytheme', $theme->parents, true)) {
   files in alphabetical order of theme name (`public/admin/settings/appearance.php`, `core_component`'s sorted
   plugin list).
 - A child that adds its page to an admin category created by its parent's `settings.php` depends on that order.
-  By reading, a child whose name sorts before the parent's would add to a category that does not exist yet. Not
-  run. Name the child so that it sorts after the parent, or add the page to the standard `themes` category.
+  When the child's name sorts before the parent's, the category does not exist yet: `$ADMIN->add()` emits the
+  debugging message "parent does not exist!", returns false, and the page is missing from the admin tree (read in
+  `admin_category::add()`, `public/lib/adminlib.php` on 5.2 and `public/admin/classes/setting/tree/category.php`
+  on 5.3; not run). Fix: name the child so that it sorts after the parent, or add the page to the standard
+  `themes` category.
 - A child does not inherit the parent's settings values. `theme_child/brandcolor` and `theme_parent/brandcolor`
   are separate; what is shared is the code that reads them.
 

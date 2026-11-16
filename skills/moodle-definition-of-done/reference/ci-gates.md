@@ -4,8 +4,8 @@ Read this when a `moodle-plugin-ci` step fails or prints nothing you can interpr
 rules moodlecheck enforces, the lang-sorting check or the standalone moodlecheck CLI, or when you are writing a
 local script that stands in for a CI step.
 
-Facts about `moodle-plugin-ci` below were read in version 4.5 of its source (`src/Command/*.php`) with
-moodle-cs 3.7 and local_moodlecheck 1.3, not observed in a run unless stated.
+Facts about `moodle-plugin-ci` below were read in version 4.5.11 of its source (`src/Command/*.php`) with
+moodle-cs 3.7.0 and local_moodlecheck 1.3.2, not observed in a run unless stated. Later versions may differ.
 
 ## What each step checks, and how it can mislead
 
@@ -15,7 +15,7 @@ moodle-cs 3.7 and local_moodlecheck 1.3, not observed in a run unless stated.
 | `phpcs` | moodle-cs on `*.php` only | Real; `--max-warnings 0` makes warnings fail | Version-gated sniffs skip silently when the Moodle branch is unknown (below) |
 | `phpdoc` | local_moodlecheck: five rules about docblock tags against the signature | Real; takes `--max-warnings` | Presence of docblocks is phpcs's job, not this one's |
 | `phpmd` | Mess detector | Always 0 | Read the log |
-| `phpcpd` | Copy-paste detector | Real | Deprecated in moodle-plugin-ci 4.5, no replacement planned |
+| `phpcpd` | Copy-paste detector | Real | Deprecated since moodle-plugin-ci 4.4.0, to be removed in 5.0.0, no replacement planned |
 | `validate` | Required files, `pluginname` string, `install.xml` table prefix, upgrade function name, `@<type>` and `@<component>` tags on every Behat feature | Real | Passes with no `LICENSE`, no README, no privacy provider |
 | `savepoints` | `db/upgrade.php` savepoints | Real; skipped without `db/upgrade.php` | Any `WARN` line fails it |
 | `mustache` | Template syntax, example context present, HTML validation, ESLint on inline JS | Real | Needs the plugin inside a Moodle tree; `templates/mobileapp/` skipped |
@@ -47,18 +47,18 @@ echo "phpcs exit: $code"; grep -c 'WARNING\|ERROR' phpcs.log; less phpcs.log
 Before trusting a clean result from a gate or a grep you wrote, run it once on input that must fail:
 
 ```bash
-cp -r /path/to/plugin /tmp/probe && cd /tmp/probe
-printf '<?php\nfunction local_myplugin_probe($a) {\n    return $a;\n}\n' > probe.php
-moodle-plugin-ci phpcs --max-warnings 0 /tmp/probe; echo "exit: $?"   # must be non-zero
+probe="$(mktemp -d)/myplugin" && cp -r /path/to/plugin "$probe"
+printf '<?php\nfunction local_myplugin_probe($a) {\n    return $a;\n}\n' > "$probe/probe.php"
+moodle-plugin-ci phpcs --max-warnings 0 "$probe"; echo "exit: $?"   # must be non-zero
 ```
 
 Do this once per new gate or pattern, not on every run.
 
 ## phpcs and the Moodle branch
 
-moodle-cs runs version-gated sniffs, lang-file ordering among them, only when it knows the Moodle branch: from
-`--runtime-set moodleBranch 503`, or by finding a Moodle root (`public/version.php` or `version.php`) above the
-file. A plugin checked in a standalone checkout skips them without saying so (moodle-cs 3.7,
+moodle-cs runs some version-gated sniffs, lang-file ordering among them (4.4 and later), only when it knows the
+Moodle branch: from `--runtime-set moodleBranch 503`, or by finding a Moodle root (`public/version.php` or
+`version.php`) above the file. A plugin checked in a standalone checkout skips them without saying so (moodle-cs 3.7,
 `moodle/Util/MoodleUtil.php` `getMoodleBranch()`; `Sniffs/Files/LangFilesOrderingSniff.php`). Check a plugin
 either inside a Moodle tree or with the runtime option:
 
@@ -102,8 +102,8 @@ sort -u used.txt | comm -23 - have.txt        # keys used but not defined: must 
 
 Also check the strings core asks for without a literal call: `pluginname`; `cachedef_<area>` for each
 definition in `db/caches.php`; `messageprovider:<name>` for each provider in `db/messages.php`; one string per
-capability in `db/access.php` (`myplugin:view` for `local/myplugin:view`); `privacy:metadata...` keys the provider names; and, for a
-theme, `choosereadme`. Dynamic keys (`'status_' . $state`) are found only by rendering every state and looking
+capability in `db/access.php` (`myplugin:view` for `local/myplugin:view`); `privacy:metadata...` keys the
+provider names; and, for a theme, `choosereadme`. Dynamic keys (`'status_' . $state`) are found only by rendering every state and looking
 for `[[`.
 
 ## moodlecheck docblock rules
@@ -134,8 +134,10 @@ matches known-bad output once. Prefer `moodle-plugin-ci phpdoc`, which has a rea
 
 ## Behat feature files (gherkinlint)
 
-Core's `.gherkin-lintrc` (5.3.0) turns on: indentation (Feature 0, Background and Scenario 2, steps 4, Examples
+Core's `.gherkin-lintrc` (5.2 and 5.3.0) turns on: indentation (Feature 0, Background and Scenario 2, steps 4, Examples
 4, example rows 6), no duplicate feature names, no empty file, no file without scenarios, no multiple empty
 lines, no partially commented tag lines, no trailing spaces, no unnamed features or scenarios, no Scenario
-Outline without Examples, and a newline at end of file. `validate` separately requires the `@<type>` and
+Outline without Examples, and a newline at end of file. A blank line after the last step fails as "Multiple
+empty lines are not allowed", because the linter counts the blank line and the final newline as two empty lines
+(gherkin-lint 4.2.2, read in its source, not run). `validate` separately requires the `@<type>` and
 `@<component>` tags (for example `@local @local_myplugin`) on every feature.

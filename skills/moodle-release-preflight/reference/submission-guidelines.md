@@ -66,7 +66,7 @@ find . -path ./node_modules -prune -o \( -name '*.min.js' -o -name '*.woff*' -o 
 grep -rhoE '\b(local|block|mod|tool|filter|qtype|theme|format|report|auth|enrol)_[a-z0-9]+\\' \
     --include='*.php' . | sort -u | grep -v "^$c"                              # [U3] other components named
 [ -d amd/src ] && { git ls-files amd/build | head -1; }                       # [U4] prints a file
-grep -rnE 'GROUP_CONCAT|IFNULL|ILIKE|::[a-z]+\b|\bLIMIT +[0-9]|NOW\(\)|CONCAT\(' \
+grep -rnE 'GROUP_CONCAT|IFNULL|ILIKE|::(int|integer|bigint|numeric|text|varchar|date|timestamp)\b|\bLIMIT +[0-9]|NOW\(\)|CONCAT\(' \
     --include='*.php' --exclude-dir={tests,vendor,thirdparty} .                # [U6] engine-specific SQL
 ```
 
@@ -74,7 +74,7 @@ grep -rnE 'GROUP_CONCAT|IFNULL|ILIKE|::[a-z]+\b|\bLIMIT +[0-9]|NOW\(\)|CONCAT\('
 
 | Rule | CI | Check |
 |---|---|---|
-| Moodle coding style | phpcs, phpdoc, grunt (eslint, stylelint), mustache | Run them with `--max-warnings 0` |
+| Moodle coding style | phpcs, phpdoc, grunt (eslint, stylelint), mustache | Run `phpcs` and `phpdoc` with `--max-warnings 0`, `grunt` with `--max-lint-warnings 0` |
 | English comments, identifiers and strings | none | |
 | **Every file** has the GPL boilerplate and an `@copyright` line | phpcs checks PHP files only, and only that the tag exists | `[C3]` |
 | Reused or adapted code keeps the original copyright line, with yours added; it is clear which parts are yours | none | For each file copied from core or another plugin, its original `@copyright` line is still there, above yours |
@@ -119,7 +119,9 @@ grep -rnE '\b(unserialize|call_user_func(_array)?|shell_exec|passthru|proc_open|
 ```
 
 Every line printed is a finding or needs a written reason. A grep that printed nothing proves only that the
-pattern matched nothing: check that it ran on the right directory.
+pattern matched nothing: check that it ran on the right directory. `[U3]`, `[U6]`, `[C5]`, `[C7]` and `[C12]` are
+rough patterns written for this file and not measured on real plugins: expect false positives (a proper noun in
+a title, a selector scoped by a parent rule, a constructor split over lines), and read each hit before reporting.
 
 ## Approval blockers
 
@@ -144,8 +146,8 @@ The page lists these as reasons a plugin will not be approved:
 |---|---|---|
 | `phplint` | PHP syntax | Anything else |
 | `phpcs` | moodle-cs on `*.php` only: style, boilerplate, `@copyright` and `@license` present, lang file syntax, a login call after `config.php`, forbidden tokens and functions | Non-PHP files, frankenstyle prefixes, capabilities, superglobals, `PARAM_RAW` |
-| `phpdoc` | local_moodlecheck's remaining inline-tag rules | Most docblock rules, which moved to phpcs |
-| `validate` | Required files, `pluginname` (a filter: `filtername` only), table prefixes, the `xmldb_<component>_upgrade` name, Behat feature tags | Licence file, README, other required strings, backup for a module |
+| `phpdoc` | local_moodlecheck's remaining rules: `@param` lists against function arguments, inline tags, no inline phpdoc blocks | Most docblock rules, which moved to phpcs |
+| `validate` | Required files, `pluginname` (a filter: `filtername` only; an activity: `modulename` or `pluginname`), table prefixes, the `xmldb_<component>_upgrade` name, Behat feature tags | Licence file, README, other required strings, backup for a module |
 | `savepoints` | `upgrade_plugin_savepoint()` calls in `db/upgrade.php` | Whether the upgrade works on real data |
 | `mustache` | Template syntax, an example context, HTML validity of the rendered example | Templates under `templates/mobileapp/` |
 | `grunt` | AMD build, eslint, stylelint, gherkinlint, and that `amd/build` matches `amd/src` | CSS scope |

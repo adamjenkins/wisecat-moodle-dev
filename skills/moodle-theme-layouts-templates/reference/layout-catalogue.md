@@ -40,8 +40,10 @@ uses. A theme can point a layout at it by name.
 Notes for choosing a layout from plugin code, which a theme author meets as bug reports:
 
 - Boost's SCSS has rules keyed on `body.pagelayout-<name>` and on `body.limitedwidth`, so the layout name changes
-  width and drawer behaviour, not only the file. A wide table on a page using `report` inside an activity was
-  seen to slide under the course index on 5.3; `incourse` with `$PAGE->activityheader->disable()` fixed it.
+  width and drawer behaviour, not only the file (for example `body:not(.pagelayout-standard):not(.limitedwidth)`
+  in `public/theme/boost/scss/moodle/layout.scss`). A wide table on a page using `report` inside an activity was
+  seen once to slide under the course index on 5.3; `incourse` with `$PAGE->activityheader->disable()` fixed it.
+  The rule responsible was not identified.
 - `limitedwidth` is not set by the layout. Scripts add it with `$PAGE->add_body_class('limitedwidth')`
   (for example `public/course/view.php`, `public/course/modedit.php`).
 - A `forcepagelayout` value in `$SESSION` overrides whatever the script asked for
@@ -172,6 +174,7 @@ Usual on a full page:
 | `output.edit_switch`, `output.search_box`, `output.navbar_plugin_output`, `output.page_heading_menu` | Navbar parts, used by `theme_boost/navbar` |
 | `output.debug_footer_html`, `output.login_info`, `output.page_doc_link`, `output.supportemail` | Footer parts, used by `theme_boost/footer` |
 
-A method that does not exist on the renderer renders as empty in Mustache, with no error. That makes a 5.3-only
-call such as `output.colour_mode_menu` safe to leave in a template that also runs on 5.2, and it makes a typo in
-a method name invisible.
+A method that does not exist on the renderer renders as empty in Mustache, with no error: the context lookup
+calls a method only when `method_exists()` is true (`public/lib/mustache/src/Context.php`, identical in 5.2 and
+5.3.0). That makes a 5.3-only call such as `output.colour_mode_menu` safe to leave in a template that also runs on
+5.2, and it makes a typo in a method name invisible.

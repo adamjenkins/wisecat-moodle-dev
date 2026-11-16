@@ -29,9 +29,9 @@ test and an axe run in light and dark were run on 5.3.0.
 ## Which themes get colour modes
 
 `theme_boost\colour_mode::is_boost_theme()` is true when the page's theme is Boost or has `boost` in
-`$THEME->parents`. A child of Boost passes. A grandchild (a child of Boost Union, say) passes only if its
-`$THEME->parents` lists every ancestor, `['boost_union', 'boost']`; with `['boost_union']` alone it gets no colour
-modes and no switcher. A dark-mode scenario that asserts `data-bs-theme="dark"` catches this at once.
+`$THEME->parents`. A child of Boost passes. A grandchild (a child of a theme `middle` that is itself a child of
+Boost) passes only if its `$THEME->parents` lists every ancestor, `['middle', 'boost']`; with `['middle']` alone it
+gets no colour modes and no switcher. A dark-mode scenario that asserts `data-bs-theme="dark"` catches this at once.
 
 ## Boost's 5.3 test files as models
 
@@ -116,11 +116,14 @@ Classic is removed from 5.3. A theme whose `version.php` depends on `theme_class
 only lists `classic` in `$THEME->parents` loses that parent silently, because `theme_config` skips a parent it cannot
 load (`public/lib/classes/output/theme_config.php`, 5.3.0), and its SCSS, layouts and renderers with it. A
 `blacklist.json` entry naming a Classic feature path stops initialisation with "Blacklisted feature ... not found",
-and a context file that `require_once`s a `behat_theme_classic_*` file fails to load. Classic's step overrides on 5.2 remain a useful reading model for a child whose navigation differs
-from Boost's, but nothing can depend on them on 5.3.
+and a context file that `require_once`s a `behat_theme_classic_*` file fails to load. Classic's step overrides on
+5.2 remain a useful reading model for a child whose navigation differs from Boost's, but nothing can depend on
+them on 5.3.
 
 ## stylelint on 5.3
 
-Core's 5.3 stylelint (`csstree/validator`) rejected `container-type`, `@container` and `clamp()` in `font-size`. Add
-`/* stylelint-disable-line csstree/validator */` to each such line; core disables the same lines in
-`public/theme/boost/scss/moodle/reportbuilder.scss`. The rules themselves are in `moodle-theme-scss`.
+Run on 5.3.0, core's stylelint rule `csstree/validator` rejected `container-type`, `@container` and `clamp()` in
+`font-size`. Add `// stylelint-disable-line csstree/validator` to each such line; core uses the same comment in
+`public/theme/boost/scss/moodle/modchooser.scss` (5.3.0). The rule is configured identically on 5.2 (`.stylelintrc`
+and the plugin version in `package.json` are the same), so expect the same findings there; that was not run. The
+rules themselves are in `moodle-theme-scss`.

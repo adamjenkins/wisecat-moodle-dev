@@ -21,9 +21,10 @@ A theme rule goes through three stages, and each needs its own proof:
    Bootstrap rules are compiled into the same sheet. Set Bootstrap's own variables from a selector that outranks
    it, `.btn.mytheme-cta { --bs-btn-bg: var(--mytheme-accent); }`, then assert the computed colour.
 
-Right after a purge, the first stylesheet request can still be answered with the previous build while the new one
-compiles (`$THEME->usefallback`, inherited from Boost). Fetch the stylesheet and check stage 2 before judging stage 3,
-and reload once before debugging a selector.
+Right after a purge, the first stylesheet request can be answered with fallback CSS while the new build compiles,
+when the theme's own `config.php` sets `$THEME->usefallback = true` (Boost sets it; the key is not inherited, so a
+child states it itself; `public/theme/styles.php`, 5.2 and 5.3). Fetch the stylesheet and check stage 2 before
+judging stage 3, and reload once before debugging a selector.
 
 ## A computed-style step
 
@@ -156,7 +157,7 @@ Pin a mode in a scenario and check it took effect:
 
 ## Phones and the fixed navbar
 
-- `I change the viewport size to "mobile"` (or `tablet`, `WxH`) in Behat; in a browser script, a phone-sized viewport.
+- `I change viewport size to "mobile"` (or `tablet`, `WxH`) in Behat; in a browser script, a phone-sized viewport.
 - Horizontal overflow: `document.documentElement.scrollWidth > window.innerWidth` means the page scrolls sideways.
   A Bootstrap `.row` outside a `.container` keeps its negative gutters and makes the page a few pixels wider than
   the phone; only this check shows it. Fix with `mx-0` or a container.

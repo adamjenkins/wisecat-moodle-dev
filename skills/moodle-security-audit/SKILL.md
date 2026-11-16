@@ -114,7 +114,8 @@ require_capability('local/example:view', context_course::instance($item->coursei
 Every request that changes state needs a sesskey check, whatever its HTTP method: `require_sesskey()` (throws) or
 `confirm_sesskey()` (returns a bool). A GET that writes is fired by an `<img src>` in any post an admin views.
 
-- `moodleform` adds and checks the sesskey; `get_data()` returns null on a bad one.
+- `moodleform` adds the sesskey field and checks it: a submitted form with a bad sesskey throws `invalidsesskey`
+  (`public/lib/formslib.php`, 5.3.0), so code after `get_data()` needs no second check.
 - A raw HTML form carries `<input type="hidden" name="sesskey" value="{{sesskey}}">`, with the value from
   `sesskey()` in the template context.
 - `core/ajax` calls send it automatically. A raw `fetch()` adds it from `core/config`:

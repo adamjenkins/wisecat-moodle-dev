@@ -59,7 +59,9 @@ apply retention. The privacy API is the same on 5.2 and 5.3 (`public/privacy/` i
 | Data inside a parent plugin (an `assignsubmission_` plugin) | `metadata\provider` + the parent's subplugin interface: [reference/activities-and-subplugins.md](reference/activities-and-subplugins.md) |
 
 The devdocs FAQ suggests a metadata provider alone for data sent only to another subsystem; by
-`component_is_compliant()` that is not compliant. Use `null_provider` when the only trace is in the logs.
+`component_is_compliant()` that is not compliant, and core's `test_all_providers_compliant` asserts exactly that
+method (read in the 5.3.0 source, not run on such a plugin). Use `null_provider` when the only trace is in the
+logs.
 
 ## Null provider
 
@@ -243,9 +245,10 @@ core's forum does by blanking authored fields.
 
 ### Ids come back as strings
 
-**Fact:** `contextlist::get_contextids()` after `add_from_sql()` returns the database values, which are strings
-(`public/privacy/classes/local/request/contextlist.php`, 5.3.0), and `$context->instanceid` is not cast either
-(`public/lib/classes/context.php`, 5.3.0). **Symptom:** `$this->assertContains($context->id, $list->get_contextids())`
+**Fact:** `contextlist::get_contextids()` after `add_from_sql()` returns the values as the database driver gave
+them, uncast (`public/privacy/classes/local/request/contextlist.php`, 5.3.0), which is a string on the MySQL and
+PostgreSQL drivers, and `$context->instanceid` is not cast either, while `$context->id` is an int
+(`public/lib/classes/context.php`, 5.3.0). Read in the source, not run. **Symptom:** `$this->assertContains($context->id, $list->get_contextids())`
 fails (PHPUnit's `assertContains` is strict) and `===` comparisons in provider code are silently false. **Fix:**
 `array_map('intval', ...)` before comparing, or `assertEqualsCanonicalizing()`. `userlist::get_userids()` is
 built from array keys and is int.
@@ -255,14 +258,15 @@ built from array keys and is int.
 **Fact:** `add_user_preference($name, $stringid)` declares one preference; there is no wildcard, so numbered
 preferences are declared one by one. `export_user_preferences(int $userid)` reads each with
 `get_user_preferences($name, null, $userid)` and writes it with
-`writer::export_user_preference('local_example', $name, $value, get_string(...))`. Site-wide preferences need no
-delete method. **Symptom:** a preference that is set but not declared is undeclared personal data; core's uninstall
+`writer::export_user_preference('local_example', $name, $value, get_string(...))`, skipping a null value: the
+writer's `$value` is typed `string`, so an unset preference passed through is a `TypeError`. Site-wide preferences
+need no delete method. **Symptom:** a preference that is set but not declared is undeclared personal data; core's uninstall
 does not remove a plugin's preferences (`uninstall_plugin()`, `public/lib/adminlib.php`, 5.3.0; the uninstall
 recipe is in `moodle-definition-of-done`). **Fix:** declare and export each; a child theme declares only the
 preferences it adds, not its parent's. Source: `public/theme/boost/classes/privacy/provider.php` (5.2 and 5.3).
 
 **5.3+:** Boost also stores the colour mode as preference `theme_boost_colourmode` and declares it in its own
-provider; theme-side detail is in `moodle-theme-development`.
+provider; dark mode itself is in `moodle-theme-scss`, and a theme's own preferences in `moodle-theme-settings`.
 
 ### Data sent to another system
 

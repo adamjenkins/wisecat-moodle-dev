@@ -23,7 +23,8 @@ submissions; most of its rules carried over, with the differences listed at the 
 
 ## What CI checks and what it does not
 
-`moodle-plugin-ci` 4.5 (read in its source, not observed in a review):
+`moodle-plugin-ci` 4.5.11 (read in its source, not observed in a review). What each step checks, step by step,
+is in `moodle-ci-matrix`; this table is by guideline:
 
 | Guideline | Checked by CI | Not checked |
 |---|---|---|
@@ -38,7 +39,7 @@ submissions; most of its rules carried over, with the differences listed at the 
 A filter passes `validate` with `filtername` but no `pluginname`; the review asks for `pluginname`. Satisfy
 both. A plugin with `db/caches.php` needs a `cachedef_<area>` string for each definition, and a theme needs
 `choosereadme` (the theme selector's preview fetches it,
-`public/admin/amd/src/themeselector/preview_modal.js`, 5.3.0); neither is checked by CI.
+`public/admin/amd/src/themeselector/preview_modal.js`, 5.2 and 5.3.0); neither is checked by CI.
 
 ## The listing
 
@@ -92,21 +93,19 @@ file is not on this list but is raised with priority blocker under "Licensing/IP
 
 ## Findings reviewers raise that CI never sees
 
-Grouped from real review rounds on several plugins. Each has a pre-submission check.
+Grouped from real review rounds on several plugins. The two package findings are checked on the built ZIP:
 
 | Finding | Pre-submission check |
 |---|---|
 | Missing licence file | `unzip -Z1 <zip> \| grep -x '<name>/LICENSE'` |
 | ZIP root is not the plugin name | `unzip -Z1 <zip> \| cut -d/ -f1 \| sort -u` prints only `<name>` |
-| Missing language strings (`pluginname`, `cachedef_<area>`) | For each key in `db/caches.php`, grep `cachedef_<key>` in the lang file; grep every literal `get_string()` and `{{#str}}` key |
-| Global function without the full component prefix | The namespace-collision grep in `moodle-release-preflight` |
-| `PARAM_RAW` where a narrower type fits | `grep -rn 'PARAM_RAW' --include=*.php .`; each hit gets a narrower type or a one-line reason |
-| `mkdir($dir, 0777, true)` | Use `make_temp_directory()`, `make_request_directory()` or `$CFG->directorypermissions` |
-| Pages with `require_login()` but no capability | For each page script, list its `require_capability()`; justify each page without one |
-| A rule enforced on one action but not its siblings | For each write action, compare the checks its sibling actions make |
-| Per-call DB queries in a hot path (filters, renderers) | Count queries around the path in a PHPUnit test with `$DB->perf_get_queries()` |
-| Course-scoped tables with no backup and restore | For each table keyed by course, decide yes or no and write the reason in the README |
-| A README caveat missing from the settings page | Repeat it in the setting's description string |
+
+The code-level findings each have a command and an accepted fix in `moodle-release-preflight`; walk it before
+submitting. They are: missing language strings (`pluginname`, `cachedef_<area>`), global functions without the
+full component prefix, `PARAM_RAW` where a narrower type fits, `mkdir()` with a literal mode, pages with
+`require_login()` and no capability, a rule enforced on one action and not its siblings, database queries
+repeated on a hot path, course-scoped tables with no backup and restore, outbound HTTP that ignores the site
+proxy, and a README caveat missing from the settings page.
 
 ## Theme notes
 

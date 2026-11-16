@@ -6,7 +6,9 @@ leaving it out.
 
 Everything here is read in `public/lib/classes/output/theme_config.php` on Moodle 5.3.0 unless another file is
 named. The 5.2 file differs in one place only (where core fonts are found), so the rules are the same on 5.2
-(read, not run). Rows marked "run" were also seen working in a Boost child on 5.3.0.
+(read, not run). Rows marked "run" were also seen working in a Boost child on 5.3.0. This file gives the rules
+as they bear on a child of Boost; the engine itself, including themes with no parents, belongs to
+`moodle-theme-development`.
 
 ## How core builds a child's configuration
 
@@ -32,10 +34,10 @@ with a `debugging()` message "This page should be using theme ... which cannot b
 | Key | Core default | Parents consulted? | Boost's value | Symptom when a Boost child leaves it out |
 |---|---|---|---|---|
 | `parents` | none, required | - | `[]` | The theme cannot be loaded |
-| `scss` | `false` | Yes, nearest first; first one set wins | Closure | None: Boost's Closure is used and the child's `scss/` directory is still on the import path (it adds nothing unless a Boost import name matches a child file) |
+| `scss` | `false` | Yes, nearest first; first one set wins | Closure | None: Boost's Closure is used. The child's `scss/` directory is then not an import path: core collects import paths from the theme that supplies `scss` onward, so a child that wants to `@import` its own partials, or shadow a Boost partial, has to set `scss` itself (`get_scss_property()`) |
 | `prescsscallback`, `extrascsscallback` | none | Chained: farthest parent first, child last; each gets the child's `theme_config` | Boost's two functions | None |
 | `precompiledcsscallback` | none | Chained the same way, results concatenated | `theme_boost_get_precompiled_css` | None. It is used only when the SCSS compile fails, which is why a broken child looks like plain Boost (run) |
-| `editor_scss` | unset | Yes; the first parent that sets it, and that parent's directory | `['editor']` | None: Boost's `scss/editor.scss` is used |
+| `editor_scss` | unset | Yes; the farthest parent that sets it is asked first, and the files are read from that parent's directory | `['editor']` | None: Boost's `scss/editor.scss` is used |
 | `sheets`, `editor_sheets` | `[]` | Parents' sheets are always added before the child's | `[]` | None |
 | `parents_exclude_sheets`, `plugins_exclude_sheets`, `parents_exclude_javascripts` | `null` | Yes, nearest parent that sets it | unset | None |
 | `javascripts`, `javascripts_footer` | `[]` | Parents' files are added first | unset | None |
@@ -76,10 +78,11 @@ answer.
 | Mustache template `component/name` | child `templates/component/`, `mid`, `boost`, then the component's own `templates/` | `public/lib/classes/output/mustache_template_finder.php`. A name ending in `!` skips every theme and loads the component's own file |
 | Renderer class | prefixes `theme_child`, `theme_mid`, `theme_boost`, then the component | `renderer_prefixes()`; needs `theme_overridden_renderer_factory` |
 | Layout file named by a layout entry | child `layout/`, `mid`, `boost`; only the named theme when the entry has a `'theme'` key | `layout_file()`. A missing file is a `coding_exception` |
-| `scss` and the import path | first of child, `mid`, `boost` that sets `scss`; import paths are the `scss/` directories from that theme onward, in the same order | `get_scss_property()`. A child file shadows a parent file of the same relative name |
+| `scss` and the import path | first of child, `mid`, `boost` that sets `scss`; import paths are the `scss/` directories from that theme onward, in the same order | `get_scss_property()`. A file in a theme that is on the path shadows a later theme's file of the same relative name |
 | Images: `pix_core/`, `pix_plugins/<type>/<plugin>/`, `pix/` | child, then `boost`, then `mid` | `resolve_image_location()`. The farthest parent beats the nearer one. To be sure of an override in a grandchild, put the file in the grandchild |
 | `pix/favicon.ico` | child only | The path is returned without checking the parents or that the file exists |
 | Fonts: `fonts_core/`, `fonts_plugins/`, `fonts/` | child, then `boost`, then `mid` | `resolve_font_location()` |
+| `editor_scss` | child if it sets the key, else `boost`, then `mid` | `editor_scss_to_css()` |
 | Strings `region-<name>` | child, `mid`, `boost`, then `theme_boost` | `get_region_name()` |
 | Behat step overrides | the nearest parent that has any, then the theme's own on top | `public/lib/behat/classes/behat_config_util.php` |
 | React component overrides | **5.3+:** the active theme's own `js/esm/build/overrides/` only; parents are never searched | `public/lib/classes/output/requirements/import_map.php` |

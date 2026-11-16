@@ -43,8 +43,9 @@ Imports are accepted only from the theme directories. A path that leaves them is
   `$card-border-color` overrides, and a `.navbar` box-shadow rule in the preset CSS.
 - `scss/moodle/variables.scss`: the `$state-*-bg` / `$state-*-border`, `$dialogue-*`, `$filemanager-*`, `$atto-*`,
   `$popover-region-*`, `$question-*` and similar variables are colours (`$state-success-bg:
-  shift-color($success, -80%)`, `$dialogue-base-bg: $white`), so colour functions on them compile. The same code is a
-  compile error on 5.3, where they hold `var(...)`.
+  shift-color($success, -80%)`, `$dialogue-base-bg: $white`), so colour functions on them compile. On 5.3 they hold
+  `var(...)`: `darken()`, `lighten()` and `mix()` on them are a compile error, and `rgba()` emits a declaration
+  that browsers drop (read, not run).
 - Boost's partials use the SCSS colour variables (`$gray-100`, `$white`) directly, where 5.3 uses
   `var(--bs-gray-100)`. The `--bs-*` custom properties themselves are emitted by Bootstrap on 5.2 too, so theme rules
   written with them work on both.

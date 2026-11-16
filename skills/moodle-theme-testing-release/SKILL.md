@@ -157,13 +157,10 @@ overridden core template. A complete workflow, a dark-mode Behat run and the lin
 
 ### 4. Release
 
-Build the ZIP with `git archive`, check it, then follow `moodle-plugin-release`:
-
-```bash
-git archive --format=zip --prefix=mytheme/ -o mytheme.zip v1.0.0
-unzip -Z1 mytheme.zip | cut -d/ -f1 | sort -u      # must print exactly: mytheme
-unzip -Z1 mytheme.zip | grep -x 'mytheme/LICENSE'  # must print the path
-```
+Follow `moodle-plugin-release`: it owns the version and tag steps, building the ZIP with
+`git archive --prefix=mytheme/`, listing it, the root-folder rule and the licence file. What a theme adds to that
+(screenshot, plugin icon, `choosereadme`, fonts, copied core files) is in
+[reference/plugins-directory.md](reference/plugins-directory.md).
 
 ## Behat runs a theme through its suite
 
@@ -217,7 +214,7 @@ Full suite mechanics, override recipes, selectors and the element ids core steps
   page shows it. Check the names your SCSS reads in the browser: `getComputedStyle(document.body).getPropertyValue('--bs-primary')`.
 - Name the change the claim predicts and assert that change, in the role and the state users will meet it: a
   setting checked only on a course that does not use it, or only as admin, proves nothing.
-- Phones: `I change the viewport size to "mobile"`; check `document.documentElement.scrollWidth` is not larger than
+- Phones: `I change viewport size to "mobile"`; check `document.documentElement.scrollWidth` is not larger than
   the viewport (a `.row` outside a container overflows by its negative gutters), and test "visible" with
   `document.elementFromPoint()` at the element's centre, because Boost's fixed navbar (about 60 px) covers content
   that is inside the viewport.
@@ -258,9 +255,11 @@ code is otherwise identical).
   `moodle-theme-scss`. SCSS returned as a string from a PHP callback is never linted.
 - **Mustache lint** (`moodle-plugin-ci mustache`) checks every `*.mustache`, including overridden core templates
   under `templates/core/`, and fails on any warning: no `@template` docblock, no `Example context (json):`, HTML
-  validator messages, ESLint findings in `{{#js}}`. A `*.mustache.upstream` twin is not linted. A
-  `.mustachelintignore` beside the template skips the HTML validator only. Run on 5.3.0 and on a 5.2 tree: an
-  override that wraps the original with `{{> core/name! }}` passes.
+  validator messages. A `*.mustache.upstream` twin is not linted. A `.mustachelintignore` beside the template skips
+  the HTML validator only. Run on 5.3.0 and on a 5.2 tree: an override that wraps the original with
+  `{{> core/name! }}` passes. Two gaps, read in the linter bundled with moodle-plugin-ci 4.5.11, not run: a partial
+  it cannot find renders as nothing and is not reported, and `{{#js}}` blocks are not linted on 5.2 and 5.3, because
+  it looks for ESLint under `public/node_modules`, which does not exist (the log says "ESLint did not run").
 - An example context must not contain `}}`: it closes the comment and prints the rest of the docblock on the page,
   while lint and PHPUnit stay green. Write `} }` inside JSON.
 - **phpcs** applies to a copied core file as to your own: Boost's `layout/drawers.php` copied unchanged fails the
@@ -282,8 +281,8 @@ replace the legacy checklist. What a theme must have, with what checks it:
 
 | Rule | Checked by | How to satisfy it |
 |---|---|---|
-| A licence file in the package | nothing in CI; the most common review blocker | `LICENSE` with the full GPL v3 text in the root, committed before the tag, not `export-ignore`d |
-| Installs from the ZIP | nothing in CI | Root folder = the theme name (`mytheme/`), not `moodle-theme_mytheme-1.0.0/` from a GitHub source archive; core's validator rejects such a name with `rootdirinvalid` when it reaches it unrenamed (`public/lib/classes/update/validator.php`), and reviewers block it either way |
+| A licence file in the package | nothing in CI; the most common review blocker | `LICENSE` in the root, in the ZIP; the rule and its checks are in `moodle-plugin-release` |
+| Installs from the ZIP | nothing in CI | Root folder = the theme name (`mytheme/`), not `moodle-theme_mytheme-1.0.0/` (`rootdirinvalid`); building and listing the ZIP is in `moodle-plugin-release` |
 | GPL v3 when the plugin reproduces or adapts a substantial part of Moodle | review | A Boost child that copies Boost layouts or templates is in that case: GPL v3 or later |
 | Third-party files declared | nothing (the file only hides paths from CI) | Each bundled font, icon set or vendored library in `thirdpartylibs.xml`, its licence text beside it |
 | Boilerplate and `@copyright` in every file | phpcs, PHP files only | Add them by hand to `.mustache`, `.scss`, `.js`; a file copied from core or another theme keeps the original `@copyright` line above yours |
@@ -306,6 +305,7 @@ close findings: [reference/plugins-directory.md](reference/plugins-directory.md)
 | Only `@theme_mytheme` on the feature | `moodle-plugin-ci validate` fails | `@theme @theme_mytheme` |
 | Setting the theme inside a feature (`theme` in a config values table, or `set_config('theme', ...)` in a step) | Fights the suite; the feature tests a different theme in other suites | Let the suite set the theme |
 | `$THEME->hidefromselector = true` | The theme has no Behat suite at all | Leave it false in a theme that has features |
+| `I change the viewport size to "mobile"` | Undefined step: core's step has no "the" | `I change viewport size to "mobile"` |
 | SCSS-fed setting set with `the following config values are set as admin` | The page keeps the CSS built at init; the assertion fails or passes for the wrong reason | Save it on the settings page in the scenario, or a step calling `theme_reset_all_caches()` |
 | SCSS edited, Behat not re-initialised | Scenarios test the old CSS | `init.php` (or `util_single_run.php --enable`) again |
 | `run.php --scss-deprecations` | Rejected as an unknown option, or checks silently off | Pass it to `init.php`; read the "SCSS deprecations: Yes" line |
@@ -317,8 +317,7 @@ close findings: [reference/plugins-directory.md](reference/plugins-directory.md)
 | Grepping the served CSS as proof | The rule arrived but loses the cascade | A computed-style assertion |
 | Copied core template without its docblock or example context | Mustache lint fails the theme's CI | Keep `@template` and `Example context (json):` |
 | `}}` inside an example context | The rest of the docblock prints on the page | `} }` |
-| Release ZIP from GitHub's "Download ZIP" or its automatic source archive | Wrong root folder; a reviewer blocks it; core's validator can reject it with `rootdirinvalid` | `git archive --prefix=mytheme/` |
-| `LICENSE` added after the tag, or matched by `export-ignore` | The reviewed ZIP has no licence file | Commit before tagging; list the archive |
+| Release ZIP with the wrong root folder or without `LICENSE` | A reviewer blocks it; core's validator can reject the root with `rootdirinvalid` | Build and list the ZIP as `moodle-plugin-release` says |
 | No `choosereadme` string | The theme selector preview asks for a missing string | Add it to `lang/en/theme_mytheme.php` |
 | No `pix/screenshot.*` | The selector silently shows the parent's screenshot | Ship one |
 | No `pix/icon.svg` | A blank spacer instead of an icon on the plugins overview page (`public/admin/renderer.php`) | Ship a line icon with a stroke that also reads in dark mode |

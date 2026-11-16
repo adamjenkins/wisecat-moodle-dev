@@ -85,17 +85,15 @@ jobs:
           fail=0
           while IFS= read -r line; do
             file=$(echo "$line" | cut -d: -f1)
-            target=$(echo "$line" | sed -E 's/.*\(([^)]+)\).*/\1/' | sed 's/#.*//')
+            target=$(echo "$line" | cut -d: -f2- | sed 's/#.*//')
             case "$target" in
               http*|mailto*|"") continue ;;
             esac
-            dir=$(dirname "$file")
-            full="$dir/$target"
-            if [ ! -e "$full" ] && [ ! -e "$target" ]; then
+            if [ ! -e "$(dirname "$file")/$target" ] && [ ! -e "$target" ]; then
               echo "::error file=$file::link target not found: $target"
               fail=1
             fi
-          done < <(grep -rEn '\]\([^)]+\.md[^)]*\)' --include='*.md' . || true)
+          done < <(grep -rEo --include='*.md' '\]\([^)[:space:]]+\.md[^)[:space:]]*\)' . | sed -E 's/:\]\(/:/; s/\)$//' || true)
           exit $fail
 
       - name: Skill line-count budget (<= 400)

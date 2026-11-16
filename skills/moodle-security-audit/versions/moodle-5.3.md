@@ -1,8 +1,9 @@
 # Moodle 5.3: security-relevant changes
 
 Read this when the plugin supports 5.3 and it calls the token endpoint, defines external functions for
-`core/ajax`, adds REST API routes, builds Moodle app deep links, or checks whether a user may log in. Each item is new in 5.3 against 5.2; all
-were read in the 5.3.0 source and its `UPGRADING.md`, not run. The full 5.3 catalogue is `moodle-5-3-changes`.
+`core/ajax`, adds REST API routes, builds Moodle app deep links, or checks whether a user may log in. Each item
+is new in 5.3 against 5.2; all were read in the 5.3.0 source and its `UPGRADING.md`, not run. The full 5.3
+catalogue is `moodle-5-3-changes`.
 
 ## The token endpoint takes credentials by POST only
 

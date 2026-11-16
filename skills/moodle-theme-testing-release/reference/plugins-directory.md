@@ -28,45 +28,25 @@ directory itself. The general release mechanics (version numbers, notes files, t
 | **5.3+:** `js/esm/build/` | Compiled React overrides | no, unless `grunt -t esm` is asked for |
 | `README.md`, `CHANGES.md` | The listing and the README should say the same; release notes | no |
 
-Leave out of the ZIP with `export-ignore`: `/.github`, `/.gitattributes`, `/.gitignore`, `node_modules`,
-`*.upstream` twins of copied core files. Leaving out `/tests` is allowed and makes the ZIP smaller, but then the
-ZIP cannot run its own tests; either choice is fine. Never `export-ignore` `LICENSE`, `amd/build` or a font
-directory.
-
-```gitattributes
-/.github export-ignore
-/.gitattributes export-ignore
-/.gitignore export-ignore
-*.upstream export-ignore
-```
-
 ## Building and checking the ZIP
 
-From the repository root, at the release tag:
+Building the ZIP with `git archive`, the root-folder rule (`rootdirinvalid`), what the admin upload page does with
+a wrongly rooted ZIP, the licence file and `export-ignore` are owned by `moodle-plugin-release`; follow its ZIP
+recipe. What a theme adds to it, with `mytheme.zip` built there:
 
 ```bash
-name=mytheme
-git archive --format=zip --prefix="$name/" -o "../$name.zip" v1.0.0
-unzip -Z1 "../$name.zip" | cut -d/ -f1 | sort -u          # exactly one line: mytheme
-for f in LICENSE version.php config.php "lang/en/theme_$name.php"; do
-  unzip -Z1 "../$name.zip" | grep -qx "$name/$f" || echo "missing: $f"
-done
-unzip -Z1 "../$name.zip" | grep -E '^[^/]+/pix/(screenshot|icon)\.' || echo "missing: pix/screenshot or pix/icon"
-unzip -Z1 "../$name.zip" | grep -E 'node_modules/|\.upstream$|^[^/]+/\.github/' && echo "development files in the ZIP"
+unzip -Z1 mytheme.zip | grep -x 'mytheme/config.php' || echo "missing: config.php"
+unzip -Z1 mytheme.zip | grep -E '^mytheme/pix/screenshot\.' || echo "missing: pix/screenshot"
+unzip -Z1 mytheme.zip | grep -E '^mytheme/pix/icon\.' || echo "missing: pix/icon"
+unzip -Z1 mytheme.zip | grep -E '\.upstream$' && echo "upstream twins in the ZIP"
 ```
 
 - The root folder is the theme's short name: the directory under `public/theme/`, `$THEME->name`, and the part of
-  `$plugin->component` after `theme_`. Core's validator requires it to survive `clean_param($rootdir, PARAM_PLUGIN)`
-  and to match the component (`public/lib/classes/update/validator.php`, `rootdirinvalid`, 5.2 and 5.3.0). A GitHub
-  source archive is rooted at `moodle-theme_mytheme-1.0.0/`, which fails that test on its hyphens and dots.
-- The admin upload page detects the component from `version.php` and extracts under the right name before it
-  validates (`public/admin/tool/installaddon/index.php`, 5.3.0), so a wrongly rooted ZIP can still install there.
-  Reviewers raise the root folder anyway; build it right rather than argue it.
-- `git archive` packs the tag's commit, not the working tree: a `LICENSE` added after tagging, or committed but not
-  pushed before the tag, is missing from the ZIP the reviewer downloads.
-- Installing the ZIP on a test site is the only end-to-end check. The upload page exists only when
-  `$CFG->disableupdateautodeploy` is empty (`public/admin/tool/installaddon/settings.php`). Unzipping into
-  `public/theme/` and running `php admin/cli/upgrade.php` checks the files but skips the ZIP validator.
+  `$plugin->component` after `theme_`.
+- Add `*.upstream export-ignore` to `.gitattributes` when the theme keeps untouched twins of copied core files.
+  Never `export-ignore` a font directory, `amd/build` or (**5.3+**) `js/esm/build`.
+- Install the ZIP once on a clean site of the lowest supported branch; the upload page exists only when
+  `$CFG->disableupdateautodeploy` is empty (`public/admin/tool/installaddon/settings.php`, 5.2 and 5.3).
 
 ## The theme selector: screenshot and description
 
@@ -94,33 +74,17 @@ unzip -Z1 "../$name.zip" | grep -E 'node_modules/|\.upstream$|^[^/]+/\.github/' 
 - **5.3+:** Boost's dark mode inverts only core icons whose URL contains `/t/`, `/e/`, `/a/` or the group icons
   (`public/theme/boost/scss/moodle/icons.scss`). A near-black stroke such as `#212529` sits on the dark background
   `#1d2125` and all but disappears. Read in the source and reasoned, not seen in a browser. Use a mid-tone stroke
-  that reads on both, such as `#6a737b` (Boost's `$gray-600`), and look at the page once in each mode.
+  that reads on both, such as `#6a737b`, and look at the page once in each mode.
 - A 24 by 24 viewBox line icon with no XML prolog and no embedded raster matches core's icon style.
 
 ## Fonts, images and other third-party files
 
 The guidelines allow bundled third-party libraries and media under any licence, but they must be declared in
-`thirdpartylibs.xml`. (The older devdocs third-party libraries page still says a library must be GPL v3 compatible;
-the submission guidelines are the newer, controlling text.) An entry for a bundled font, in the form of Boost's
-own font entries (`public/theme/boost/thirdpartylibs.xml`, 5.3.0; on 5.2 that file lists Bootstrap instead):
-
-```xml
-<?xml version="1.0"?>
-<libraries>
-  <library>
-    <location>fonts/inter</location>
-    <name>Inter</name>
-    <description>Variable sans-serif typeface used for body text.</description>
-    <version>4.1</version>
-    <license>OFL</license>
-    <licenseversion>1.1</licenseversion>
-    <repository>https://github.com/rsms/inter</repository>
-    <copyrights>
-      <copyright>2016 The Inter Project Authors</copyright>
-    </copyrights>
-  </library>
-</libraries>
-```
+`thirdpartylibs.xml`. The entry format, with a font entry to copy, is in `moodle-plugin-release`; core's model is
+Boost's own font entries (`public/theme/boost/thirdpartylibs.xml`, 5.3.0: `fonts/noto-sans` with `<name>`,
+`<description>`, `<version>`, `<license>`, `<licenseversion>`, `<repository>` and `<copyrights>`; on 5.2 that file
+lists Bootstrap, Font Awesome and the design system instead). Take the version and the copyright line from the
+font's own licence file, not from memory. For a theme:
 
 - `location` is relative to the theme root. Listed paths are skipped by phplint, phpcs, phpdoc, Mustache lint and,
   after `grunt ignorefiles`, stylelint. Declaring a file you wrote yourself only hides it from the checks.
@@ -263,8 +227,8 @@ than the one the theme supports. The mechanics of the reply and of a fix release
 
 ## What is not known
 
-- Which file names count as "a licence file": reviewers name `LICENSE`; whether `LICENSE.md`, `LICENSE.txt` or
-  `COPYING` pass the same check is not documented. Use `LICENSE`.
+- Which file names count as "a licence file" besides `LICENSE` is not documented (`moodle-plugin-release`). Use
+  `LICENSE`.
 - The exact commands, options and Moodle branch of the Plugins directory's own automated check: the guidelines say
   only that it uses moodle-plugin-ci. Make the theme pass `--max-warnings 0` and `--max-lint-warnings 0`.
 - How the namespaced-CSS rule is applied to a theme, whose job is site-wide CSS. The reading above (scope what the

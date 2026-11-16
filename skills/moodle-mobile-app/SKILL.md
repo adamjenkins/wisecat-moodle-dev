@@ -218,7 +218,7 @@ shows the error. Design writes to fail visibly offline, or implement your own sy
 | Editing `db/mobile.php` and reloading the app | No change | Purge caches, then log out and in (handlers are cached in `tool_mobile/plugininfo`) |
 | Styles changed, `version` not | Old CSS on devices | Bump `styles.version` |
 | `--ion-color-step-*` or `prefers-color-scheme` in app CSS | Fallback colours; wrong in dark mode | `--ion-text-color-step-N`, `:root.dark` |
-| `this.CoreDomUtilsProvider.showToast()` | Not a function in current apps | `this.CoreToastsService.show({message, translateMessage: true})`, or `successMessage` on the directive |
+| `this.CoreDomUtilsProvider.showToast()` copied from an old example | Deprecated since app 4.5 (the whole class since 5.0); still present in app 5.3.0, will stop working when it is removed | `this.CoreToastsService.show({message, translateMessage: true})`, or `successMessage` on the directive |
 | Testing only in PHPUnit | Green tests, broken app (the web service permission layer is never entered) | Call `tool_mobile_get_content` over REST: [reference/testing-and-debugging.md](reference/testing-and-debugging.md) |
 
 ## Reference files

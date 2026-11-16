@@ -5,23 +5,12 @@ catalogue is in `moodle-5-3-changes`.
 
 ## Test tooling
 
-- **`public/admin/tool/phpunit/cli/util.php` gains `--snapshot[=NAME]`, `--restore=NAME` and `--upgrade`.** A CI job
-  can cache an initialised core test site, restore it, and upgrade only the plugin, instead of installing from
-  scratch. The 5.2 `util.php` has `--drop`, `--install`, `--buildconfig`, `--buildcomponentconfigs` and `--run` only;
-  a script that passes the new options to 5.2 fails.
-- **Testing classes renamed into autoloaded namespaces** (MDL-87716). The old names keep working without debugging
-  until 6.0, so code that supports 5.2 keeps them:
-
-  | 5.2 name | 5.3 name |
-  |---|---|
-  | `\phpunit_util` | `\core\test\phpunit\phpunit_util` |
-  | `\testing_util` | `\core\test\testing_util` |
-  | `\phpunit_event_sink` | `\core\test\phpunit\event_sink` |
-  | `\phpunit_message_sink` | `\core\test\phpunit\message_sink` |
-  | `\phpunit_phpmailer_sink` | `\core\test\phpunit\phpmailer_sink` |
-  | `\phpunit_event_mock` | `\core\test\phpunit\event_mock` |
-  | `\phpunit_coverage_info` | `\core\test\phpunit\coverage_info` |
-
+- **`public/admin/tool/phpunit/cli/util.php` gains `--snapshot[=NAME]`, `--snapshot --list`, `--restore=NAME` and
+  `--upgrade`.** A CI job can cache an initialised core test site, restore it, and upgrade only the plugin, instead
+  of installing from scratch. `--restore` takes the exact name printed by `--snapshot --list`, not the short name
+  given to `--snapshot=NAME` (the script's own help text). The "initialised for different version" error also
+  offers `util.php --upgrade` on 5.3. The 5.2 `util.php` has `--drop`, `--install`, `--buildconfig`,
+  `--buildcomponentconfigs`, `--diag` and `--run` only; a script that passes the new options to 5.2 fails.
 - **`advanced_testcase::get_testable_command($name)`** returns a Symfony `CommandTester` for a command registered with
   the new `bin/moodle` console (`\core\cli\application`). Neither exists on 5.2.
 
@@ -43,5 +32,11 @@ that is skipped there, for example by checking `method_exists()` in `setUp()` an
   `\core\di::make()` (MDL-89528). A test that builds the object with `new` gets null properties; build it through
   `\core\di::make()`.
 
-The numeric-entity change in exporter output (MDL-79755) is not 5.3-specific: it is in 5.2.2 too, so it is in the
-skill body.
+## Admin setting classes
+
+The `admin_settingpage`, `admin_setting_*` and related classes moved out of `public/lib/adminlib.php` into the
+`core_admin` component and autoload under their old names (`public/lib/db/legacyclasses.php`). `admin_get_root()`
+and the other functions stay in `adminlib.php`, so a test still requires that file.
+
+The numeric-entity change in `block_myoverview` output (MDL-79755) is not 5.3-specific: it is in 5.2.2 too, so it is
+in the skill body.

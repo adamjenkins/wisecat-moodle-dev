@@ -70,9 +70,10 @@ done
 - **Never trust `grunt ... --force`**: it downgrades every later failure to a warning and prints "Done, but
   with warnings". `grunt amd --force` builds and lints nothing. After a build, check that `amd/build` is newer
   than `amd/src`.
-- Gherkinlint uses core's `.gherkin-lintrc` (5.3.0): two-space indentation steps (Feature 0, Scenario 2,
-  Step 4), no trailing spaces, no multiple empty lines, a newline at end of file, no unnamed scenarios. A
-  feature file ending with an extra blank line has been seen to fail it.
+- Gherkinlint uses core's `.gherkin-lintrc` (5.2 and 5.3.0): indentation in steps of two spaces (Feature 0,
+  Scenario 2, Step 4), no trailing spaces, no multiple empty lines, a newline at end of file, no unnamed
+  scenarios. A blank line after the last step fails as "Multiple empty lines are not allowed" (seen in practice;
+  the rule's source in gherkin-lint 4.2.2 agrees). The full shape is owned by `moodle-behat-testing`.
 - The full gate list, docblock rules moodlecheck enforces, and the standalone-tool traps are in
   [reference/ci-gates.md](reference/ci-gates.md).
 
@@ -114,9 +115,10 @@ done
 - Run Behat with `--scss-deprecations`, as the CI template does (`moodle-behat-testing`).
 - Every "I should see" for one mode of a form or page has an "I should not see" for the other modes' fields
   (`moodle-behat-testing`).
-- **PHPUnit green is not production.** PHPUnit loads all of core; a web request does not. Code calling a core
-  free function (`create_course()`, `fulldelete()`) without the matching `require_once` passes tests and fails
-  in the browser. Routed POST bodies, hook dispatch, draft file areas and browser widgets (file picker,
+- **PHPUnit green is not production.** A PHPUnit process has already loaded libraries a web request has not
+  (`course/lib.php` through the data generator, `lib/filelib.php` through the file storage). Code calling a
+  free function from them (`create_course()`, `fulldelete()`) without the matching `require_once` passes tests
+  and dies in the browser with "Call to undefined function". Routed POST bodies, hook dispatch, draft file areas and browser widgets (file picker,
   editor, date selector) need one real request each.
 - **Renames and re-scopes reach past the class.** After renaming or splitting a state key, or turning a
   constant into a setting, grep the old key or literal in `tests/` (helpers that write `$SESSION` or config
@@ -131,8 +133,8 @@ done
 - **Load the changed `install.xml` on a fresh install with developer debugging**, or run
   `moodle-plugin-ci install`, and check the output for `XMLDB has detected` and `Debugging:`. XMLDB reports a
   CHAR NOT NULL column with an empty-string default, or a TEXT column with a default, through `debugging()`
-  on install (`public/lib/xmldb/xmldb_field.php:255-261`, 5.3.0); the PHPUnit and Behat init output has been
-  seen not to show it. While writing a table, `grep -n 'DEFAULT=""' db/install.xml` must print nothing: an
+  on install (`xmldb_field::setDefault()`, `public/lib/xmldb/xmldb_field.php`, 5.2 and 5.3.0); the PHPUnit and
+  Behat init output has been seen not to show it (seen in practice, cause not traced in the source). While writing a table, `grep -n 'DEFAULT=""' db/install.xml` must print nothing: an
   optional CHAR is `NOTNULL="false"` with no default.
 - Test both paths: a fresh install and an upgrade from the previous release, on a site that has rows in the
   changed tables. Both must give the same schema.
@@ -150,28 +152,28 @@ If the plugin stores course- or activity-linked data, check each of these, or st
   logic the forms apply.
 - **Course reset needs all three callbacks** for an activity module:
 
-```php
-function myplugin_reset_course_form_definition(&$mform) {
-    $mform->addElement('header', 'mypluginheader', get_string('modulenameplural', 'mod_myplugin'));
-    $mform->addElement('advcheckbox', 'reset_myplugin_attempts', get_string('removeattempts', 'mod_myplugin'));
-}
+  ```php
+  function myplugin_reset_course_form_definition(&$mform) {
+      $mform->addElement('header', 'mypluginheader', get_string('modulenameplural', 'mod_myplugin'));
+      $mform->addElement('advcheckbox', 'reset_myplugin_attempts', get_string('removeattempts', 'mod_myplugin'));
+  }
 
-function myplugin_reset_course_form_defaults($course) {
-    return ['reset_myplugin_attempts' => 1];
-}
+  function myplugin_reset_course_form_defaults($course) {
+      return ['reset_myplugin_attempts' => 1];
+  }
 
-function myplugin_reset_userdata($data) {
-    // Delete user data when $data->reset_myplugin_attempts is set, reset
-    // gradebook entries, and return a status array for the reset report.
-}
-```
+  function myplugin_reset_userdata($data) {
+      // Delete user data when $data->reset_myplugin_attempts is set, reset
+      // gradebook entries, and return a status array for the reset report.
+  }
+  ```
 
-  Core looks these up as `<modname>_reset_...`, without the `mod_` prefix (`public/course/reset_form.php:88-89,
-  184`, 5.3.0; `forum_reset_userdata()` in `public/mod/forum/lib.php`). With no form definition, the module is
+  Core looks these up as `<modname>_reset_...`, without the `mod_` prefix (`public/course/reset_form.php`,
+  5.2 and 5.3.0; `forum_reset_userdata()` in `public/mod/forum/lib.php`). With no form definition, the module is
   listed as unsupported or its option never appears, and grades stay stale.
-- **Uninstall**: core's `uninstall_plugin()` deletes the plugin's tables, config, capabilities, events, tasks,
-  message providers and files, but not its user preferences (`public/lib/adminlib.php`, `uninstall_plugin()`,
-  5.3.0). Add `db/uninstall.php` when the plugin stores preferences or writes outside its own tables (grade
+- **Uninstall**: core's `uninstall_plugin()` deletes the plugin's tables, config, capabilities, calendar
+  events, tasks, web service functions, message providers and files, but not its user preferences
+  (`public/lib/adminlib.php`, `uninstall_plugin()`, 5.2 and 5.3.0). Add `db/uninstall.php` when the plugin stores preferences or writes outside its own tables (grade
   items, config of other components):
 
   ```php
@@ -212,7 +214,8 @@ Green tests are not the finish line. Install the change on a running Moodle and 
   `php admin/cli/upgrade.php --non-interactive` and `php admin/cli/purge_caches.php` from the Moodle root (the
   CLI scripts sit beside `public/`, not inside it, in 5.2 and 5.3.0), and make the files readable by the web
   server user. Skipping the purge is the usual failure: core caches the class map in
-  `$CFG->cachedir/core_component.php` (`public/lib/classes/component.php:448`, 5.3.0), so a new class file
+  `$CFG->cachedir/core_component.php` (`core_component::init()`, `public/lib/classes/component.php`, 5.3.0), so
+  a new class file
   gives a fatal "class not found" on the site while PHPUnit is green.
 - Read the stored record, the rendered notice, or what the screenshot actually shows, not the fact that the
   command returned. Look at every screenshot you save.
@@ -229,11 +232,13 @@ Green tests are not the finish line. Install the change on a running Moodle and 
 - A form-decorating or page-altering plugin is also checked on a Moodle with only standard plugins; another
   installed plugin can supply what yours forgot.
 - Do not check filter or `format_text()` output while "logged in as" another user: core forces cleaning for the
-  whole session (`$CFG->forceclean`, `public/lib/moodlelib.php:2427-2432`, 5.3.0). See `moodle-field-lessons`.
+  whole session (`$CFG->forceclean`, set in `require_login()`, `public/lib/moodlelib.php`, 5.3.0). See
+  `moodle-field-lessons`.
 - **CSS has two levels of evidence.** Finding the rule in the served stylesheet proves it arrived; only a
   screenshot or `getComputedStyle()` proves it applies, because the theme's and Bootstrap's rules can win. The
-  first page load after a purge has been seen to serve the previous CSS: reload before judging. Commands in
-  [reference/site-verification.md](reference/site-verification.md).
+  first stylesheet request after a purge is answered with the previous CSS while the new one is built
+  (`public/theme/styles.php`, themes with `$THEME->usefallback`, which Boost sets): reload before judging.
+  Commands in [reference/site-verification.md](reference/site-verification.md).
 
 ## 8. Release notes and docs
 

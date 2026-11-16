@@ -19,7 +19,7 @@ Source: `public/lib/UPGRADING.md` 5.3, MDL-87010.
 ## Deep-link auto-login
 
 `tool_mobile/enabledeeplinkautologin` (new, default off) controls whether a deep link that carries a token and
-private token logs the user in automatically (`public/admin/tool/mobile/settings.php:577`, MDL-88924). A plugin that
+private token logs the user in automatically (`public/admin/tool/mobile/settings.php:577`, MDL-88924; not in the 5.3.0 upgrade notes). A plugin that
 generates app deep links for automatic login needs that setting on, and should say so in its documentation.
 
 ## Web services returning course modules

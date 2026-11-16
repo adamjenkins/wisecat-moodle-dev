@@ -183,9 +183,11 @@ invalidation, versioned data and testing. The rules that bite most often:
 
 - **Every definition needs a `cachedef_<name>` string** in the plugin's `lang/en` file. The cache admin page and the
   performance footer call `get_string('cachedef_' . $area, $component)` (`public/cache/classes/definition.php`,
-  `get_name()`, 5.3.0). Symptom: a "Missing language string definitions" finding from a Plugins directory reviewer,
-  and `[[cachedef_x]]` on the admin page. No CI check catches it.
+  `get_name()`, 5.3.0). Symptom: a missing-string finding from a Plugins directory reviewer, and
+  `[[cachedef_x]]` on the admin page. No CI check catches it.
 - **A `db/caches.php` change needs a version bump.** Definitions are read into the cache configuration on upgrade.
+  A definition used before that is found on first use, but with a "Cache definitions reparsed causing cache
+  reset" `debugging()` notice and a reset of the cache configuration (`public/cache/classes/factory.php`, 5.3.0).
 - **`get()` returns `false` for a miss.** Never cache a bare `false`; wrap it (`['value' => false]`) or cache `0`.
 - **Pick the mode by who shares the value:** `MODE_APPLICATION` for every user on every server, `MODE_SESSION` for
   one user, `MODE_REQUEST` for this request only.
@@ -246,8 +248,8 @@ Scheduled tasks, `db/tasks.php`, locks, concurrency limits, retries and running 
   };
   ```
 
-- **Production caches stay on:** `cachejs`, `cachetemplates` and theme designer mode off. Each is marked
-  "NOT FOR PRODUCTION SERVERS" in `config-dist.php` when changed from its default.
+- **Production caches stay on:** `cachejs`, `cachetemplates` and theme designer mode off. `config-dist.php` marks
+  the changed value of each as not for production servers.
 
 ## Common mistakes
 
@@ -264,7 +266,7 @@ Scheduled tasks, `db/tasks.php`, locks, concurrency limits, retries and running 
 | `ttl` instead of invalidation | Stale data until expiry, wrapper cost | `invalidationevents` and `\core_cache\helper::invalidate_by_event()` |
 | Mail or external calls on POST | Slow page, timeouts, duplicate sends on retry | Ad-hoc task |
 | Lock released outside `finally` | Lock held until it expires after an exception | `try { ... } finally { $lock->release(); }` |
-| Truthiness test on `queue_adhoc_task($t, true)` | "Already queued" never detected on 5.3 | Check the queue explicitly (versions file) |
+| Truthiness test on `queue_adhoc_task($t, true)` | "Already queued" never detected on 5.3 | Check the queue with `get_adhoc_tasks()` (5.3 version notes) |
 | Grade, modinfo or course APIs in `db/upgrade.php` | Upgrade slow or broken on large sites | Queue an ad-hoc task (`moodle-upgrade-migration`) |
 
 ## Reference files

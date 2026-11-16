@@ -7,8 +7,8 @@ Classes 1 to 6 are the defects that Plugins directory and external security revi
 This file widens the net. It comes from a static audit of several dozen widely installed third-party plugins;
 each class below was found in more than one of them. Examples are described as patterns only.
 
-Report each line of the [checklist](#checklist) as pass, fail (file:line) or N/A (reason). Where a line repeats a
-finding already reported under classes 1 to 6, report it once.
+Report each line of the Checklist section at the end as pass, fail (file:line) or N/A (reason). Where a line
+repeats a finding already reported under classes 1 to 6, report it once.
 
 ## How to run it
 

@@ -3,8 +3,8 @@
 Read this when the matrix includes Moodle 5.1 or earlier, or you need the requirement values for a branch before
 5.2.
 
-The skills support 5.2 and later (`docs/SUPPORTED_VERSIONS.md`); these rows are for plugins that still test older
-branches. Recheck each value on the branch itself before relying on it (main file, section 3).
+The skills support 5.2 and later; these rows are for plugins that still test older branches. Recheck each value on
+the branch itself before relying on it (main file, section 3).
 
 | Branch | PHP (min to max) | MariaDB min | PostgreSQL min | MySQL min |
 |---|---|---|---|---|
@@ -24,5 +24,7 @@ How they were read: the minimums from the `<MOODLE version="X.Y">` blocks of `pu
   branch from 4.5 to 5.2; to test each branch at its own minimum, use per-row image values as in the main file.
 - **Plugin CLI paths differ.** Before 5.1 there is no `public/` directory: `admin/tool/phpunit/cli/init.php`, not
   `public/admin/tool/phpunit/cli/init.php`. moodle-plugin-ci handles this itself; hand-written steps must not.
-- **moodle-cs coverage attributes.** On branches before 5.0, `#[CoversClass]` attributes are not recognised by the
-  sniff; the `@covers` docblock must sit directly above `class` (`moodle-phpunit-testing`).
+- **moodle-cs coverage attributes.** When phpcs knows the branch is below 5.0 (it does in CI, where the plugin sits
+  inside the Moodle checkout), `#[CoversClass]` attributes do not count as coverage information (moodle-cs 3.7.0,
+  `AbstractTestCaseSniff::shouldCheckTestCaseAttributes()`); a test that must pass phpcs on 4.5 keeps an `@covers`
+  docblock tag as well.

@@ -212,7 +212,8 @@ $PAGE->set_title(format_string($cm->name) . ': ' . get_string('report', 'local_e
 - Landmarks come from the theme's layout. Do not add `<main>` or `role="main"` in plugin output: the page already
   has one, and two fail axe's `landmark-no-duplicate-main`. A plugin `<nav>` or `role="search"` needs a unique
   `aria-label`. `core/search_input_auto` exposes a `{{$searchrole}}` block to drop its `role="search"` when it sits
-  inside another search landmark (`public/lib/templates/search_input_auto.mustache:40`, 5.2 and 5.3).
+  inside another search landmark (`public/lib/templates/search_input_auto.mustache:40`; read in 5.3.0 and 5.2.2,
+  absent from 5.2.0 and 5.2.1, where the block is ignored and the role stays).
 
 ## Testing
 

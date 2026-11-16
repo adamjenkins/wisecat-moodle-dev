@@ -28,8 +28,8 @@ the moodle-plugin-ci 4.5 and moodle-cs 3.7 source, not run):
 
 - **The ZIP.** CI installs from the checkout. The licence file and the ZIP's root folder, the two most common
   review findings, are never seen. Check the built ZIP with `moodle-plugin-release`.
-- **Most required strings.** `validate` asks for `pluginname` (a filter: `filtername` only). `cachedef_*`,
-  capability and message provider strings are not checked.
+- **Most required strings.** `validate` asks for `pluginname` (a filter: `filtername` only; an activity:
+  `modulename` or `pluginname`). `cachedef_*`, capability and message provider strings are not checked.
 - **Frankenstyle prefixes.** `validate` checks table names; `phpcs` checks global function names for lower case
   only. A missing prefix is an approval blocker.
 - **Authorisation and parameter types.** `phpcs` checks that a login call follows `config.php`, not that a
@@ -278,7 +278,7 @@ guideline, with what CI covers, is in [reference/submission-guidelines.md](refer
 | Narrowest `PARAM_*` type, or a stated reason for `PARAM_RAW` | `grep -rn PARAM_RAW --include='*.php' .` | medium |
 | Directories via `make_temp_directory()`, `make_request_directory()` or `$CFG->directorypermissions`, never `0777` | `grep -rnE '\bmkdir\(' --include='*.php' .` | medium, low |
 | Outbound HTTP through `\curl` (proxy, blocked hosts), or the setting says the proxy is not used; every caveat the README states is also in the setting's description | `grep -rn curl_init --include='*.php' .` | medium |
-| No per-call queries on a hot path (filters run `setup()` on every `format_text()`) | a query-count test | medium |
+| No per-call queries on a hot path (a filter's `setup()` runs on every `format_text()` call) | a query-count test | medium |
 | Course-keyed tables backed up, or left out with a reason | `grep -n 'NAME="courseid"' db/install.xml` | medium |
 
 **Namespace collisions block approval.** Every global function, global class and `define()`d constant takes the
@@ -300,9 +300,8 @@ Each line printed is a finding or needs a reason. Names core dictates are not fi
 with exit status 1 is the pass; check that `grep` itself ran. Fix: rename to `<component>_<name>()`, or move the
 code into a class under `classes/`.
 
-**Release files,** owned by `moodle-plugin-release`: a tracked `LICENSE` with the full licence text that is not
-`export-ignore`d, a ZIP whose single root folder is the plugin name without its type, and only `lang/en/` in the
-tag (`git ls-tree -r --name-only <tag> -- lang | grep -v '^lang/en/'` prints nothing).
+**Release files** (the `LICENSE` file, the ZIP's root folder, only `lang/en/` in the package) are checked on the
+built ZIP: `moodle-plugin-release`.
 
 ### Minor gates
 
@@ -325,8 +324,8 @@ tag (`git ls-tree -r --name-only <tag> -- lang | grep -v '^lang/en/'` prints not
 
 ## 7. Extended security checklist
 
-Classes 1 to 6 come from reviews of a small set of plugins. A static audit of several dozen widely installed
-third-party plugins found more: SQL from mobile `$args`, `unserialize()` of restored data, IDOR and
+Classes 1 to 6 come from reviews of submitted plugins. Static audits of widely installed third-party plugins
+found more: SQL from mobile `$args`, `unserialize()` of restored data, IDOR and
 client-supplied `userid`, GET-without-sesskey writes, `noclean` on student or LLM text, SSRF through PDF
 renderers, SEPARATEGROUPS leaks. For any plugin with request entry points, walk
 [reference/extended-security-checklist.md](reference/extended-security-checklist.md) after classes 1 to 6 and
@@ -335,7 +334,7 @@ capability whose writes are rendered for other users (3b).
 
 ## Common mistakes
 
-| Mistake | Why it fails review | Fix |
+| Mistake | What happens | Fix |
 |---|---|---|
 | Capability checked on the submitted course or cm id | Attacker picks the context | Derive context from the URL id; re-validate submitted ids |
 | Page or web service with `require_login()` only | Any account can act | A capability with a risk flag, on the page and in the service |

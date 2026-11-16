@@ -23,9 +23,10 @@ The AMD recipe is `moodle-amd-javascript`; theme-side CSS and templates are in `
   ```
 
 - **AMD names resolve only to `amd/build/<name>.min.js`**, with no index fallback: a nested module needs its full
-  path or a re-export shim. A dynamic `import()` in `amd/src` is rewritten by the build into a failing RequireJS
-  call; vendor ES modules as `.js` files loaded from outside `amd/`, never `.mjs` (commonly served with a type
-  browsers refuse for modules).
+  path or a re-export shim. A dynamic `import()` in `amd/src` is compiled to a RequireJS call: it works for an
+  AMD module name (`await import('core/ajax')`, as `public/lib/amd/src/notification.js` does, 5.3.0) and fails
+  for a URL or a vendored ES module. Ship vendor ES modules as `.js` files loaded from outside `amd/`, never
+  `.mjs` (commonly served with a type browsers refuse for modules).
 - **A module with `export default` loses its named exports in the AMD build**: one style per module (`moodle-amd-javascript`).
 - **Never name a Mustache context variable `uniqid`**: `core/templates` overwrites it (`moodle-theme-layouts-templates`).
 - **An `output_fragment_<name>` callback never calls `require_login()`**: it throws "The theme has already been set up" (`moodle-amd-javascript`).

@@ -135,8 +135,10 @@ code, not run: `-t` replaces the defaults, so list them all.
   `moodle-theme-scss`.
 - With `--max-lint-warnings 0`, stylelint warnings fail too: upper-case or long hex colours, `0px`, lines over 132
   characters.
-- On 5.3, core's stylelint (`csstree/validator`) rejected `container-type`, `@container` and `clamp()` in
-  `font-size`; append `/* stylelint-disable-line csstree/validator */` to each such line, as core does.
+- Core's stylelint has the `csstree/validator` rule on 5.2 and 5.3 (`.stylelintrc`, identical in both). Run on
+  5.3.0, it rejected `container-type`, `@container` and `clamp()` in `font-size`; append
+  `// stylelint-disable-line csstree/validator` to each such line, as core does in
+  `public/theme/boost/scss/moodle/modchooser.scss` (5.3.0).
 - `gherkinlint` checks every feature file with core's `.gherkin-lintrc`: indentation (Feature 0, Background and
   Scenario 2, steps 4, Examples 4, example rows 6), no trailing spaces, no multiple empty lines, a newline at the end,
   named features and scenarios, unique feature names, no outline without examples.
@@ -158,9 +160,16 @@ toolchain and compare; do not silence it.
 - Every `*.mustache` in the theme is linted except `templates/mobileapp/`. Overridden core templates under
   `templates/core/` and `templates/<component>/` are linted exactly like the theme's own.
 - Partials are resolved first in the theme's `templates/<component>/`, then in the component's own templates.
-  Parent themes are not searched, so a partial that exists only in Boost's overrides is reported as missing.
+  Parent themes are not searched. A partial that is not found is not reported: the Mustache library renders it as
+  nothing and the linter checks the HTML without it. So lint cannot show that a template copied from 5.3 includes
+  a partial that 5.2 lacks; only a page render on that branch does. Read in the linter and its Mustache library
+  (moodle-plugin-ci 4.5.11), not run.
 - Any warning fails the file: no `@template` docblock, no `Example context (json):`, an HTML validator message on
-  the rendered example, an ESLint finding in `{{#js}}`.
+  the rendered example.
+- `{{#js}}` blocks are not linted on 5.2 and 5.3: the linter looks for ESLint in `node_modules/.bin/` under the
+  directory moodle-plugin-ci passes as the Moodle base, which is `public/` since 5.1, while `node_modules` is in
+  the Moodle root. The step's log then says "ESLint did not run". Read in moodle-plugin-ci 4.5.11
+  (`MustacheCommand.php`) and its bundled linter, not run. Lint that JavaScript by keeping it in `amd/src`.
 - `*.mustache.upstream` twins (the untouched originals kept beside copies) are not linted: the file glob ends at
   `.mustache`. The same holds for `*.php.upstream` under phpcs and phplint.
 - `.mustachelintignore` in the template's directory lists file-name patterns whose HTML validation is skipped. It
@@ -172,9 +181,6 @@ toolchain and compare; do not silence it.
   that is cheaper than a baseline mechanism. Large themes either keep a baseline of upstream findings in their own
   workflow or list overridden core templates in `MUSTACHE_IGNORE_NAMES` (per-command form of `IGNORE_NAMES`), which
   drops those templates from all Mustache checks.
-- A large reference theme's workflow notes that Mustache lint under moodle-plugin-ci does not run ESLint on `{{#js}}`
-  for Moodle 5.1 and later because it cannot find ESLint under `public/`. Not checked here; do not rely on
-  `{{#js}}` being linted.
 
 ### phpcs and phpdoc
 

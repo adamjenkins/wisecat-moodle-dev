@@ -21,9 +21,10 @@ keeps the traps those recipes do not spell out. Samples are valid on Moodle 5.2 
   require_once($CFG->dirroot . '/question/engine/lib.php');
   ```
 
-- **A script that uses a data generator outside PHPUnit** (a CLI script building demo data on a live site) also
-  needs `require_once($CFG->libdir . '/testing/generator/lib.php');` before `testing_util::get_data_generator()`;
-  PHPUnit loads it for you, the CLI does not.
+- **A script that uses a data generator outside PHPUnit** (a CLI script building demo data) gets it from
+  `\core\test\testing_util::get_data_generator()`, which loads `lib/testing/generator/lib.php` itself
+  (`public/lib/classes/test/testing_util.php`, 5.2 and 5.3). `new \testing_data_generator()` written directly is a
+  "Class not found" fatal outside PHPUnit unless the script requires that file first.
 - **`assign_capability()` defaults to `$overwrite = false`** and does nothing when a row exists (for example the
   archetype's `CAP_ALLOW`), so a test of the denied path silently tests the allowed one. Pass `true`, clear the
   caches, and assert the gate flipped before testing it.
@@ -58,10 +59,12 @@ keeps the traps those recipes do not spell out. Samples are valid on Moodle 5.2 
   rebuild_course_cache($course->id, true);
   ```
 
-- **`route_testcase` group paths:** pass `''` as `$grouppath` to `add_class_routes_to_route_loader()`;
-  `ROUTE_GROUP_PAGE` builds a `//path` pattern that never matches (every expected-404 test then passes for the
-  wrong reason), and `null` makes the test case guess from the namespace. Always include a 200 case
-  (`public/lib/tests/classes/router/route_testcase.php`, 5.3.0).
+- **`route_testcase` group paths:** pass `''` as `$grouppath` to `add_class_routes_to_route_loader()` for a page
+  route; `ROUTE_GROUP_PAGE` is `'/'` and builds a `//path` pattern that never matches (every expected-404 test
+  then passes for the wrong reason), and `null` guesses from the namespace and throws "Unable to determine route
+  path" for anything but an `api` class. Always include a 200 case. A route in the `''` group runs without the
+  login and validation middleware the site attaches to page routes, so it does not test those
+  (`public/lib/tests/classes/router/route_testcase.php`, `public/lib/classes/router.php`, read in 5.3.0).
 - **`\core\task\grade_cron_task` locks nothing** in courses whose course grade item has `needsupdate = 1`. Call
   `grade_regrade_final_grades($courseid)` before running it in synthetic setups.
 - **Derive expected timestamps independently** whenever DST, a timezone or a window boundary is involved, and paste
@@ -127,7 +130,7 @@ See also `moodle-behat-testing`.
 
 See also `moodle-ci-matrix` and `moodle-definition-of-done`.
 
-- **Derive every matrix cell** (Moodle x PHP x DB) from each branch's `admin/environment.xml`; never cross current
+- **Derive every matrix cell** (Moodle x PHP x DB) from each branch's `public/admin/environment.xml`; never cross current
   PHP or database versions with old branches. Check service images, `include` entries missing axes, and
   artifact-name characters.
 - **Vacuous passes:** an empty `tests/` passes phpunit and behat; `phpmd` exits 0 with violations; `mustache`

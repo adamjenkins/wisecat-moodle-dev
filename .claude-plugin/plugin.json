@@ -1,7 +1,7 @@
 {
   "name": "wisecat-moodle-dev",
   "version": "0.1.0",
-  "description": "The most complete Moodle development toolkit: 19 skills, 8 slash commands, 2 subagents — covering scaffolding, XMLDB, capabilities, web services, Hooks API, AMD JS, PHPUnit, Behat, security, privacy/GDPR, performance, accessibility, themes, mobile, and cross-version upgrades. Ships with adapters for Cursor, Copilot, Aider, Continue.",
+  "description": "Moodle plugin and theme development for Moodle 5.2 and 5.3: 25 skills, 10 slash commands and 2 subagents. Seven theme skills (Boost child themes, SCSS and dark mode, layouts and templates, renderers, settings, testing and release) and plugin skills for scaffolding, XMLDB, web services, hooks, JavaScript, PHPUnit, Behat, CI, security, privacy, performance, accessibility, the Moodle app, upgrades and release. Adapters for Cursor, Copilot, Aider and Continue.",
   "author": {
     "name": "Adam Jenkins",
     "email": "adam@wisecat.net"

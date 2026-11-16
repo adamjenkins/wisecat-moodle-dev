@@ -40,7 +40,9 @@ docker run -d -p 4444:4444 --shm-size=2g selenium/standalone-chrome:4
 ```
 
 `moodle-plugin-ci behat --profile chrome` starts the same image, `selenium/standalone-chrome:4`
-(`BehatCommand.php`, 4.5.11), so this matches CI. Name other browsers or hosts in `config.php` with
+(`BehatCommand.php`, 4.5.11), so this matches CI; its default profile is Firefox (`selenium/standalone-firefox:4`)
+unless `MOODLE_BEHAT_DEFAULT_BROWSER` says otherwise. Whether today's build of that floating `:4` tag works with
+Moodle's Behat extension was not run for this file. Name other browsers or hosts in `config.php` with
 `$CFG->behat_profiles` and select one with `--profile=<name>` on `run.php` (`config-dist.php`, the commented
 `behat_profiles` example). Avoid `latest`: it can pair a browser with a driver the Behat extension does not handle,
 and the failure looks like a test bug.
@@ -50,13 +52,13 @@ and the failure looks like a test bug.
 | Symptom | Likely cause | Check or fix |
 |---|---|---|
 | Fewer scenarios than the repository has | The site runs an older installed copy, or a new `.feature` is not in `behat.yml` | Compare with `grep -c '^ *Scenario' tests/behat/*.feature`; copy the plugin again and re-run `init.php` |
-| An edited scenario runs the old steps | Gherkin cache keyed on file modification time; a copy that preserved old timestamps | `touch` the copied feature files, or re-init. Seen in practice |
+| An edited scenario runs the old steps | Behat reuses a cached parse while the cache entry is newer than the feature file (`FileCache::isFresh()` in `vendor/behat/gherkin`; the cache is `behat_gherkin_cache` in the system temp directory unless configured); a copy that preserved old timestamps looks unchanged | `touch` the copied feature files, or delete that cache directory. Mechanism read in the source; symptom seen in practice |
 | "Undefined step" for a step you wrote | New context file, or class not named `behat_<component>` | Re-init; check the class name |
 | `the following "x > y" exist` says the entity is unknown | Entity declared outside `tests/generator/behat_<component>_generator.php`, or no re-init | Move it there; re-init |
 | Green locally, red in CI on every JavaScript step | Local site not initialised with `--scss-deprecations` | `init.php --scss-deprecations`; read the "Run optional tests" banner |
 | Red in CI with "debugging() message/s found" | A deprecated call reached the page; developer debugging is on in CI | Fix the call; the message names it (`look_for_exceptions()` in `behat_session_trait.php`) |
 | Red only on the PostgreSQL row | SQL that MySQL accepts (ordering, `GROUP BY`, text comparison) | Run the scenario on PostgreSQL, or read the query (`moodle-phpunit-testing` covers the transaction side) |
-| Site home steps land on the dashboard or login page | `enablemyhome` is 0 on new 5.2.2+ and 5.3 sites | Set it in the Background (main file) |
+| Site home steps land on the dashboard or login page | `enablemyhome` is 0 on new 5.2 and 5.3 sites | Set `enablemyhome` to 1 with `the following config values are set as admin:` in the Background |
 | A changed SCSS or `styles.css` has no effect | Theme CSS is built at init and restored per scenario | Re-init |
 | Accessibility step fails with "No data" | The server denies `/lib/behat/axe/axe.min.js` | Allow `/behat/` paths on the Behat site's virtual host. Seen in practice |
 | Accessibility step passes on a page that cannot pass | Site initialised with `--no-axe`: the step does nothing | Re-init without it; the banner says "Accessibility: No" |
@@ -87,7 +89,8 @@ Scripts that drive a real Moodle site for walkthroughs, screenshots or smoke che
 steps handle for you. Each was seen in practice.
 
 - **User tours cover the page on a user's first visit.** The tour backdrop blocks clicks and appears in screenshots.
-  Behat disables tours; a script must mark the tours complete for its test users first, or close the tour.
+  A Behat site installs the shipped tours disabled; a script against another site must mark the tours complete for
+  its test users first, or close the tour.
 - **Wait for network idle before typing a password.** Core's `togglesensitive` module replaces the password input
   through `outerHTML` after load, discarding anything typed earlier. Assert the field's value before submitting.
 - **Select buttons by role and name.** `page.getByRole('button', {name: 'Save changes'})`; "the submit button" is

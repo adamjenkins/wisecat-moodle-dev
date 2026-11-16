@@ -20,6 +20,7 @@ Rows for a plugin supporting 5.2:
 
 with the service image defaults `postgres:16` and `mariadb:10.11`, so these rows test the branch at its minimum.
 
-- PHP 8.2 must not appear with 5.2: the install environment check fails ("PHP version must be at least 8.3.0").
-- `enablemyhome` defaults to 0 on new 5.2.2+ installs, which a CI site is; Behat features that need site home set
+- PHP 8.2 must not appear with 5.2: every CLI script stops with "Moodle 5.2 or later requires at least PHP 8.3.0"
+  (`public/lib/phpminimumversionlib.php`).
+- `enablemyhome` defaults to 0 on new 5.2 installs, which a CI site is; Behat features that need site home set
   it themselves (`moodle-behat-testing`).

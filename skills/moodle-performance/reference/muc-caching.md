@@ -47,7 +47,9 @@ $string['cachedef_dashboard'] = 'Dashboard data for the current user';
 
 Then bump `$plugin->version` and upgrade: definitions are loaded into the cache configuration on upgrade, and a
 missing `cachedef_` string shows as `[[cachedef_x]]` on Site administration > Plugins > Caching > Configuration and
-is a Plugins directory review finding.
+is a Plugins directory review finding. A definition used before the upgrade ran is found on first use, with a
+"Cache definitions reparsed causing cache reset" `debugging()` notice, which fails a test; an edited definition is
+not re-read until the upgrade (`public/cache/classes/factory.php`, `create_cache_from_definition()`, 5.3.0).
 
 `cache_store::MODE_*` (the alias that core's own file uses) and `\core_cache\store::MODE_*` are the same constants on
 5.2 and 5.3.
@@ -58,7 +60,7 @@ is a Plugins directory review finding.
 |---|---|---|
 | `mode` (required) | Always | Application: shared by all users and, with a shared store, all web servers. Session: one user. Request: this request only |
 | `simplekeys` | Keys are only `a-zA-Z0-9_` | Keys are not hashed; any other character breaks lookups |
-| `simpledata` | Values are scalars or arrays of scalars | The loader skips its handling of objects and references; do not store objects with it on |
+| `simpledata` | Values are scalars or arrays of scalars | The loader returns and stores the value without making a reference-free copy (`cache.php`, the `uses_simple_data()` checks); do not store objects with it on |
 | `staticacceleration` (+ `staticaccelerationsize`) | The same keys are read many times in one request | Keeps a PHP array copy per request; memory |
 | `requireidentifiers` | The data depends on extra identifiers passed to `make()` | Every `make()` must pass them |
 | `datasource` | The cache can load misses itself | Class implements `\core_cache\data_source_interface` |
@@ -161,7 +163,9 @@ when the version number already exists in your data (a revision column); otherwi
 
 Core ships the stores `apcu`, `file`, `redis`, `session` and `static` on 5.2 and 5.3 (`public/cache/stores/`).
 Without any configuration, application caches go to the file store in `$CFG->cachedir` (shared between web servers
-when `dataroot` is shared), session caches to the session store, request caches to the static store. Administrators
+when `dataroot` is shared), session caches to the session store, request caches to the static store
+(`default_application`, `default_session`, `default_request` in `public/cache/classes/config_writer.php`, 5.3.0).
+Administrators
 map definitions to Redis or APCu in Site administration > Plugins > Caching > Configuration; code must work with any
 store, so do not depend on eviction order or on a TTL being honoured.
 

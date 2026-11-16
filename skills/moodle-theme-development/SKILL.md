@@ -82,11 +82,12 @@ theme/mytheme/
 ├── pix_core/, pix_plugins/<type>/<plugin>/     image overrides
 ├── fonts/, fonts_core/, fonts_plugins/         fonts and font overrides
 ├── style/                 plain CSS files named in $THEME->sheets
-└── LICENSE                the Plugins directory expects a licence file in the root
+└── LICENSE                the Plugins directory expects a licence file in the root (moodle-plugin-release)
 ```
 
-- **`pix/screenshot`** (`.png` or `.jpg`, about 500 by 400 px) is what the theme selector shows. Without it the
-  selector card has a broken image (`public/admin/themeselector.php`, 5.3.0).
+- **`pix/screenshot`** (`.png` or `.jpg`, about 500 by 400 px) is what the theme selector shows. Without it a
+  child shows its parent's screenshot, because theme images fall back to the parents, and a theme with no parents
+  shows a broken image (`public/admin/themeselector.php`, `theme_config::resolve_image_location()`, read in 5.3.0).
 - **`pix/favicon.ico` is never inherited.** Core returns `<active theme>/pix/favicon.ico` without checking that it
   exists or looking at parents, so a child without the file requests a missing favicon unless the site has uploaded
   one in the admin settings. Fix: copy a `favicon.ico` into the child's `pix/`
@@ -176,9 +177,9 @@ not run in this exact form). Adding the theme's own SCSS, `lib.php` and settings
 | Rule | Symptom when ignored | Fix |
 |---|---|---|
 | `$THEME->parents` must be an array, even when empty | The theme does not load; pages fall back with "cannot be initialised" | `$THEME->parents = [];` or the parent list |
-| `$THEME->name` must equal the directory name | The theme is skipped by the theme selector and `?theme=` does not stick | Set it to the directory name; do not leave `'boost'` in a copied file |
+| `$THEME->name` must equal the directory name | The theme is skipped by the theme selector and `?theme=` does not stick (read, not run) | Set it to the directory name; do not leave `'boost'` in a copied file |
 | `rendererfactory` is not inherited | Every theme renderer is ignored, including Boost's own `core_renderer`, with no error | Restate `'theme_overridden_renderer_factory'` |
-| `usefallback`, `requiredblocks`, `addblockposition`, `haseditswitch`, `usescourseindex`, `activityheaderconfig`, `yuicssmodules`, `removedprimarynavitems`, `csspostprocess`, `enablecourseajax`, `doctype`, `hidefromselector`, the arrow keys and `blockrtlmanipulations` are not inherited | The child silently gets core's defaults: no course index, no edit switch, "Turn editing on" buttons return, the navigation and settings blocks become required, four YUI CSS modules load | Restate each one the parent sets, as above |
+| `usefallback`, `requiredblocks`, `addblockposition`, `haseditswitch`, `usescourseindex`, `activityheaderconfig`, `yuicssmodules`, `removedprimarynavitems`, `csspostprocess`, `enablecourseajax`, `doctype`, `hidefromselector`, the arrow keys and `blockrtlmanipulations` are not inherited | The child silently gets core's defaults: no course index, "Turn editing on" buttons return beside the edit switch, the navigation and settings blocks become required, four YUI CSS modules load (read, not each reproduced) | Restate each one the parent sets, as above |
 | Inherited from an ancestor that sets them: `scss`, `iconsystem`, `editor_scss`, `csstreepostprocessor`, `blockrendermethod`, the two exclude lists; `layouts` cascade per page type | Restating them is harmless, but restating `editor_scss` with a file the child does not ship drops the parent's editor styles | Leave them out unless changing them |
 | Chained, every ancestor's runs: `prescsscallback`, `extrascsscallback`, `precompiledcsscallback`; concatenated: `sheets`, `editor_sheets`, `javascripts` | A child callback that repeats what the parent's emits puts that SCSS in the stylesheet twice | Emit only the child's additions |
 | Keys outside the whitelist are dropped | No effect and no warning. Seen names: `enable_dock`, `editorsheets`, `undeletableblocktypes`, `renderfactory`, `allowedscss` | Use the real name: `editor_sheets`, `requiredblocks`, `rendererfactory` |
@@ -287,7 +288,8 @@ $CFG->cachejs = false;            // AMD modules uncached.
 - **A page that suddenly looks like plain Boost means the SCSS did not compile.** The stylesheet request hides
   debugging output, the compile error goes to the PHP error log at developer debugging level, and the CSS falls
   back to Boost's shipped `style/moodle.css` (run on 5.3.0). Look for "Error while compiling SCSS" in the log, or
-  run `build_theme_css.php` with developer debugging on. `moodle-theme-scss` covers reading the error.
+  run `build_theme_css.php` with developer debugging on, which reaches the same compile code (read; the message
+  was seen from a separate compile script). `moodle-theme-scss` covers reading the error.
 - **Theme designer mode still caches each sheet for 10 seconds** (`THEME_DESIGNER_CACHE_LIFETIME`,
   `public/lib/csslib.php`), and it serves many separate CSS requests, so page loads are slow.
 - **Plugin CSS is part of the theme stylesheet.** Every plugin's `styles.css` is concatenated first, then parent

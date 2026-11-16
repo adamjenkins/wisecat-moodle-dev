@@ -23,7 +23,9 @@ was built or loaded for it.
    The result goes through `post_process()`, so `[[pix:]]`, `[[font:]]`, `csspostprocess` and the RTL flip apply. It is
    not minified.
 4. `editor_scss` is resolved differently from `editor_sheets`: the theme's own list if it sets one, otherwise the
-   first parent that has one, **and the files are read from the directory of whichever theme supplied the list**.
+   list of the first parent that has one, searching from the base parent towards the nearest (with
+   `$THEME->parents = ['mid', 'boost']`, Boost's list wins over `mid`'s), **and the files are read from the directory
+   of whichever theme supplied the list** (`editor_scss_to_css()`).
 5. The editor SCSS is compiled with a bare compiler: no pre-SCSS callback, no extra-SCSS callback, no theme settings,
    and only the directory of the file as import path. A compile error is only a developer debugging message
    ("Error while compiling editor SCSS").
@@ -47,6 +49,8 @@ A child of Boost that does not mention `editor_scss` gets Boost's `editor.scss`,
 is the right choice unless the theme must change how content looks while it is being edited.
 
 ## Recipe: add to Boost's editor styles
+
+Read in the source, not run: no child editor sheet was built for this recipe.
 
 ```php
 // config.php

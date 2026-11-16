@@ -141,7 +141,8 @@ class core_renderer extends \theme_boost\output\core_renderer {
 
 - The renderer is used only if `config.php` restates `$THEME->rendererfactory = 'theme_overridden_renderer_factory';`
   (it is not inherited; see `moodle-theme-boost-child`). Symptom without it: the section renders nothing, because
-  Mustache finds no such method and treats it as empty.
+  Mustache calls a method only if `method_exists()` says it is there, and otherwise treats the name as empty
+  (`public/lib/mustache/src/Context.php`, same file in 5.2).
 - The `!` suffix is 5.2 and later (`public/lib/classes/output/mustache_template_finder.php`, identical in 5.2 and
   5.3.0). Wrapping `core/notification_info` this way was run on 5.3.0, in PHP and in a browser-side render;
   wrapping a `theme_boost` partial uses the same code path and was read, not run.
@@ -167,7 +168,8 @@ Use this when only some page layouts change, or the template needs data that a r
 
 This was run on 5.3.0 with the `course` layout. Two things found there: phpcs with the moodle standard reports
 Boost's own `drawers.php` (no trailing comma after the last context item), so fix that line in the copy; and the
-`.upstream` extension keeps the twins out of phpcs and the Mustache lint. The full worked files, the header
+`.upstream` extension keeps the twins out of phpcs and the Mustache lint (moodle-plugin-ci selects `*.php` and
+`*.mustache` by name). The full worked files, the header
 comment wording and the per-release checklist are in [reference/copying-a-layout.md](reference/copying-a-layout.md).
 
 What a layout template must print, in this order, or the page breaks: `output.doctype`, `output.htmlattributes`
@@ -230,7 +232,8 @@ by a key that only 5.3's navigation export contains:
   `public/lib/templates/`.
 - **A theme's own templates** sit directly in `templates/` and are named `theme_mytheme/<name>`.
 - **`{{> core/name! }}`** includes the component's original and ignores every theme override. Use it to wrap
-  instead of copy. It cannot change markup inside the original.
+  instead of copy. It cannot change markup inside the original. An override that includes its own name without
+  the `!` includes itself.
 - **`{{< theme_boost/drawer }}...{{/ theme_boost/drawer }}`** fills named `{{$block}}`s of a parent template. A block
   name the parent does not define is ignored without a warning.
 - **Overrides apply to browser-rendered templates too**: `core/templates` fetches the source through the same
@@ -311,7 +314,7 @@ both versions. Read in the 5.3.0 source; no React override was built. See [versi
 | Setting `'options' => ['nofooter' => true]` and expecting core to act | Nothing changes | Read `$PAGE->layout_options['nofooter']` in your layout file |
 | Calling a custom `output.<method>` in the `maintenance` layout | Renders empty: that layout uses `core_renderer_maintenance`, not the theme's `core_renderer` | Keep the maintenance template free of theme methods; see [reference/special-layouts.md](reference/special-layouts.md) |
 | `empty($PAGE->cm)` or `isset($PAGE->pagetype)` in a layout file | Always "not set": `moodle_page` has no `__isset()` | Read the property into a variable first |
-| Choosing a page layout for its name | Boost keys width and drawer rules on `pagelayout-<name>` and `limitedwidth`; a wide table on a `report` layout page sat under the course index (observed on 5.3) | For a page inside an activity use `incourse`; check at phone and desktop width |
+| Choosing a page layout for its name | Boost keys width and drawer rules on `pagelayout-<name>` and `limitedwidth`; a wide table on a `report` layout page sat under the course index (seen once on 5.3; the rule responsible was not identified) | For a page inside an activity use `incourse`; check at phone and desktop width |
 | Judging a template change through a browser-rendered template with designer mode on | No change seen | `$CFG->cachetemplates = false;` or purge |
 | Styling 5.3 navigation by looking at the page with JavaScript off | The fallback markup is the legacy one, so old selectors seem to work | Inspect with JavaScript on |
 

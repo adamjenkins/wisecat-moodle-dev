@@ -82,9 +82,9 @@ These are for the people running the site; plugin code must work without them.
 - **Directories:** `$CFG->cachedir` and `$CFG->tempdir` must be shared by all web servers; `$CFG->localcachedir` is
   per server and holds files Moodle can rebuild (compiled JavaScript, theme CSS, language caches). Put it on fast
   local disk (`config-dist.php`, 5.3.0).
-- **Production switches:** `$CFG->cachejs`, `$CFG->cachetemplates` on and `$CFG->themedesignermode` off. Each is
-  marked "NOT FOR PRODUCTION SERVERS" in `config-dist.php` when changed; with them changed, JavaScript, templates or
-  theme CSS are rebuilt or re-sent instead of cached.
+- **Production switches:** `$CFG->cachejs`, `$CFG->cachetemplates` on and `$CFG->themedesignermode` off.
+  `config-dist.php` marks the changed value of each as not for production servers; with them changed, JavaScript,
+  templates or theme CSS are rebuilt or re-sent instead of cached.
 - **Cron:** run `admin/cli/cron.php` every minute, or keep-alive runners for sites with many ad-hoc tasks; slow or
   stopped cron shows as tasks that never run, not as slow pages.
 

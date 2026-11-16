@@ -115,16 +115,20 @@ the reference file that holds the rest. Every rule holds on Moodle 5.2 and 5.3 u
 
 ## Web services and routed controllers
 
+The first three rules are owned by `moodle-web-services`, which has the samples and sources.
+
 - **`'loginrequired' => false` functions must not call `self::validate_context()`**: it ends in `require_login()`
-  and refuses the anonymous callers the flag exists for. Set the page context with `$PAGE->set_context()` instead
-  (which `$OUTPUT` needs anyway to render user pictures).
-- **Match the gate of the page the function backs.** Validating a course context enforces enrolment; if the page
-  requires ownership, unenrolled owners silently get `requireloginerror`. Test with a non-enrolled owner.
-- **`validate_parameters()` rejects free text that `PARAM_TEXT` cleaning would change**: use `PARAM_RAW` (`moodle-web-services`).
-- **Routing Engine controllers without a `requestbody` schema** get `$request->getParsedBody() === []` in
-  production (the request validator replaces it). Declare the schema, or read POST data with `optional_param()`
-  plus `require_sesskey()`. `route_testcase::process_request()` does not run that middleware, so verify with a real
-  HTTP POST.
+  and refuses anonymous callers; call `$PAGE->set_context()` instead.
+- **Match the gate of the page the function backs**: a course context check enforces enrolment, so an unenrolled
+  owner gets `requireloginerror`.
+- **`validate_parameters()` rejects free text that `PARAM_TEXT` cleaning would change**: declare it `PARAM_RAW` and
+  escape at the sink.
+- **Routing Engine controllers without a `requestbody` schema** get `$request->getParsedBody() === []` on a
+  site: the request validator clears the body (`public/lib/classes/router/request_validator.php`,
+  `validate_request_body()`, 5.2 and 5.3). Declare the schema, or read POST data with `optional_param()` plus
+  `require_sesskey()`. A page route added to `route_testcase` with the group path `''` gets no validation
+  middleware (`\core\router::configure_routes()` attaches it by group name, `public/lib/classes/router.php`,
+  5.3.0), so the test sees the posted body; verify with a real HTTP POST.
 
 ## Authorisation and state
 

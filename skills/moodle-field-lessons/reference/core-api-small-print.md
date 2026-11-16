@@ -12,12 +12,15 @@ Samples are valid on Moodle 5.2 and 5.3; source lines were read in 5.3.0 unless 
   `$updatepassword`); pass `true` so it is hashed. **5.3+:** the function is deprecated for
   `\core\user::create_user()` (guard with `method_exists()`, `moodle-plugin-development` version notes).
 - **`core_external\util::generate_token()` always inserts a new row**; it never reuses an existing token. Track every
-  token you mint so you can revoke it.
+  token you mint so you can revoke it (`moodle-web-services`).
 - **Another user's timezone:** if `empty($tz) || $tz == 99`, use `core_date::get_server_timezone()`;
   `get_user_timezone(99)` resolves through the viewer's `$USER->timezone`, not the other user's.
-- **The manual enrolment welcome message throws for a user with no email address** when the enrolment runs outside
-  a transaction that catches it. An importer that enrols users without email turns the instance's welcome message
-  (`customint1`) off first. Seen in practice; the call site was not re-read for this file.
+- **The enrolment welcome message throws for a user with no email address** when the enrolment runs outside a
+  database transaction: `send_course_welcome_message_to_user()` calls `message_send()`, the email processor
+  fails, and the message manager throws `moodle_exception` "Message was not sent."; inside a transaction the
+  message is buffered until the commit instead (`public/lib/enrollib.php`,
+  `public/lib/classes/message/manager.php`, `send_message_to_processors()`; read in 5.3.0, not run). An importer
+  that enrols users without email first sets the enrol instance's `customint1` to `ENROL_DO_NOT_SEND_EMAIL`.
 - **`$USER` is cached in the session**: a database change to the current user's record is not visible to sessions
   already logged in.
 
@@ -52,9 +55,11 @@ Samples are valid on Moodle 5.2 and 5.3; source lines were read in 5.3.0 unless 
   name per fresh process.
 - **Do not use PCRE `\p{Han}` to mean ideographs**: it also matches CJK punctuation such as `、` and `。`. Use
   explicit ranges and print sample matches before trusting counts.
-- **Third-party libraries bundled in core have their own small print**: `firebase/php-jwt` fills its `$headers`
-  out-parameter only when you pass an object, and the `mod_lti` test generator sets no `tooldomain`. Read the
-  library code, not its README.
+- **Third-party libraries bundled in core have their own small print.** `\Firebase\JWT\JWT::decode($jwt, $keys,
+  $headers)` fills `$headers` only when the variable already holds an object, so pass `$headers = new \stdClass();`
+  (`public/lib/php-jwt/src/JWT.php`, `decode()`, 5.3.0); a null variable stays null. The `mod_lti` test generator
+  sets no `tooldomain` on the tool types it creates (`public/mod/lti/tests/generator/lib.php`), so a test that
+  matches tools by domain sets it itself. Read the library code, not its README.
 - **Keep `defined('MOODLE_INTERNAL') || die();` only in files that run code at require time**; let phpcs decide,
   and run it at once on code copied from another plugin (siblings carry unfixed warnings).
 - **No scaffolding placeholders in file headers**, and one canonical `@copyright` line per author.
@@ -86,9 +91,12 @@ configured.
   }
   ```
 
-- **`process_action()` can throw instead of returning a failed response**: a blocked request has error code 0, and
-  `\core_ai\error\factory::create()` throws `\InvalidArgumentException` for it (`public/ai/classes/error/factory.php:57`).
-  Catch `\Exception`; catching `\moodle_exception` misses it.
+- **`process_action()` can throw instead of returning a failed response.** The core providers pass the code of a
+  caught HTTP client exception to `\core_ai\error\factory::create()`, which throws `\InvalidArgumentException`
+  when the code is 0, as it is for a request that never got an HTTP status (blocked or refused before a response)
+  (`public/ai/provider/openai/classes/abstract_processor.php`, `query_ai_api()`;
+  `public/ai/classes/error/factory.php:57`; read in 5.2 and 5.3.0, not run). Catch `\Exception`; catching
+  `\moodle_exception` misses it.
 - **The manager cannot be told to use one provider instance**; it picks among the enabled providers for the action.
   A plugin that must pin a provider calls that provider's processor itself and records the action, which is outside
   the public API.

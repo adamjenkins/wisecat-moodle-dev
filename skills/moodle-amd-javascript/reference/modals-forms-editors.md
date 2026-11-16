@@ -145,7 +145,7 @@ class edit_item extends \core_form\dynamic_form {
   the form renders (a `render()` override), not from `definition()`, which also runs on submission.
 - `config.moduleName` selects another modal class than `core/modal_save_cancel`; `saveButtonText` relabels Save.
 - A throwaway page form that contains a file picker element can break a later modal form's file picker: the picker's
-  templates are printed once per request (field lesson; see `moodle-field-lessons`).
+  templates are printed once per request (`moodle-field-lessons`).
 
 ## TinyMCE (editor_tiny) plugin layout
 
@@ -154,7 +154,7 @@ Files of `public/lib/editor/tiny/plugins/h5p` (5.3.0), the smallest core plugin 
 | File | Job |
 |---|---|
 | `classes/plugininfo.php` | `extends \editor_tiny\plugin implements plugin_with_buttons, plugin_with_menuitems`; `get_available_buttons()` returns `['tiny_example/example']`; add `plugin_with_configuration` to pass per-context data such as capabilities |
-| `amd/src/common.js` | `export const component = 'tiny_example'; export const pluginName = 'example';` plus button and icon names |
+| `amd/src/common.js` | The names used by the other files: `component` (`'tiny_example'`), `pluginName` (`'tiny_example/plugin'`), the button name and the icon name |
 | `amd/src/plugin.js` | Default export is a promise that calls `tinyMCE.PluginManager.add(`${component}/plugin`, setup)` and resolves `[`${component}/plugin`, Configuration]` |
 | `amd/src/commands.js` | `getSetup()` resolves a function that calls `editor.ui.registry.addButton()` / `addMenuItem()` |
 | `amd/src/configuration.js` | `configure(instanceConfig)` returns `{toolbar: addToolbarButton(...), menu: addMenubarItem(...)}` from `editor_tiny/utils` |

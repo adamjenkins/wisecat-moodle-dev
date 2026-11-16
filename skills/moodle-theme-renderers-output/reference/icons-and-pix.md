@@ -111,7 +111,8 @@ tries `.svg` (when the browser supports SVG), then `.png`, `.gif`, `.jpg`, `.jpe
 - `favicon` is a special case: `resolve_image_location('favicon', 'theme')` returns
   `<current theme>/pix/favicon.ico` without checking that it exists and without looking at parents. A child of
   Boost with no `pix/favicon.ico` serves a broken favicon unless the site's favicon admin setting is set, which
-  `core_renderer::favicon()` prefers. Ship the file.
+  `core_renderer::favicon()` prefers. Ship the file. Read in `theme_config.php`, `core_renderer.php` and
+  `public/theme/image.php` (an unreadable file is answered "not found"), 5.3.0 and 5.2; not run.
 - Images are served by `public/theme/image.php` from a per-theme cache keyed by the theme revision. A request for
   a missing image writes an `.error` marker, and later requests return "not found" from the marker until the
   theme caches are purged. After adding or replacing an image file, purge.
@@ -154,13 +155,18 @@ tries `.svg` (when the browser supports SVG), then `.png`, `.gif`, `.jpg`, `.jpe
   backgrounds; or add a rule of the theme's own:
 
   ```scss
-  [data-bs-theme="dark"] img.icon[src*="/theme_mytheme/"] {
+  [data-bs-theme="dark"] img.icon[src*="theme_mytheme"] {
       filter: invert(1);
   }
   ```
 
-  The selector above assumes the image URL contains the component name, which is how `image.php` URLs are built;
-  read in the source, not run. Inverting changes hue, so use it only for monochrome icons.
+  The selector matches on the component name, which is in both forms of the image URL: the path form
+  `theme/image.php/<theme in use>/theme_mytheme/<revision>/<image>` and the query form
+  `theme/image.php?theme=...&component=theme_mytheme&image=...` that is used when slash arguments are off or theme
+  designer mode is on. Do not match on `/theme_mytheme/` with slashes, which misses the query form. It applies to
+  icons requested with the component `theme_mytheme`; an icon requested with the component `theme` has only the
+  current theme's name in its URL. Read in `theme_config::image_url()`, 5.3.0; not run. Inverting changes hue, so
+  use it only for monochrome icons.
 
 ## Deprecated icons
 

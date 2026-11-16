@@ -96,10 +96,15 @@ that was removed from an installed component: the autoload of the theme class is
   throws unless both the target and the page layout are `maintenance`. The page can run while database tables are
   missing or out of date, so a maintenance renderer or template must not depend on theme settings, blocks, menus
   or a logged-in user. Source: `public/lib/classes/output/core_renderer_maintenance.php`, 5.3.0.
-- Email renderers: a module that sends templated mail asks for a renderer with a subtype and an email target, for
-  example the forum's `email` subtype. The theme class is then `theme_mytheme\output\mod_forum\email\renderer_htmlemail`
-  or `...\email_renderer_htmlemail`, following the subtype row with the suffix appended. Read in the factory code;
-  the forum case was seen in a published theme, not run.
+- Email renderers: a module that sends templated mail asks for a renderer with a subtype and an email target.
+  The forum calls `get_renderer('mod_forum', 'email', $target)` with `htmlemail` and `textemail`
+  (`public/mod/forum/classes/task/send_user_notifications.php`, 5.3.0 and 5.2). The theme class follows the
+  subtype row with the suffix appended: `theme_mytheme\output\mod_forum\email_renderer_htmlemail` is tried first,
+  then `theme_mytheme\output\mod_forum\email\renderer_htmlemail`; for plain text the suffix is `_textemail`.
+  The forum's own classes are `\mod_forum\output\email\renderer` (HTML) and
+  `\mod_forum\output\email\renderer_textemail`. Because the forum ships a suffixed text renderer, a theme class
+  without the `_textemail` suffix never reaches plain-text mail (pass 2 wins over pass 3); an unsuffixed theme
+  class does reach HTML mail. Read in the factory code and the forum source; not run.
 
 ## How `render()` picks a method
 

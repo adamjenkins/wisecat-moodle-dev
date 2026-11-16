@@ -54,7 +54,7 @@ source" means it was read and not run. Nothing here was run on 5.2: 5.2 statemen
 ## Default recipe
 
 A tabbed page with a colour, a select, a dependent text field and an uploaded image. Run on 5.3.0 as shown, except
-the upload path (see "Stored files").
+the upload path and the `theme_config::load('mytheme')` form of the file URL, which were read (see "Stored files").
 
 ### settings.php
 
@@ -276,7 +276,7 @@ the layout (`moodle-theme-layouts-templates`), or print the value from a rendere
   below lists the names Boost reads.
 - **Right after saving, one page load can still show the old CSS.** Boost sets `$THEME->usefallback = true`, and
   the fallback copy is sent once while the new CSS builds (`public/theme/styles.php`, read in the source). Reload
-  before concluding that a setting has no effect.
+  before concluding that a setting has no effect; `moodle-theme-development` has the cache rules.
 
 ### Stored files
 
@@ -350,7 +350,7 @@ theme: a child does not redeclare them. See [versions/moodle-5.3.md](versions/mo
 | `[[setting:name]]` in SCSS or CSS | The placeholder reaches the browser as text | A variable from the pre-SCSS callback |
 | Default colour repeated in `settings.php`, PHP and SCSS | The copies drift; an empty setting gives a different colour from the stated default | Empty setting default, `!default` in SCSS |
 | HTML in a select or multicheckbox choice label | Shown escaped in the "Default:" line and mangled in admin search | Plain-text labels; HTML in the description |
-| `admin_setting_configtext` pattern with a modifier, such as `'/^\p{L}+$/u'` | Treated as an unknown parameter type; applying defaults fails during install | End the pattern with `/`: `'/(*UTF)^\p{L}+$/'` |
+| `admin_setting_configtext` pattern with a modifier, such as `'/^\p{L}+$/u'` | Not seen as a pattern, so `clean_param()` throws `coding_exception: Unknown parameter type` when the value is validated: while defaults are applied on install or upgrade, and on save (read) | End the pattern with `/`: `'/(*UTF)^\p{L}+$/'` |
 | A file setting created with a non-zero item id | URL returns 404 | Item id 0 |
 | New setting without a version bump | First option shown instead of the default; Save stores it | Bump the version; read with a fallback |
 | Renaming a setting by editing its name | Every site loses the saved value | An upgrade step that copies the value |

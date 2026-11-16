@@ -226,8 +226,10 @@ modal.getRoot().on(ModalEvents.save, (e) => {
   `ModalEvents.destroyed` bound on `modal.getRoot()` never fires: `destroy()` calls `this.root.remove()` (which unbinds
   jQuery handlers) and then triggers the event (`modal.js:1011-1012`, read 5.2 and 5.3). Test
   `modal.getRoot()[0].isConnected` where code must know the modal is gone. `ModalEvents.hidden` is triggered by
-  `hide()`, which `destroy()` calls before removing the root, so it should cover every close path (read in the
-  source, not run).
+  `hide()`, which `destroy()` calls before removing the root, so it covers every close path of a modal that has been
+  shown. `hide()` triggers it from the backdrop promise's callback, so on a modal destroyed before its first `show()`
+  finished the event can come after the root is removed and is lost (`modal.js:963-1013`, read 5.2 and 5.3, not
+  run).
 - `core/modal` traps focus and returns it to the opener (`returnElement`, else the active element at `show()`); the
   heading level and labelling rules are in `moodle-accessibility`.
 - A form in a modal: `core_form/modalform` with a `\core_form\dynamic_form` class. A dynamic form must

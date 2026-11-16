@@ -4,8 +4,8 @@ Read this when writing or reviewing `db/services.php`, `db/tasks.php`, `db/event
 `db/messages.php`, `db/install.php`, `db/uninstall.php` or an external function class.
 
 All samples are valid on Moodle 5.2 and 5.3. Each file starts with `<?php`, the GPL boilerplate, a file docblock
-and `defined('MOODLE_INTERNAL') || die();`. Which of these files need a version bump is in `SKILL.md`, mental
-model point 2: services, tasks, messages, caches, access and log do; events and hooks need only a cache purge.
+and `defined('MOODLE_INTERNAL') || die();`. A change to services, tasks, messages, caches, access or log takes
+effect only when a higher `$plugin->version` makes the upgrade run; events and hooks need only a cache purge.
 
 ## db/services.php and the external function class
 
@@ -70,8 +70,9 @@ class get_items extends external_api {
   until a version bump has run the upgrade.
 - `self::validate_context()` ends in `require_login()`. A function declared `'loginrequired' => false` must set
   `$PAGE->set_context()` itself instead, or anonymous callers are refused.
-- `validate_parameters()` rejects a value that cleaning would change, so free text declared `PARAM_TEXT` fails on
-  input such as `9.11 < 9.9`. Declare free text `PARAM_RAW` and escape it at every sink (`moodle-web-services`).
+- `validate_parameters()` rejects a value that cleaning would change (`invalid_parameter_exception`), so free text
+  declared `PARAM_TEXT` fails on input such as `if a<b then c>d`, where `strip_tags()` removes `<b then c>`.
+  Declare free text `PARAM_RAW` and escape it at every sink (`moodle-web-services`).
 - The course context check enforces enrolment. If the page this function backs is gated on ownership or another
   capability, gate the function the same way, or unenrolled owners get `requireloginerror`.
 
@@ -107,8 +108,9 @@ class cleanup extends \core\task\scheduled_task {
 
 - Check registration with `php admin/cli/scheduled_task.php --list | grep local_example` (core CLI, Moodle root).
 - An ad-hoc task extends `\core\task\adhoc_task`, carries data with `set_custom_data()`, the acting user with
-  `set_userid()`, and is queued with `\core\task\manager::queue_adhoc_task($task, true)`. **5.3+:** the return
-  value of that call changed (see `versions/moodle-5.3.md`); do not branch on it across branches.
+  `set_userid()`, and is queued with `\core\task\manager::queue_adhoc_task($task, true)`. Do not branch on the
+  return value: on 5.2 it is false when an identical task is already queued, and **5.3+:** it is the id of the
+  new or the existing task (`public/lib/classes/task/manager.php` of each).
 
 ## db/events.php
 
@@ -124,7 +126,8 @@ $observers = [
 - Observers are `internal` by default: they run inside the transaction that triggered the event. Declare
   `'internal' => false` for work that must run only after the commit (default read in
   `public/lib/classes/event/manager.php`, 5.3.0). PHPUnit on PostgreSQL wraps each test in a transaction, so
-  non-internal observers behave differently there (`moodle-phpunit-testing`).
+  a non-internal observer does not run inside a test there, while it runs at once on MySQL and MariaDB
+  (`moodle-phpunit-testing` has the fix).
 - Your own `course_deleted` observer runs in your tests too and may delete fixtures a test built.
 
 ## db/caches.php
@@ -141,6 +144,9 @@ $definitions = [
 
 - Each definition needs `$string['cachedef_items']` in the lang file; a missing one shows as `[[cachedef_items]]`
   on the cache admin page and is a review finding.
+- A definition that is not yet registered is found on first use, with a "Cache definitions reparsed causing cache
+  reset" `debugging()` notice that fails a test; an edited definition is read again only by the upgrade
+  (`public/cache/classes/factory.php`, 5.3.0). Bump the version for both.
 - Use: `$cache = \cache::make('local_example', 'items');`. For values computed once per request (for example a
   filter's resolved configuration per context), a request cache (`MODE_REQUEST`) removes repeated queries.
 

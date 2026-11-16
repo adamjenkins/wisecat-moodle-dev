@@ -10,8 +10,9 @@ on real plugins.
 
 `tests/generator/lib.php`, class `<component>_generator`, extending one of the bases in
 `public/lib/testing/generator/`: `component_generator_base` (any plugin), `testing_module_generator` (activities),
-`testing_block_generator` (blocks). The same class feeds Behat's `the following "<component> > <entity>" exist:`
-step (`moodle-behat-testing`).
+`testing_block_generator` (blocks). Behat's `the following "<component> > <entity>" exist:` step reaches the same
+`create_*()` methods through a second class, `tests/generator/behat_<component>_generator.php`, which maps entity
+names to them (`moodle-behat-testing`).
 
 ```php
 <?php
@@ -74,9 +75,11 @@ $item = $this->getDataGenerator()->get_plugin_generator('local_example')->create
   updates through `update_moduleinfo()` with data shaped like the form's, and drive the real form once in Behat.
   The generator also passes `intro`/`introformat`; a real form post uses `introeditor` (`['text' => ..., 'format' =>
   FORMAT_HTML, 'itemid' => $draftid]`). Seen in practice.
-- **Some module generators need a real user.** Workshop refuses the guest: call `$this->setAdminUser()` before
-  `create_module('workshop', ...)` ("No guests here!"). A workshop instance has two grade items, a ready fixture for
-  multi-grade-item code.
+- **Some module generators need a logged-in user.** The workshop generator calls `file_get_unused_draft_itemid()`
+  (`public/mod/workshop/tests/generator/lib.php`), which throws `noguest` ("No guests here!") for the guest and
+  for the not-logged-in user a test starts with. Fix: `$this->setAdminUser()` or `setUser()` before
+  `create_module('workshop', ...)`. A workshop instance has two grade items, a ready fixture for multi-grade-item
+  code.
 - **Generators append modules to the end of a section.** To test another order, set the sequence and rebuild:
 
   ```php
@@ -96,12 +99,15 @@ $item = $this->getDataGenerator()->get_plugin_generator('local_example')->create
 - `getDataGenerator()->enrol_user()` uses the course's single enrolment instance of that method and returns `false`
   without an error when there is none or more than one (`data_generator.php`, `enrol_user()`). Assert its return
   value when the course was not made by `create_course()`.
-- A capability override in a test must actually change something; see `assign_capability()` in the main file.
+- A capability override in a test must actually change something: `assign_capability()` does nothing when a row
+  already exists unless its fifth argument `$overwrite` is `true`. Assert the gate flipped before testing it.
 
 ## Quiz attempts
 
-- `mod_quiz_generator::create_attempt($quizid, $userid)` makes a preview attempt when the current `$USER` can preview
-  the quiz, and previews are ignored by `quiz_has_attempts()` and reports. Symptom: "the attempt exists but the
+- `mod_quiz_generator::create_attempt($quizid, $userid)` does not pass `$userid` on to
+  `quiz_prepare_and_start_new_attempt()` (`public/mod/quiz/tests/generator/lib.php`, 5.3.0), so the attempt belongs
+  to the current `$USER` and is a preview when that user can preview the quiz. Previews are ignored by
+  `quiz_has_attempts()` (`public/mod/quiz/locallib.php`) and by reports. Symptom: "the attempt exists but the
   report or lock does not see it". Fix: `$this->setUser($student)` around `create_attempt()` and
   `submit_responses()`, then switch back. Seen in practice.
 - Questions for the quiz go into a question bank you chose explicitly, normally a `mod_qbank` instance created in the
@@ -109,9 +115,11 @@ $item = $this->getDataGenerator()->get_plugin_generator('local_example')->create
 
 ## Grades
 
-- `\core\task\grade_cron_task` does nothing for courses whose course grade item has `needsupdate = 1`. In a synthetic
-  setup, call `grade_regrade_final_grades($course->id)` before running it. Seen in practice.
-- `get_gradable_users()` throws while a regrade is pending; regrade first in tests that call it.
+- `\core\task\grade_cron_task` (it locks grade items and grades whose lock time has passed) skips every course whose
+  course grade item has `needsupdate = 1` (`public/lib/classes/task/grade_cron_task.php`). In a synthetic setup,
+  call `grade_regrade_final_grades($course->id)` before running it. Seen in practice.
+- `get_gradable_users()` throws `gradesneedregrading` while a regrade is pending (`graded_users_iterator::init()`
+  calls `export_verify_grades()`, `public/grade/lib.php`); regrade first in tests that call it.
 
 ## Blocks
 

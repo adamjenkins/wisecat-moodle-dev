@@ -31,8 +31,9 @@ theme/mytheme/
     UPGRADE.md                          the list of upstream files to re-diff at each Moodle release
 ```
 
-The twin has the extension `.upstream`, so phpcs (which reads `*.php`) and the Mustache lint (which reads
-`*.mustache`) do not see it. Run on 5.3.0: both gates were clean with the twins in the repository. To keep the
+The twin has the extension `.upstream`, so phpcs and the Mustache lint do not see it: moodle-plugin-ci selects
+files named `*.php` (and passes `--extensions=php`) for the first and `*.mustache` for the second (read in its
+`CodeCheckerCommand` and `MustacheCommand`). Run on 5.3.0: both gates were clean with the twins in the repository. To keep the
 twins out of archives built with `git archive`, add `*.upstream export-ignore` to `.gitattributes`; shipping them
 is also fine.
 

@@ -1,6 +1,7 @@
 # Boost child themes on Moodle 5.3
 
-What is specific to Moodle 5.3 for a child of Boost, against the 5.2 baseline. Read from the 5.3.0 source and
+Read this when a Boost child targets Moodle 5.3, when a child written on 5.2 is moved to 5.3, or when checking
+what is announced for removal after 5.3. Read from the 5.3.0 source and
 `public/theme/boost/UPGRADING.md`; items marked "run" were seen in a Boost child on 5.3.0.
 
 ## version.php for a 5.3-only theme
@@ -28,7 +29,7 @@ $plugin->dependencies = ['theme_boost' => 2026100500];  // Boost as shipped with
 
 | In the child | What changed in 5.3 | Symptom | Fix |
 |---|---|---|---|
-| SCSS colour functions on Boost variables: `darken($state-success-bg, 5%)`, `rgba($dialogue-base-bg, .9)`, `mix($formlisting-bg, ...)` | `$state-*-bg`, `$state-*-border`, eleven `$dialogue-*` and about forty other Boost variables now hold `var(...)`; in the default preset so do `$card-bg` and `$card-border-color` | Compile error (a colour function given a `var()` string), so the site shows plain Boost | Compute from a literal colour of your own, set in `pre.scss` |
+| SCSS colour functions on Boost variables: `darken($state-success-bg, 5%)`, `rgba($dialogue-base-bg, .9)`, `mix($formlisting-bg, ...)` | about fifty variables in Boost's `scss/moodle/variables.scss` now hold `var(...)`, among them the eight `$state-*-bg` and `$state-*-border` and twelve `$dialogue-*`; none did on 5.2. In the default preset so do `$card-bg` and `$card-border-color` | Compile error (a colour function given a `var()` string), so the site shows plain Boost | Compute from a literal colour of your own, set in `pre.scss` |
 | A white page assumed | `$body-bg` is `$gray-100` in the default preset; the navbar lost its preset box-shadow | Panels that were invisible on white now show as white boxes on grey | Use `var(--bs-body-bg)`, or set `$body-bg` in `pre.scss` |
 | Copy of `templates/drawers.mustache` or `columns2.mustache` | `core/moremenu` became `core/secondarymoremenu`; the `drawerheadercontent` block of `theme_boost/drawer` was removed and `drawercontrols` added | The 5.2 copy still renders, with the legacy menu and without the course index expand/collapse control | Re-diff against the 5.3 file (`moodle-theme-layouts-templates`) |
 | Copy of `templates/navbar.mustache` | `core/moremenu` became `core/primarymoremenu`; a colour mode menu block was added | No switcher: where the site default is dark, a logged-in user cannot change it | Add `{{# output.colour_mode_menu }}{{{ . }}}{{/ output.colour_mode_menu }}`; it renders nothing on 5.2 |
@@ -78,5 +79,5 @@ long-term support release) in 7.0
 | AMD names `theme_boost/index` and `theme_boost/bootstrap/*` | 7.0 | `public/theme/boost/UPGRADING.md`; `public/theme/boost/classes/hook_listener.php` |
 | `user_*` functions of `user/lib.php` | 7.0 by the policy | root `UPGRADING.md`, 5.3 section |
 
-When 6.0 is added to this repository, what really happened goes in `versions/moodle-6.0.md`; this table records
-only what 5.3.0 announces.
+This table records only what 5.3.0 announces. What a later version really removed belongs in that version's
+notes.

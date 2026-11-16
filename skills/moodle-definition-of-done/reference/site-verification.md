@@ -19,7 +19,7 @@ php admin/cli/purge_caches.php
 - `upgrade.php` is needed after any `version.php` bump. Without a bump, a changed `install.xml`, `db/access.php`,
   `db/services.php`, `db/tasks.php` or `db/caches.php` is not re-read.
 - The purge rebuilds the class map cached in `$CFG->cachedir/core_component.php`
-  (`public/lib/classes/component.php:448`, 5.3.0). A new class file without a purge fails on the site with
+  (`core_component::init()`, `public/lib/classes/component.php`, 5.3.0). A new class file without a purge fails on the site with
   "class not found" while PHPUnit, which builds its own map, is green. The purge also drops compiled theme
   CSS, the language string cache and the template cache.
 - The web server user must be able to read every file. Repository files created with mode 0600 give
@@ -60,7 +60,7 @@ A check proves only what its success state uniquely renders.
   Another plugin on a development site can load a library, a string or a JavaScript module that yours relies on
   without declaring it.
 - Do not check filtered output while "logged in as" another user. During that session `require_login()` sets
-  `$CFG->forceclean` (`public/lib/moodlelib.php:2427-2432`, 5.3.0), so `format_text()` ignores `noclean` and
+  `$CFG->forceclean` (`public/lib/moodlelib.php`, 5.3.0), so `format_text()` ignores `noclean` and
   strips attributes before filters run, and the page differs from what that user really sees.
 
 ## CSS: arrival, then effect
@@ -91,8 +91,11 @@ purge or a theme revision change. Two levels of evidence:
    equal or higher specificity. To restyle a Bootstrap component, set its own custom properties from a selector
    that outranks it (`.btn.local-myplugin-share { --bs-btn-bg: var(--bs-primary); }`) rather than raising weight.
 
-- The first page load after a purge has been seen to serve the previous stylesheet; reload once before judging.
-  The cause was not confirmed from the source.
+- The first stylesheet request after a purge is answered with the previous CSS. When no compiled sheet is cached
+  and the theme sets `$THEME->usefallback` (Boost does),
+  `public/theme/styles.php` sends the last generated sheet, kept unversioned in `$CFG->tempdir/theme/<name>/`,
+  with no-cache headers and builds the new one afterwards (`theme_styles_fallback_content()`, 5.2 and 5.3.0, read
+  in the source). Reload once before judging.
 - A custom property that does not exist on the active theme resolves to its fallback or to nothing:
   `getComputedStyle(document.documentElement).getPropertyValue('--bs-body-bg')` returning `''` means it is
   undefined there.

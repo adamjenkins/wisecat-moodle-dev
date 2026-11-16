@@ -22,7 +22,7 @@ if (method_exists(\core\user::class, 'create_user')) {
 
 | 5.3 change | On 5.2 | What a 5.2 + 5.3 plugin does |
 |---|---|---|
-| `user/lib.php` functions deprecated for `\core\user::*` (`user_create_user()` to `\core\user::create_user()`, `user_update_user()`, `user_delete_user()`, `user_get_user_details()` and about 25 more), MDL-82650; the old functions now live in `public/lib/deprecatedlib.php` and emit a deprecation | Only the old functions exist | Guard as above; `--fail-on-warning` CI rejects the notice on the 5.3 row |
+| `user/lib.php` functions deprecated for `\core\user::*` (`user_create_user()` to `\core\user::create_user()`, `user_update_user()`, `user_delete_user()`, `user_get_user_details()` and about 20 more), MDL-82650; the old functions now live in `public/lib/deprecatedlib.php` and emit a deprecation | Only the old functions exist | Guard as above; `--fail-on-warning` CI rejects the notice on the 5.3 row |
 | Legacy global external classes (`\external_api`, `\external_value`, `\external_single_structure`, ...) deprecated | `\core_external\...` already exists (since 4.2) | Always `use core_external\...` |
 | Admin setting classes get namespaced names (`\admin_setting_configtext` is now an alias of `\core_admin\setting\setting\configtext`, `\admin_settingpage` of `\core_admin\setting\settingpage\settingpage`); "existing classes are currently unaffected" | Only the global names exist | Keep the global names |
 | `FEATURE_GROUPMEMBERSONLY` deprecated and no longer supported (MDL-83231) | Accepted | Remove the case from `<modname>_supports()` |

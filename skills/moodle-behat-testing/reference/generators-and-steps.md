@@ -77,7 +77,8 @@ What happens to each row (`generate_items()` in `public/lib/behat/classes/behat_
   code is strict.
 - The PHPUnit generator is loaded in a Behat process without the PHPUnit bootstrap, so it requires its own
   dependencies (`require_once($CFG->dirroot . '/local/example/locallib.php')`).
-- A new entity, or a new file, is unknown until Behat is initialised again (see the main file).
+- A new entity, or a new file, is unknown until Behat is initialised again (`init.php`), because the run reads
+  the copy of the plugin installed under the Moodle root.
 - **Rich text needs a format column.** A generator row with `intro` or `content` and no format can leave TinyMCE
   unattached in JavaScript scenarios. Pass `| introformat | 1 |` (`FORMAT_HTML`). Seen in practice.
 - Generators skip the form: data created this way never runs `mod_form` validation or the editor's draft file
@@ -215,7 +216,8 @@ A selector for your own widgets, used as `"<locator>" "local_example > <alias>"`
 | `css_element`, `xpath_element` | raw selectors, last resort | `I click on "[data-action='mark']" "css_element"` |
 
 The full list is in `public/lib/behat/classes/partial_named_selector.php` (5.2 and 5.3). Prefer a named selector
-to `css_element`: class names change between branches (see the 5.3 version notes), names and labels rarely do.
+to `css_element`: class names change between branches (the modal title is `h5.modal-title` on 5.2 and
+`h2.modal-title` on 5.3), names and labels rarely do.
 
 ## Built-in steps worth knowing
 

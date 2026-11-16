@@ -114,7 +114,7 @@ Purge caches once so the class autoloader sees the new file. No theme revision i
    `\core\output\core_renderer_maintenance`. Source: `renderer_factory_base.php` (`get_target_suffix()`),
    `theme_overridden_renderer_factory.php`, `public/lib/pagelib.php` (`get_renderer()`), 5.3.0 and 5.2.
 5. **Keep the parent's signature.** PHP raises a fatal error on an incompatible override, and a narrower one
-   breaks callers: `body_attributes()` is called with a string by some layouts and an array by others. Copy the
+   breaks callers: `body_attributes()` accepts a string or an array, and layouts pass either. Copy the
    signature from the class being extended on the lowest supported version; the public method signatures of
    `core_renderer` are the same in 5.2 and 5.3 except for one method added in 5.3 (compared with `diff`).
 6. **A renderer extending a class that no longer exists is a fatal error** when that renderer is requested.
@@ -146,10 +146,12 @@ argument. Add the method to the theme's `core_renderer` and call it with triple 
 {{{ output.mytheme_banner }}}
 ```
 
-A method name that does not exist renders as nothing, with no error (read in the source, not run as a negative
-test). This is how one template can serve two versions: `{{# output.colour_mode_menu }}{{{ . }}}{{/ output.colour_mode_menu }}`
-prints the switcher on 5.3 and nothing on 5.2. Prefix the theme's own methods with the theme name so a later core
-method of the same name cannot collide.
+A method name that does not exist renders as nothing, with no error: Mustache calls a name only when
+`method_exists()` is true (read in `public/lib/mustache/src/Context.php`, 5.3.0 and 5.2; not run as a negative
+test). A protected or private method passes that test and is then a fatal error, so keep such methods public.
+This is how one template can serve two versions:
+`{{# output.colour_mode_menu }}{{{ . }}}{{/ output.colour_mode_menu }}` prints the switcher on 5.3 and nothing on
+5.2. Prefix the theme's own methods with the theme name so a later core method of the same name cannot collide.
 
 ### Plugin and course format renderers
 
@@ -292,7 +294,7 @@ $THEME->iconsystem = '\\theme_mytheme\\output\\icon_system_fontawesome';
   `parents = ['middle', 'boost']`, a file in Boost's `pix_core` beats the same file in `middle`. Only the theme's
   own copy is certain to win. Source: `theme_config.php` (`resolve_image_location()`), 5.3.0 and 5.2.
 - A request for an image that does not exist is remembered until the next theme cache purge. Adding the file
-  afterwards changes nothing until the purge. Source: `public/theme/image.php`, 5.3.0.
+  afterwards changes nothing until the purge. Source: `public/theme/image.php`, 5.3.0 and 5.2.
 - **5.3+:** in dark mode Boost inverts only `<img>` icons whose URL contains `/t/`, `/e/`, `/a/` or one of three
   group icons. Any other image icon, including one a theme adds with a dark stroke, stays dark on a dark page.
   Map it to a glyph, or add a rule under `[data-bs-theme="dark"]`. Source:
@@ -341,7 +343,8 @@ exists; the same regions are Mustache templates with AMD modules.
 
 - `$OUTPUT` in a CLI script is `core_renderer_cli` (seen on 5.3.0), and a PHPUnit run is a CLI script too, so
   theme renderer and template overrides cannot be judged there. Load a page in a browser or assert on it in Behat;
-  in PHPUnit ask for `$PAGE->get_renderer('core', null, RENDERER_TARGET_GENERAL)` (read in the source, not run).
+  in PHPUnit ask for `$PAGE->get_renderer('core', null, RENDERER_TARGET_GENERAL)`: an explicit target is not
+  replaced by the CLI default (read in `get_target_suffix()`, 5.3.0 and 5.2; not run).
 - Assert the change the override predicts (the body class, the extra element) on a page that uses that layout,
   as the role that will see it. The theme Behat and PHPUnit recipes are in `moodle-theme-testing-release`.
 

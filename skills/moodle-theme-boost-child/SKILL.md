@@ -32,7 +32,7 @@ Source for all rows: `public/lib/classes/output/theme_config.php`, identical in 
 
 | Kind | What it covers | What the child does |
 |---|---|---|
-| Looked up through the parents, nearest first | layout files, layout table, Mustache templates, renderer classes, `scss`, `editor_scss`, `iconsystem`, region name strings | Nothing. Add a file or a key only to replace the parent's |
+| Looked up through the parents: the child, then the nearest parent that has it | layout files, layout table, Mustache templates, renderer classes, `scss`, `iconsystem`, region name strings; also `editor_scss`, images and fonts, where with two parents the farthest is asked before the nearer | Nothing. Add a file or a key only to replace the parent's |
 | Chained: every parent's runs, then the child's | `prescsscallback`, `extrascsscallback`, `precompiledcsscallback`, `sheets`, `javascripts` | Add only its own part. Never repeat Boost's |
 | Not inherited: the child's value or core's default | `rendererfactory`, `usefallback`, `requiredblocks`, `addblockposition`, `haseditswitch`, `usescourseindex`, `activityheaderconfig`, `yuicssmodules`, `removedprimarynavitems`, favicon | Restate Boost's value in `config.php` |
 
@@ -63,7 +63,7 @@ theme/example/                 (public/theme/example in the Moodle tree, or $CFG
   scss/example/pre.scss
   scss/example/post.scss
   pix/screenshot.png  pix/favicon.ico  pix/icon.svg
-  LICENSE                      GPL text in the root; moodle-theme-testing-release has the release rules
+  LICENSE                      GPL text in the root; moodle-plugin-release has the package rules
 ```
 
 ### version.php
@@ -236,7 +236,8 @@ $string['privacy:metadata'] = 'The Example theme does not store any personal dat
 
 `pluginname` and `choosereadme` are required (the theme selector shows both). Region names such as
 `region-side-pre` fall back to the parents' and then Boost's strings, so a child that adds no region needs none.
-Keep the keys in alphabetical order; the code checker enforces it.
+Keep the keys in alphabetical order: moodle-cs reports unordered keys as a warning
+(`moodle.Files.LangFilesOrdering`), which fails a CI run that allows no warnings.
 
 ### classes/privacy/provider.php
 
@@ -346,8 +347,9 @@ use one branch per Moodle version with `$plugin->supported = [503, 503]`, as the
   upstream against the new one. Mark copied PHP with a fixed phrase ("Modifications compared to the original").
 - Test for the feature, not the version: `class_exists(\theme_boost\colour_mode::class)` is true from 5.3.
   `$CFG->branch` still holds the old value while a core upgrade is running.
-- 47 of Boost's 52 `scss/moodle` partials differ between 5.2 and 5.3.0. A child selector that leans on Boost's
-  markup or specificity needs a look in a browser on each version.
+- 36 of the 52 `scss/moodle` partials Boost ships on 5.2 differ on 5.3.0, which also adds five (compared between
+  5.2.2 and 5.3.0). A child selector that leans on Boost's markup or specificity needs a look in a browser on
+  each version.
 
 What changed in Boost for 5.3, what a 5.2-era child must re-check, and the removals announced for 6.0 and 7.0 are
 in the version files below.
@@ -357,11 +359,11 @@ in the version files below.
 | Mistake | What happens | Fix |
 |---|---|---|
 | Leaving out `rendererfactory` | Core's `standard_renderer_factory` is used: the child's renderer classes are never loaded and Boost's `core_renderer` is skipped too, with no error | `$THEME->rendererfactory = 'theme_overridden_renderer_factory';` |
-| Leaving out `haseditswitch`, `usescourseindex`, `requiredblocks`, `activityheaderconfig`, `yuicssmodules` | In turn: old "Turn editing on" buttons return beside the switch; no course index drawer; Navigation and Administration blocks are forced onto every page; activity titles are printed twice; YUI reset CSS is loaded on every page | Restate all of them as in the recipe |
+| Leaving out `haseditswitch`, `usescourseindex`, `requiredblocks`, `activityheaderconfig`, `yuicssmodules` | In turn (read in the code that reads each key, not each reproduced): old "Turn editing on" buttons return beside the switch; no course index drawer; Navigation and Administration blocks are forced onto every page; activity titles are printed twice; YUI reset CSS is loaded on every page | Restate all of them as in the recipe |
 | Copying Boost's pre or extra SCSS code into the child's callbacks | Brand colour, raw SCSS and background rules are emitted twice | The child's callbacks add only the child's part |
 | Expecting Boost's saved settings to apply | Brand colour, raw SCSS and backgrounds vanish when the site switches to the child | Declare the same setting names under `theme_example` ([reference/boost-settings.md](reference/boost-settings.md)) |
 | An SCSS error anywhere in the stack | The page looks like plain Boost: core catches the error and serves the inherited precompiled Boost CSS, with a message only at developer debugging level (run on 5.3.0) | Turn on developer debugging, or look for "Error while compiling SCSS" in the PHP error log; `moodle-theme-scss` |
-| Judging a CSS change on the first load after a purge | The old design is shown once: with `usefallback = true` the previous sheet is served from the temp directory while the new one compiles (`public/theme/styles.php`, 5.3.0) | Reload once; or set `usefallback = false` while developing |
+| Judging a CSS change on the first load after a purge | The old design is shown once: with `usefallback = true` the previous sheet is served from the temp directory while the new one compiles (`public/theme/styles.php`, 5.3.0) | Reload once; or set `usefallback = false` while developing (`moodle-theme-development` has the cache rules) |
 | `$THEME->editor_scss = ['editor'];` with no `scss/editor.scss` in the child | Boost's editor styles are no longer used and the editor content is unstyled (read in the source) | Leave the key unset, or ship the file |
 | `@import "bootstrap/functions";` or any path into Bootstrap | Works on 5.2, "file not found" on 5.3, and then plain Boost (run on 5.3.0) | Import only the wrapper names `bootstrap`, `fontawesome`, `moodle`, or reuse Boost's preset as the recipe does |
 | Hard-coded light backgrounds or `prefers-color-scheme` | **5.3+:** when the admin enables colour modes in Boost's settings, every Boost descendant gets `data-bs-theme` on `<html>`; the child cannot opt out and shows light panels with light text | `--bs-*` custom properties, and `[data-bs-theme="dark"]` for exceptions |

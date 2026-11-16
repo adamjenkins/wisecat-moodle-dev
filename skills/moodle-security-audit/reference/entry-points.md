@@ -138,5 +138,6 @@ queued it, stored with the task. An adhoc task given `set_userid()` runs as that
 
 A filter's `filter()` runs on text written by any user and its output is not cleaned again. Build HTML with
 `html_writer` or a template, escape every value taken from the text, and never expand secrets (the sesskey,
-tokens) into the output. A filter is also on every page's hot path: `setup()` runs for every `format_text()` and
-`format_string()` call (`public/lib/classes/formatting.php`, 5.3.0), so it must not run per-call queries.
+tokens) into the output. A filter is also on every page's hot path: `setup()` runs for every `format_text()`
+call, and for every `format_string()` call on a site that filters all strings
+(`public/lib/classes/formatting.php`, 5.3.0), so it must not run per-call queries.

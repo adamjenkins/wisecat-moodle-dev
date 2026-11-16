@@ -29,8 +29,9 @@ each `db/` file. Supported versions: Moodle 5.2 (baseline) and 5.3.
    with the component, because they all share one PHP process and one database.
 2. **The numeric `$plugin->version` drives installation.** When it is higher than the value stored in
    `config_plugins`, the upgrade runs `db/upgrade.php` (or `db/install.xml` on a fresh install), then re-reads
-   `db/access.php`, `db/log.php`, `db/services.php`, `db/tasks.php`, `db/messages.php`, `db/tag.php` and
-   `db/caches.php` into the database (`upgrade_component_updated()`, `public/lib/upgradelib.php`, 5.3.0).
+   `db/access.php`, `db/log.php`, `db/services.php`, `db/tasks.php`, `db/messages.php` and `db/tag.php` into the
+   database (`upgrade_component_updated()`) and `db/caches.php` into the cache configuration
+   (`cache_helper::update_definitions()`; both in `public/lib/upgradelib.php`, 5.2 and 5.3).
    Edit one of those files without a bump and the upgrade prints "No upgrade needed"; nothing changes.
    `db/events.php` and `db/hooks.php` are read into the cache instead, so a cache purge picks them up.
 3. **`classes/` is autoloaded by namespace.** `\local_example\task\cleanup` is
@@ -83,12 +84,9 @@ $plugin->maturity  = MATURITY_STABLE;
   `release` changes only when you cut a release (`moodle-plugin-release`).
 - **`$plugin->dependencies`** takes the other plugin's `version` number, not `ANY_VERSION`, once your code
   calls something that plugin added: `['mod_quiz' => 2026042000]`.
-- **`LICENSE` sits in the plugin root and must reach the ZIP.** `moodle-plugin-ci validate` does not check it,
-  and a `.gitattributes` `export-ignore` line can drop it from a `git archive` build. The ZIP has one root folder
-  named after the plugin without its type (`example/`), never a GitHub-style `moodle-local_example-1.0.0/`:
-  core's validator compares the root with `clean_param($root, PARAM_PLUGIN)` and reports `rootdirinvalid`
-  (`public/lib/classes/update/validator.php`, read in 5.3.0). Build with
-  `git archive --format=zip --prefix=example/ -o local_example.zip v1.0.0`.
+- **`LICENSE` sits in the plugin root from the first commit.** `moodle-plugin-ci validate` does not check it and
+  the Plugins directory blocks approval without it. How the ZIP is built and checked (one root folder named
+  `example/`, the licence file inside it) is owned by `moodle-plugin-release`.
 
 ## db/install.xml and db/upgrade.php
 
@@ -214,7 +212,7 @@ patterns: [reference/settings-and-pages.md](reference/settings-and-pages.md).
   `modulename`/`modulenameplural`/`pluginadministration` for a `mod`. A missing one passes every automated gate
   and shows as `[[key]]` on the page.
 - `{$a}` versus `{$a->name}` must match what the caller passes; nothing checks it. Placeholder rules, multilang
-  and spelling: `moodle-field-lessons` (its `reference/output-and-lang-strings.md`).
+  and spelling: `moodle-field-lessons` (its output and lang strings reference).
 
 ## lib.php callbacks and hooks
 
@@ -301,7 +299,7 @@ Core CLI stays in `admin/cli/` at the Moodle root; the PHPUnit and Behat tools a
 | `$plugin->supported = [502];` | `coding_exception` on every plugin list | `[502, 502]` |
 | `CHAR NOTNULL="true" DEFAULT=""` | `debugging()` on fresh install only; CI install aborts | `NOTNULL="false"`, no default |
 | `install.xml` fixed, no upgrade step | Existing sites keep the old schema | Pair every schema change with a step |
-| No `LICENSE` in the root, or ZIP root `moodle-local_x-1.0.0/` | Plugins directory blocker; `rootdirinvalid` | `LICENSE` in root; `git archive --prefix=<name>/` |
+| No `LICENSE` in the root, or ZIP root `moodle-local_x-1.0.0/` | Plugins directory blocker; `rootdirinvalid` on install | `LICENSE` in root; build the ZIP as `moodle-plugin-release` says |
 | Helper `function render_x()` in a page script | Namespace collision blocker in review | Component prefix or a class |
 | Page with `require_login()` only | Any account can use it | `require_capability()` per page and action |
 | `PARAM_RAW` on a name or id | Review finding; unvalidated input | Narrowest `PARAM_*`, or a comment with the reason |

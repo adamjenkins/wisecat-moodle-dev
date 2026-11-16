@@ -73,9 +73,11 @@ completion and dates information.
 - A page can switch the header off for itself with `$PAGE->activityheader->disable()`. That is the plugin's
   decision, not the theme's, and it explains why a theme change "does nothing" on some activity pages. A module can
   also supply its own subclass, `mod_<name>\output\activity_header`, which `$PAGE` uses instead of core's.
-- A plugin page that shows a wide table inside a course does better on the `incourse` layout with the activity
-  header disabled than on `report`: on 5.3 the `report` layout put such a table under the course index drawer.
-  A theme that redefines these layouts should keep `incourse` free of side regions that narrow the content.
+- A plugin page that shows a wide table inside a course has been reported to sit better on the `incourse` layout
+  with the activity header disabled than on `report`, where on 5.3 the table ran under the course index drawer.
+  This is a field report, not explained by the source: Boost's `config.php` gives both layouts the same file
+  (`drawers.php`) and the same region on 5.3.0 and 5.2. Reproduce it on the page in question before changing a
+  layout because of it.
 
 Source: `public/lib/classes/output/activity_header.php`, `public/theme/boost/config.php`,
 `public/lib/pagelib.php` (`magic_get_activityheader()`).

@@ -8,17 +8,22 @@ need to limit what a token can do.
 An external client needs all of these on the site, in Site administration > Server > Web services (the "Overview"
 page there walks through them):
 
-1. Advanced features: "Enable web services" (`enablewebservices`). Without it every call fails with
-   "Web services are not enabled in Advanced features."
-2. The protocol enabled (Manage protocols: REST, SOAP). Without it: "You are not allowed to use the rest protocol".
+1. Advanced features: "Enable web services" (`enablewebservices`).
+2. The protocol enabled (Manage protocols: REST, SOAP). With either of these two off,
+   `webservice/rest/server.php` answers HTTP 403 with an empty body, and the file scripts (`upload.php`,
+   `pluginfile.php`) answer "Web services are not enabled in Advanced features."
 3. A service that contains the functions, enabled. A predefined service from `db/services.php` appears here after
-   the upgrade; enable it, or build a custom one.
+   the upgrade; enable it, or build a custom one. Otherwise "Web service is not available (it doesn't exist or
+   might be disabled)".
 4. If the service has `restrictedusers => 1`: the user added under Authorised users. Otherwise "The user is not
    allowed for this service".
-5. The user holds `webservice/rest:use` (or `webservice/soap:use`) and every capability the functions check.
+5. The user holds `webservice/rest:use` (or `webservice/soap:use`), otherwise "You are not allowed to use the rest
+   protocol (missing capability: webservice/rest:use)", and every capability the functions check.
 6. A token for that user and service.
 
-Error texts read in `public/webservice/lib.php` (5.3.0).
+These texts are the `debuginfo` of a `webservice_access_exception`: with debugging off the client sees only
+`accessexception`, "Access control exception". Read in `public/webservice/lib.php` and
+`public/webservice/rest/server.php` (5.3.0).
 
 ## Calling over REST
 
@@ -44,8 +49,9 @@ curl -s "$SITE/webservice/rest/server.php" \
   `debuginfo` (which names the failing key) is included only when the site has debugging on
   (`public/webservice/rest/locallib.php`, `generate_error()`, 5.3.0).
 - Without `moodlewsrestformat=json` the response is XML.
-- SOAP: `webservice/soap/server.php?wsdl=1&wstoken=...` gives the WSDL. XML-RPC is not in core on 5.2 or 5.3
-  (`public/webservice/` holds only `rest` and `soap`).
+- SOAP: `webservice/soap/server.php?wsdl=1&wstoken=...` gives the WSDL (`public/webservice/soap/locallib.php`
+  reads `wsdl` and `wstoken`, 5.3.0). XML-RPC is not in core on 5.2 or 5.3 (`public/webservice/` holds only `rest`
+  and `soap`).
 
 ## Getting a token
 

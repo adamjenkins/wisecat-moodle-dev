@@ -40,15 +40,16 @@ every branch in `$plugin->supported` before relying on one.
 ## Other task changes
 
 - `\core\task\manager::task_is_scheduled()` is deprecated; use `get_queued_adhoc_task_record()` (MDL-86422).
-- `\core\task\manager::set_scheduled_task_nextruntime()` now returns a bool, `false` when the task is running
-  (MDL-89200).
+- `\core\task\manager::set_scheduled_task_nextruntime()` returns a bool, `false` when the task is running
+  (MDL-89200). The method is not in the 5.2.2+ `manager.php`, so guard it with `method_exists()` in a plugin that
+  supports 5.2.
 - `queue_adhoc_task()` called from an upgrade step before the `identityhash` column exists queues a plain task
   without duplicate detection instead of failing (`manager.php` comment, MDL-89876).
 - Uninstalling a block plugin no longer deletes its instances synchronously: `\core\task\delete_block_instances_task`
   deletes them in batches from cron. A test or script that uninstalls a block and then counts `block_instances` must
   run ad-hoc tasks first (MDL-89289).
 - `adhoc_task::set_soft_retry_delay()` and `manager::adhoc_task_delayed()` are listed as new in 5.3's
-  `UPGRADING.md` (MDL-79763); the methods are also present in the 5.2.2+ source read for this skill.
+  `UPGRADING.md` (MDL-79763), and were also backported to 5.2.2. They are absent from 5.2.0 and 5.2.1.
 
 ## Caching
 

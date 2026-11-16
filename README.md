@@ -1,350 +1,168 @@
-# moodle-dev
+# wisecat-moodle-dev
 
-> The most complete Moodle development toolkit for AI coding assistants — skills, slash commands, and subagents that turn your assistant into a Moodle expert.
-> **Native plugin for [Claude Code](https://docs.anthropic.com/claude/docs/claude-code); ships with adapters for [Cursor](adapters/cursor/), [GitHub Copilot](adapters/copilot/), [Aider](adapters/aider/), [Continue](adapters/continue/), and a [paste-anywhere bundle](adapters/generic/PROMPTS.md).**
+Skills, slash commands and subagents that teach an AI coding assistant to build Moodle **plugins and themes** for
+Moodle 5.2 and 5.3. A native plugin for [Claude Code](https://code.claude.com/docs), with generated adapters for
+Cursor, GitHub Copilot, Aider, Continue and a paste-anywhere bundle.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](CHANGELOG.md)
-[![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-8A2BE2.svg)](https://docs.anthropic.com/claude/docs/claude-code)
-[![Cursor](https://img.shields.io/badge/Cursor-Rules-black.svg)](adapters/cursor/)
-[![Copilot](https://img.shields.io/badge/Copilot-Chatmodes-24292e.svg)](adapters/copilot/)
-[![Aider](https://img.shields.io/badge/Aider-Conventions-orange.svg)](adapters/aider/)
-[![Continue](https://img.shields.io/badge/Continue-Rules-blueviolet.svg)](adapters/continue/)
-[![Moodle 4.x](https://img.shields.io/badge/Moodle-4.x%20%7C%205.x-orange.svg)](https://moodledev.io)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+[![Moodle](https://img.shields.io/badge/Moodle-5.2%20%7C%205.3-orange.svg)](docs/SUPPORTED_VERSIONS.md)
 
-Scaffolds plugins, writes XMLDB upgrades, audits privacy/security, generates PHPUnit + Behat tests, builds AMD modules, reviews PRs — all following official Moodle coding standards (PSR-4, frankenstyle, MOODLE_INTERNAL, GPL headers, `get_string`, `$DB`).
+## What it is for
 
-> 🧭 **You are on the `wisecat/moodle-5.3` branch of a fork** ([adamjenkins/claude-moodle-dev](https://github.com/adamjenkins/claude-moodle-dev), from [SaadRahman01/claude-moodle-dev](https://github.com/SaadRahman01/claude-moodle-dev)). It adds **Moodle 5.3** coverage (based on 5.3beta, to be re-checked at 5.3.0) and six extra skills: `moodle-5-3-changes`, `moodle-field-lessons`, `moodle-release-preflight`, `moodle-ci-matrix`, `moodle-definition-of-done` and `moodle-plugin-release`. **To install this branch in Claude Code you must name the branch**. Without it you get the default branch, which has none of this. See [Install → this branch](#claude-code-this-forks-moodle-53-branch).
+A capable model already knows PHP and the outline of Moodle. What it gets wrong is the detail that passes a code
+check and fails on a real site: a child theme that silently loses its renderer overrides, an SCSS error that
+quietly serves stock Boost, a release that CI passes and a Plugins directory reviewer sends back for a missing
+licence file. These skills carry that detail: the rule, what you see when it is ignored, the fix, and where in
+Moodle's source it comes from.
 
----
+- **25 skills** that load themselves when the task matches.
+- **10 slash commands** for common jobs.
+- **2 subagents**: a reviewer and a scaffolder.
 
-## Why this plugin
+## How the skills are built
 
-Claude already knows PHP. It does **not** know:
-- Moodle's frankenstyle conventions (`local_<name>`, `mod_<name>`, `block_<name>`, ...)
-- XMLDB editor workflow + `upgrade_plugin_savepoint` rules
-- Privacy API contracts (`null_provider` vs `request\plugin\provider`)
-- Capability + sesskey + `require_login` security pattern
-- Moodle 4.4+ Hooks API vs legacy `lib.php` callbacks
-- `pluginfile.php` file-serving callback
-- Behat + PHPUnit Moodle harness (`resetAfterTest`, generators, tags)
-- AMD/RequireJS + grunt build
-- Mobile app remote templates + `get_remote_addons`
+- Each `SKILL.md` is at most 400 lines and holds what most tasks need.
+- Detail lives in `reference/` files beside it. Each one is listed with the condition under which to read it, so
+  the model opens it only then.
+- What is specific to one Moodle version lives in `versions/moodle-X.Y.md`. Adding a Moodle version means adding
+  files, not rewriting skills: see [docs/SUPPORTED_VERSIONS.md](docs/SUPPORTED_VERSIONS.md).
+- A claim says how it was obtained where that matters: run on a real site, or read in the source.
 
-This plugin teaches Claude all of it. Auto-activates when Claude detects Moodle work.
-
----
+The full contract is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Install
 
-### Claude Code: this fork's Moodle 5.3 branch
-
-The plugin is served from the marketplace's own git checkout (`"source": "./"` in `.claude-plugin/marketplace.json`). **The branch Claude Code clones is therefore the branch you get.** Pin it with `#<branch>`:
+### Claude Code
 
 ```
-/plugin marketplace add adamjenkins/claude-moodle-dev#wisecat/moodle-5.3
-/plugin install moodle-dev@moodle-dev
+/plugin marketplace add adamjenkins/wisecat-moodle-dev
+/plugin install wisecat-moodle-dev@wisecat-moodle-dev
 ```
 
-From a shell, quote the argument so `#` isn't read as a comment:
-
-```bash
-claude plugin marketplace add 'adamjenkins/claude-moodle-dev#wisecat/moodle-5.3'
-claude plugin install moodle-dev@moodle-dev
-```
-
-The full clone URL works too: `https://github.com/adamjenkins/claude-moodle-dev.git#wisecat/moodle-5.3`. Leaving out `#wisecat/moodle-5.3` installs the default branch, which has **no** 5.3 content.
-
-**Already have the upstream plugin installed?** Both marketplaces are named `moodle-dev`, and Claude Code allows only one marketplace per name. Remove the old one first:
+From a local clone:
 
 ```
-/plugin marketplace remove moodle-dev
-/plugin marketplace add adamjenkins/claude-moodle-dev#wisecat/moodle-5.3
-/plugin install moodle-dev@moodle-dev
+/plugin marketplace add /absolute/path/to/wisecat-moodle-dev
+/plugin install wisecat-moodle-dev@wisecat-moodle-dev
 ```
 
-**Check it worked:** `/plugin list` shows `moodle-dev@moodle-dev`, and the skill list includes `moodle-5-3-changes`. Nineteen skills in total; upstream has thirteen.
+Check with `/plugin list`. After pulling new commits, run `/reload-plugins`.
 
-**Getting later commits from the branch:** `claude plugin update` compares version numbers, and commits on this branch don't always bump the version. It may answer "already at the latest version" while the branch has moved on. To be sure you have the latest commit, refresh the marketplace and reinstall:
-
-```
-/plugin marketplace update moodle-dev
-/plugin uninstall moodle-dev@moodle-dev
-/plugin install moodle-dev@moodle-dev
-```
-
-**For a whole team or project,** declare the pinned marketplace in `.claude/settings.json`:
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "moodle-dev": {
-      "source": {
-        "source": "github",
-        "repo": "adamjenkins/claude-moodle-dev",
-        "ref": "wisecat/moodle-5.3"
-      }
-    }
-  }
-}
-```
-
-**Working on the skills themselves?** Use a local clone that has the branch checked out. A local-directory marketplace loads the plugin in place from the working tree. Whatever branch is checked out is what Claude sees, and edits apply at the next session start or `/reload-plugins`.
-
-```bash
-git clone -b wisecat/moodle-5.3 https://github.com/adamjenkins/claude-moodle-dev.git
-# then, in Claude Code:
-/plugin marketplace add /absolute/path/to/claude-moodle-dev
-/plugin install moodle-dev@moodle-dev
-```
-
-After a `git pull` (or a `git switch` to another branch), run `/reload-plugins`.
-
-The non-Claude adapters (`install.sh`, below) copy from your checkout too, so clone with `-b wisecat/moodle-5.3` before running them.
-
-### Claude Code: upstream (native plugin)
-
-```
-/plugin marketplace add https://github.com/SaadRahman01/claude-moodle-dev
-/plugin install moodle-dev@moodle-dev
-```
-
-(If `git@github.com` SSH auth fails, use the full `https://` URL as shown above.)
-
-Local dev: `/plugin marketplace add /absolute/path/to/claude-moodle-dev`.
-Verify: `/plugin list`.
-
-### One-liner installer (any non-Claude assistant)
+### Other assistants
 
 ```
 ./install.sh <cursor|copilot|aider|continue|generic> [--dest <path>]
 ```
 
-Defaults to current directory. Or copy manually as below.
+The default destination is the current directory. Each target also receives `moodle-skill-files/`: the reference
+and version files the skills link to.
 
-### Cursor
+| Assistant | What is installed |
+|---|---|
+| Cursor | `.cursor/rules/*.mdc`: each skill is a rule attached to PHP, Mustache, JavaScript, SCSS and CSS files |
+| GitHub Copilot | `.github/copilot-instructions.md`, a chat mode per skill, a prompt file per command |
+| Aider | `CONVENTIONS.md`, with skills and commands under `.aider/` to load with `/read-only` |
+| Continue | `.continue/config.yaml`, rules and prompts |
+| Anything else | `MOODLE_PROMPTS.md`: one file with every skill, agent and command |
 
-Copy `adapters/cursor/.cursor/` into your project (or `~/.cursor/` for global use). Each skill becomes an on-demand rule; agents and commands surface via `@<name>` mentions in chat.
+## Skills
 
-### GitHub Copilot
+### Themes
 
-Copy `adapters/copilot/.github/` into your repo. `copilot-instructions.md` is applied to every chat in the repo; per-skill chatmodes appear in the chat-mode picker.
+| Skill | Use it for |
+|---|---|
+| `moodle-theme-development` | Start here. How Moodle loads and chooses a theme, `config.php` keys, parents, caches, and which sibling skill to use |
+| `moodle-theme-boost-child` | Building a child of Boost, or a grandchild such as a child of Boost Union |
+| `moodle-theme-scss` | SCSS, Bootstrap variables, design tokens, dark mode, right-to-left, fonts, editor styles |
+| `moodle-theme-layouts-templates` | Layouts, block regions, Mustache overrides, and the parts of 5.3 that React renders |
+| `moodle-theme-renderers-output` | Renderer overrides, hooks from a theme, icons and images |
+| `moodle-theme-settings` | The theme settings page, and settings that feed SCSS and templates |
+| `moodle-theme-testing-release` | PHPUnit and Behat for a theme, accessibility checks, CI, packaging and submission |
 
-### Aider
+### Plugins
 
-Drop `adapters/aider/CONVENTIONS.md` into your project root and add it to `.aider.conf.yml`:
+| Skill | Use it for |
+|---|---|
+| `moodle-plugin-development` | Creating or changing any plugin type |
+| `moodle-field-lessons` | Pitfalls that pass the checks and break on a real site |
+| `moodle-web-services` | External functions and web services |
+| `moodle-hooks-api` | Hooks: listening, dispatching, replacing `lib.php` callbacks |
+| `moodle-amd-javascript` | JavaScript modules, modals, templates, the editor |
+| `moodle-accessibility` | WCAG 2.2 AA in plugin UI |
+| `moodle-mobile-app` | Moodle app support |
+| `moodle-performance` | Caching, queries, background tasks |
+| `moodle-privacy-gdpr` | The privacy provider |
+| `moodle-security-audit` | Security review of plugin code |
 
-```yaml
-read:
-  - CONVENTIONS.md
-```
+### Testing, release and upgrades
 
-Load individual skills on demand with `/read-only adapters/aider/skills/<name>.md`.
+| Skill | Use it for |
+|---|---|
+| `moodle-phpunit-testing` | PHPUnit tests |
+| `moodle-behat-testing` | Behat acceptance tests |
+| `moodle-ci-matrix` | A `moodle-plugin-ci` workflow with a checked Moodle, PHP and database matrix |
+| `moodle-definition-of-done` | The checklist before calling work complete |
+| `moodle-release-preflight` | The defects that reviews catch after CI is green |
+| `moodle-plugin-release` | Versions, release notes, the package, tagging and the Plugins directory |
+| `moodle-upgrade-migration` | Moving a plugin to a newer Moodle or PHP |
+| `moodle-5-3-changes` | What Moodle 5.3 removed, moved, deprecated and added |
 
-### Continue.dev
-
-Copy `adapters/continue/` into `~/.continue/` (merge with existing `config.yaml`). Skills load as rules; commands appear as slash prompts.
-
-### Any other assistant
-
-Paste relevant sections from [`adapters/generic/PROMPTS.md`](adapters/generic/PROMPTS.md) — it's one self-contained markdown file with every skill, agent, and command. Works with anything that takes a system prompt.
-
----
-
-## What's inside
-
-### Skills (auto-activate)
-
-| Skill | Triggers on |
-|-------|-------------|
-| `moodle-plugin-development` | Creating/modifying any plugin (all types) |
-| `moodle-phpunit-testing` | Writing/running PHPUnit tests |
-| `moodle-behat-testing` | Writing/running Behat acceptance tests |
-| `moodle-amd-javascript` | AMD modules, ES6, grunt build |
-| `moodle-web-services` | REST/AJAX/external functions, tokens |
-| `moodle-security-audit` | Security review, capability/sesskey audit |
-| `moodle-privacy-gdpr` | Privacy provider, GDPR compliance |
-| `moodle-performance` | MUC caching, query tuning, ad-hoc tasks |
-| `moodle-accessibility` | WCAG 2.1 AA, ARIA, screen reader checks |
-| `moodle-theme-development` | Boost child themes, SCSS, layouts |
-| `moodle-upgrade-migration` | Cross-version upgrades, deprecations |
-| `moodle-mobile-app` | Mobile app remote templates, addons |
-| `moodle-hooks-api` | 4.4+ Hooks API: authoring, listening, migrating magic callbacks |
-| `moodle-5-3-changes` | Upgrading to / targeting Moodle 5.3 (beta-based): breaking changes, deprecations, full catalogue |
-| `moodle-field-lessons` | Non-obvious pitfalls learned from shipping real plugins |
-| `moodle-release-preflight` | Pre-release security/quality checklist of commonly caught defect classes |
-| `moodle-ci-matrix` | moodle-plugin-ci workflow with a verified Moodle × PHP × DB matrix |
-| `moodle-definition-of-done` | Definition-of-done checklist before calling plugin work complete |
-| `moodle-plugin-release` | Version/release numbers, release notes, tagging, Plugins directory publishing |
-
-### Slash commands
+## Slash commands
 
 | Command | What it does |
-|---------|--------------|
-| `/moodle-new-plugin` | Scaffold a new plugin (asks type + name) |
-| `/moodle-bump-version` | Bump `version.php` + add upgrade step |
-| `/moodle-privacy-audit` | Check privacy provider correctness |
-| `/moodle-security-review` | Run security checklist on a file/plugin |
-| `/moodle-string-check` | Find hard-coded English needing `get_string` |
-| `/moodle-codestyle` | Run `phpcs` with Moodle ruleset |
-| `/moodle-mustache-lint` | Lint Mustache templates: a11y, security, hard-coded strings |
-| `/moodle-capability-audit` | Cross-check `db/access.php` against runtime `has_capability` use |
+|---|---|
+| `/moodle-new-plugin` | Scaffold a plugin |
+| `/moodle-new-theme` | Scaffold a Boost child theme |
+| `/moodle-theme-check` | Check a theme against the theme skills' common mistakes |
+| `/moodle-bump-version` | Bump `version.php` and add an upgrade step |
+| `/moodle-privacy-audit` | Check the privacy provider against the schema |
+| `/moodle-security-review` | Run the security checklist on a file or plugin |
+| `/moodle-capability-audit` | Compare `db/access.php` with the capability checks in the code |
+| `/moodle-string-check` | Find hard-coded English |
+| `/moodle-codestyle` | Run `phpcs` with the Moodle standard and fix what it reports |
+| `/moodle-mustache-lint` | Lint Mustache templates, including theme overrides |
 
-### Subagents
+## Subagents
 
-| Agent | Use case |
-|-------|----------|
-| `moodle-reviewer` | Deep PR review against Moodle coding standards |
-| `moodle-scaffolder` | Generates a plugin skeleton from a brief |
+| Agent | Use it for |
+|---|---|
+| `moodle-reviewer` | A review of a plugin, theme or diff: standards, security, privacy, strings, versions, tests |
+| `moodle-scaffolder` | A complete plugin or Boost child theme skeleton from a short brief |
 
----
+Example prompts: [EXAMPLES.md](EXAMPLES.md).
 
-## Example: from prompt to plugin
+## Moodle versions
 
-**You:**
-
-> Build a `local_attendance_export` plugin that lets teachers export per-course attendance as CSV. Needs a capability, a settings page, and a CLI script.
-
-**Claude (with this plugin loaded) generates:**
-
-```
-local/attendance_export/
-├── version.php                            # 2026050200, requires 2024042200
-├── settings.php                           # admin_setting_configtext for default delimiter
-├── lib.php                                # local_attendance_export_extend_navigation()
-├── cli/export.php                         # require($CFG->libdir . '/clilib.php'); cli params
-├── classes/
-│   ├── exporter.php                       # business logic, uses $DB
-│   ├── output/renderer.php
-│   └── privacy/provider.php               # null_provider (no user data stored)
-├── db/
-│   ├── access.php                         # local/attendance_export:export
-│   └── install.xml                        # (empty — no tables)
-├── lang/en/local_attendance_export.php    # pluginname, capability, settings strings
-└── tests/exporter_test.php                # PHPUnit, resetAfterTest, generator
-```
-
-Every file follows Moodle conventions. `require_capability` + `require_sesskey` wired. PHPUnit test uses `$this->getDataGenerator()`. Privacy provider declared. `version.php` bumped correctly.
-
----
-
-## Example prompts
-
-See [EXAMPLES.md](EXAMPLES.md) for 30+ prompts covering scaffolding, upgrades, testing, security audits, performance tuning, theme work, and mobile app integration.
-
----
-
-## Comparison
-
-|  | Vanilla Claude | + moodle-dev |
-|--|----------------|--------------|
-| Knows frankenstyle naming | partial | yes |
-| Bumps `version.php` correctly | no | yes |
-| Adds `upgrade_plugin_savepoint` | no | yes |
-| Writes privacy provider | rarely | always |
-| Adds `require_sesskey` on POST | no | yes |
-| Uses `$DB` not raw SQL | partial | yes |
-| Uses `get_string()` not English literals | no | yes |
-| Generates passing PHPUnit + Behat | no | yes |
-| Knows Moodle 4.4 Hooks API | no | yes |
-| Generates `pluginfile.php` callback | no | yes |
-| Mobile app remote templates | no | yes |
-
----
+Moodle 5.2 and 5.3. Earlier versions appear only where a plugin moving up from them needs to know what changed.
+[docs/SUPPORTED_VERSIONS.md](docs/SUPPORTED_VERSIONS.md) explains how a version is added or dropped.
 
 ## Repository layout
 
 ```
-.claude-plugin/         # Claude Code plugin manifest
-skills/                 # canonical skills (Claude reads these directly)
-agents/                 # canonical subagents
-commands/               # canonical slash commands
-
-adapters/               # generated per-assistant — DO NOT hand-edit
-  cursor/.cursor/rules/*.mdc
-  copilot/.github/copilot-instructions.md + chatmodes/*.chatmode.md
-  aider/CONVENTIONS.md + skills/ + commands/
-  continue/config.yaml + rules/ + prompts/
-  generic/PROMPTS.md    # paste-anywhere single-file bundle
-
-scripts/build-adapters.py   # regenerates adapters/ from canonical files
-install.sh                  # one-liner adapter installer for non-Claude assistants
-tests/run.sh                # structural test harness (run before commit)
-docs/ADAPTER_AUTHORING.md   # how to add a new assistant
-.githooks/pre-commit        # phpcs + PHPUnit + version.php monotonicity (install: git config core.hooksPath .githooks)
-.github/workflows/lint.yml     # CI: JSON, frontmatter, adapter sync, links, spellcheck, actionlint
-.github/workflows/release.yml  # tag-driven release: bundle + changelog extraction + GH release
-.github/CODEOWNERS          # auto-review routing
-.github/dependabot.yml      # weekly GitHub Actions updates
-SECURITY.md                 # vulnerability disclosure policy
+.claude-plugin/              plugin and marketplace manifests
+skills/<name>/SKILL.md       the skill
+skills/<name>/reference/     detail, read on a stated condition
+skills/<name>/versions/      what is specific to one Moodle version
+agents/  commands/           subagents and slash commands
+adapters/                    generated for other assistants: never edit by hand
+scripts/build-adapters.py    regenerates adapters/
+tests/run.sh                 structural checks; run before committing
+docs/                        supported versions, adapter authoring
 ```
 
-### Editing workflow
+To change something: edit under `skills/`, `agents/` or `commands/`, run `python3 scripts/build-adapters.py`, then
+`tests/run.sh`, and commit both the source and `adapters/`.
 
-1. Edit canonical files under `skills/`, `agents/`, or `commands/`.
-2. Run `python3 scripts/build-adapters.py` to regenerate adapters.
-3. Commit both. CI fails if `adapters/` drifts from canonical source.
+## Licence
 
----
-
-## Compatibility
-
-| Moodle | Status |
-|--------|--------|
-| 5.3    | supported on this branch: `moodle-5-3-changes` plus 5.3 notes in every skill. Based on 5.3beta (Build 20260916): PHP 8.3 min, MariaDB 11.4 / PostgreSQL 17 / MySQL 8.4, upgrade from 4.4+, React navigation, dark colour mode. Re-check at 5.3.0 |
-| 5.2    | supported (PHP 8.3 min, `/public` doc-root, React core, Oracle dropped — releases 2026-04-20) |
-| 5.1    | supported (PHP 8.2 min, `/public` doc-root introduced, Routing Engine) |
-| 5.0    | supported |
-| 4.5    | supported (LTS) |
-| 4.4    | supported (Hooks API) |
-| 4.3    | supported (legacy callbacks) |
-| 4.2    | supported (`core_external` namespace) |
-| ≤ 4.1  | best-effort (older external_api) |
-
-PHP support: 8.1+ for Moodle 4.x, 8.2+ for 5.0/5.1, 8.3+ for 5.2. PHP 8.4 tested on 5.1+. Some skills note Moodle-version-specific differences.
-
----
-
-## Roadmap
-
-- [ ] `moodle-question-bank` skill (qtype/qbank deeper coverage)
-- [ ] `moodle-h5p` skill
-- [ ] `moodle-lti-tool` skill (LTI 1.3 tool/provider)
-- [ ] `moodle-analytics` skill (analytics models)
-- [ ] `moodle-cli-script` slash command
-- [ ] `moodle-translation-export` slash command
-- [ ] MCP server wrapping `moodledev.io` docs search
-- [ ] MCP server for live Moodle dev instance (XMLDB editor, purge caches)
-
-Vote / request: [open an issue](https://github.com/SaadRahman01/claude-moodle-dev/issues/new/choose).
-
----
-
-## Contributing
-
-PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Quick path:
-
-1. Fork
-2. Add a skill: `skills/<name>/SKILL.md` with `name` + `description` frontmatter
-3. Add a command: `commands/<name>.md` with frontmatter
-4. Add an agent: `agents/<name>.md` with frontmatter
-5. PR — CI lints JSON + frontmatter automatically
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
-
-Code Claude generates with these skills should ship as **GPL-3.0-or-later** to be Moodle plugin directory compatible.
-
----
+MIT: see [LICENSE](LICENSE). Code written with these skills for Moodle should itself be GPL v3 or later, as the
+Moodle Plugins directory requires.
 
 ## Credits
 
-Built by [Saad Rahman](https://github.com/SaadRahman01). 
-Moodle 5.3 branch (`wisecat/moodle-5.3`) and the field-lessons and release skills maintained in the [adamjenkins/claude-moodle-dev](https://github.com/adamjenkins/claude-moodle-dev) fork. 
-Powered by [Claude Code](https://docs.anthropic.com/claude/docs/claude-code) and the [Moodle Developer Documentation](https://moodledev.io).
+This repository started from [moodle-dev](https://github.com/SaadRahman01/claude-moodle-dev) by Saad Rahman (MIT),
+whose skills, commands, agents and adapter generator are its foundation. The theme skills, the reference and
+version file structure, and the field rules were added here by Adam Jenkins.
 
-If this saves you time, ⭐ the repo — helps others find it.
+Built on the [Moodle Developer Documentation](https://moodledev.io) and the Moodle source.

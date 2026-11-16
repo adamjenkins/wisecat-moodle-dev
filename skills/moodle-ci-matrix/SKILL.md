@@ -1,6 +1,6 @@
 ---
 name: moodle-ci-matrix
-description: Use when adding or updating a GitHub Actions workflow that runs moodle-plugin-ci for a Moodle plugin (.github/workflows/ci.yml from gha.dist.yml), choosing its Moodle branch x PHP x database matrix, or when CI fails at "Initialize containers", at moodle-plugin-ci install, with "PHP version must be at least", an empty DB in a job, an artifact-name error, "No PHPUnit tests to run, free pass!", or green while the Plugins directory still rejects the plugin. Covers the upstream template and its steps, reading each branch's environment.xml and core push.yml, service image pins and health checks, include/exclude pitfalls, non-blocking rows for main, running the pipeline locally as written, secrets in logs, optional PHP extensions, and what a green run does not check. Skip when running PHPUnit or Behat locally with no workflow involved (moodle-phpunit-testing, moodle-behat-testing) or for theme-specific CI (moodle-theme-testing-release).
+description: Use when adding or updating a GitHub Actions workflow that runs moodle-plugin-ci for a Moodle plugin (.github/workflows/ci.yml from gha.dist.yml), choosing its Moodle branch x PHP x database matrix, or when CI fails at "Initialize containers", at moodle-plugin-ci install, with "requires at least PHP", an empty DB in a job, an artifact-name error, "No PHPUnit tests to run, free pass!", or green while the Plugins directory still rejects the plugin. Covers the upstream template and its steps, reading each branch's environment.xml and core push.yml, service image pins and health checks, include/exclude pitfalls, non-blocking rows for main, running the pipeline locally as written, secrets in logs, optional PHP extensions, and what a green run does not check. Skip when running PHPUnit or Behat locally with no workflow involved (moodle-phpunit-testing, moodle-behat-testing) or for theme-specific CI (moodle-theme-testing-release).
 ---
 
 # Moodle plugin CI matrix (moodle-plugin-ci on GitHub Actions)
@@ -13,16 +13,17 @@ breakage comes from the matrix, a Moodle branch paired with a PHP or database ve
 and from believing a green run proves more than it does. Verify every combination against a source.
 
 How sure each statement is: the moodle-plugin-ci statements were read in the 4.5.11 source; branch requirements were
-read in the 5.2 and 5.3.0 trees (`public/admin/environment.xml`, `.github/workflows/push.yml`); the workflow below was
-written for a plugin supporting 5.2 and 5.3 and has not been run for this skill. "Seen in practice" marks failures
-observed on real plugin workflows.
+read in the 5.2 and 5.3.0 trees (`public/admin/environment.xml`, `.github/workflows/push.yml`); the template's
+steps and images are as published with moodle-plugin-ci 4.5.11, so compare them with the file you fetch; the
+workflow below was written for a plugin supporting 5.2 and 5.3 and has not been run for this skill. "Seen in
+practice" marks failures observed on real plugin workflows.
 
 ## When to Use
 
 - Adding `.github/workflows/ci.yml` (or `moodle-ci.yml`) to a plugin repository
 - Adding or dropping a Moodle branch, PHP version or database in an existing matrix
-- CI fails at "Initialize containers", at `moodle-plugin-ci install`, or with an environment check error such as
-  "PHP version must be at least ..."
+- CI fails at "Initialize containers", at `moodle-plugin-ci install`, or with a requirement error such as
+  "Moodle 5.2 or later requires at least PHP 8.3.0" (`public/lib/phpminimumversionlib.php`)
 - Adding a non-blocking row for Moodle `main` (the next release, in development)
 - Deciding whether a green run is enough before a Plugins directory submission
 - **Skip when:** running PHPUnit or Behat locally with no workflow involved (`moodle-phpunit-testing`,
@@ -169,11 +170,12 @@ you push: parse the YAML and apply GitHub's documented rules with a short script
   minimum version, and one that is too old fails the newer branch. When one image must serve every row, pin the
   lowest version that satisfies every branch; when branches differ (5.2 and 5.3 do), make the image a matrix value
   with a default, as above.
-- The upstream template's floating `postgres:17` and `mariadb:11` images are newer than the minimum for 5.2. Pin
-  them explicitly.
+- The upstream template's `postgres:17` and floating `mariadb:11` images (as published with 4.5.11) are newer
+  than the minimum for 5.2. Pin them explicitly.
 - **Health check:** MariaDB 11.x images do not ship `mysqladmin`, so `--health-cmd="mysqladmin ping"` never reports
   healthy and the job dies at "Initialize containers". Use `healthcheck.sh --connect --innodb_initialized` (as
-  above) or `mariadb-admin ping`. Seen in practice.
+  above) or `mariadb-admin ping`. Seen in practice on 11.x; that `mariadb:10.11` ships the same script was not
+  re-checked for this skill, so watch the first 5.2 MariaDB row.
 - Before changing any matrix key, grep the workflow for every `matrix.` consumer: the service images, `setup-php`,
   the install env and artifact names all read it.
 
@@ -219,7 +221,8 @@ coming back:
   `.mustachelintignore` next to the template skips only HTML validation, not the rest.
 - Lang strings sorted by key, and no PHP other than `$string['id'] = 'value';` in the lang file (phpcs
   `moodle.Files.LangFilesOrdering`).
-- A trailing blank line or a tab in a `.feature` file fails gherkinlint in the Grunt step.
+- A blank line after the last step, trailing spaces or wrong indentation in a `.feature` file fails gherkinlint in
+  the Grunt step (`moodle-behat-testing` has the shape core's `.gherkin-lintrc` enforces).
 - Bootstrap 4 class names (`mr-2`, `sr-only`, `font-weight-bold`) in templates or in markup built by JavaScript fail
   every JavaScript Behat step under `--scss-deprecations` on 5.2 and 5.3. Seen in practice.
 - `amd/build` rebuilt with the Node version and grunt of the branch the Grunt step runs on (Node `>=22.11.0 <23`
@@ -247,7 +250,8 @@ coming back:
 
 - **A code path behind an optional PHP extension runs only where the extension is loaded.** A runner's PHP can load
   extensions a local site lacks (Imagick, for example), so an `extension_loaded('imagick')` branch that a GD-only
-  local site skips runs on every CI row and fails there first. Seen in practice. Name the extensions you rely on in
+  local site skips runs on CI and fails there first. Seen in practice; which extensions a runner loads by default
+  depends on the `setup-php` version and was not checked for this skill. Name the extensions you rely on in
   `setup-php`'s `extensions:` input so every row is explicit, test both paths deliberately (or load the extension
   locally, `moodle-phpunit-testing`), and expect CI-only failures when the local site lacks one.
 - **The PostgreSQL rows are the only place PostgreSQL-sensitive tests run.** PHPUnit wraps each test in a
@@ -305,4 +309,5 @@ coming back:
   (matrix `include` and `exclude` rules)
 - https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#masking-a-value-in-a-log
   (`::add-mask::`)
-- Adding a Moodle version to this repository: `docs/SUPPORTED_VERSIONS.md`, step 4.
+- When a new Moodle version is supported, add `versions/moodle-X.Y.md` with the values read from that branch and
+  extend the default matrix in section 4.

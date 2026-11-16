@@ -4,20 +4,21 @@ Read this when writing `settings.php` for any plugin type, an admin external pag
 or a page that handles a form POST.
 
 Samples are valid on Moodle 5.2 and 5.3. The admin setting classes keep their global names
-(`admin_settingpage`, `admin_setting_configtext`, ...) on both; 5.3 adds namespaced names, listed in
-`versions/moodle-5.3.md`.
+(`admin_settingpage`, `admin_setting_configtext`, ...) on both. **5.3+:** they are aliases of namespaced classes
+(`\core_admin\setting\setting\configtext`, `\core_admin\setting\settingpage\settingpage`), which do not exist
+on 5.2, so a plugin that supports both keeps the global names.
 
 ## What settings.php receives
 
-`settings.php` is included by the plugin's `plugininfo` class while the admin tree is built
-(`public/admin/settings/plugins.php`, 5.3.0). What exists in scope depends on the type:
+`settings.php` is included by the type's `load_settings()` method (`public/lib/classes/plugininfo/<type>.php`)
+while `public/admin/settings/plugins.php` builds the admin tree (5.3.0). What exists in scope depends on the type:
 
 | Type | In scope | What you do |
 |---|---|---|
 | `mod`, `block`, `filter`, `format`, `auth`, `enrol`, `repository`, `qtype`, `tiny`, most others | `$settings`, an `admin_settingpage` core created; `$ADMIN`; `$hassiteconfig` | Add settings to `$settings` inside `if ($ADMIN->fulltree)` |
 | `local` | `$ADMIN`, `$hassiteconfig`; no `$settings` | Create a page and add it to `localplugins` (or any category) |
 | `tool` | `$ADMIN`, `$hassiteconfig`; no `$settings` | Create a page and add it under `tools` (or the category that fits) |
-| `report` | `$ADMIN`; a `$settings` page core created, added under "Reports" only if still set after the include (`public/admin/settings/plugins.php`, 5.3.0) | Add settings to `$settings`, or add an `admin_externalpage` for the report and set `$settings = null;` |
+| `report` | `$ADMIN`; a `$settings` page core created, added under Plugins > Reports (`reportplugins`) only if still set after the include (`public/admin/settings/plugins.php`, 5.3.0) | Add settings to `$settings`, or add an `admin_externalpage` for the report and set `$settings = null;` |
 
 Calling `$settings->add()` where no `$settings` exists is a fatal error during upgrade.
 
@@ -58,7 +59,7 @@ Rules that hold for every type:
 - A new setting is stored with its default only when the upgrade runs, so add settings in a version-bumping
   change. Until then `get_config()` returns `false` and the form shows the first choice of a select next to
   "Default: ...". Traps of individual setting classes (multicheckbox defaults, `configtext` regex paramtypes,
-  `filetypes` labels): `moodle-field-lessons` (its `reference/forms-and-settings.md`).
+  `filetypes` labels): `moodle-field-lessons` (its forms and settings reference).
 - An `admin_settingpage` or `admin_externalpage` can name a capability other than `moodle/site:config` as its
   fourth argument; then it must be added outside `if ($hassiteconfig)`, or the non-admin holders of that
   capability get "Access denied". Core precedent: `public/report/log/settings.php`.

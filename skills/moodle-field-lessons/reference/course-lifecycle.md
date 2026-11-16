@@ -23,9 +23,11 @@ The privacy provider recipe is `moodle-privacy-gdpr`; the definition-of-done wal
 ## Restore file areas
 
 - **`add_related_files($component, $filearea, 'user')` restores nothing for a user-keyed module file area.**
-  `send_files_to_pool()` joins the mapping on `parentitemid = contextid`, and the `user` mapping does not store the
-  module context there (`public/backup/util/dbops/restore_dbops.class.php`, `send_files_to_pool()`, 5.3.0). Call
-  the pool directly with `$skipparentitemidctxmatch = true`:
+  `send_files_to_pool()` joins the mapping on `parentitemid = contextid`, and a `user` mapping row holds the
+  user's own context id in `parentitemid`, never the module context the files are in
+  (`public/backup/util/dbops/restore_dbops.class.php`, `send_files_to_pool()` and the user-restore code that maps
+  `context` from `parentitemid`; read in 5.3.0, not run). The restore reports success and the file area is empty.
+  Call the pool directly with `$skipparentitemidctxmatch = true`:
 
   ```php
   \restore_dbops::send_files_to_pool($this->get_basepath(), $this->get_restoreid(),
@@ -37,8 +39,11 @@ The privacy provider recipe is `moodle-privacy-gdpr`; the definition-of-done wal
   activity. A condition that refers to ids (a group, a grouping, another activity) remaps them in its own
   `update_after_restore()` and stores nothing else that must survive.
 - **Do not name a nested backup element after a column of its parent record** (an element `items` under a record
-  that has an `items` column): the names collide and every backup of the activity fails. PHPUnit tests that do not
-  run the backup controller never see it; duplicating the activity once on a site runs the full backup and restore.
+  that has an `items` column): `add_child()` throws `base_element_struct_exception('baseelementchildnameconflict')`
+  while the structure is defined, so every backup of the activity fails
+  (`public/backup/util/structure/base_nested_element.class.php`, `check_and_set_used()`, 5.3.0). PHPUnit tests that
+  do not run the backup controller never see it; duplicating the activity once on a site runs the full backup and
+  restore. Rename the element (`item_list`) or the column.
 
 ## Dates and times that restore and reset move
 

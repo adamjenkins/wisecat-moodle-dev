@@ -126,9 +126,10 @@ $font-family-sans-serif-jp: "My Sans", "Noto Sans JP", system-ui, sans-serif;
 ```
 
 - **5.3+:** `$font-family-sans-serif` defaults to `$mds-font-family-base` joined with a fallback list
-  (`public/theme/boost/scss/moodle/font-stack.scss`). Eight design system component rules use
-  `font-family: var(--mds-font-family-base)` directly, so changing only `$font-family-sans-serif` leaves those
-  components in Noto Sans.
+  (`public/theme/boost/scss/moodle/font-stack.scss`). The design system component styles use
+  `font-family: var(--mds-font-family-base)` directly (16 declarations in
+  `lib/bundles/design-system/js/components/_index.legacy.scss`, 5.3.0), so changing only `$font-family-sans-serif`
+  leaves those components in Noto Sans.
 - **5.3+:** content in Japanese (`:lang(ja)`) takes `$font-family-sans-serif-jp`
   (`scss/moodle/font-stack-lang.scss`), which starts with `$mds-font-family-base` and then Noto Sans JP.
 - Not compiled with a custom font for this file. Declaring the `@font-face` and shipping the files is a separate step.
@@ -152,7 +153,9 @@ $font-family-sans-serif-jp: "My Sans", "Noto Sans JP", system-ui, sans-serif;
 ```
 
 A variable that must follow the mode is set to a custom property in pre-SCSS, as Boost does on 5.3:
-`$card-bg: var(--bs-white);`. Remember that such a variable can no longer go through `darken()`, `mix()` or `rgba()`.
+`$card-bg: var(--bs-white);`. Such a variable can no longer go through a colour function: `darken()`, `lighten()`
+and `mix()` stop the compile ("is not a color"), and `rgba()` emits a declaration that browsers drop (read in the
+compiler, not run).
 
 ## Presets
 
@@ -161,7 +164,9 @@ A preset is the main SCSS text: the file that sets variables and imports Bootstr
 - Boost ships `default.scss` and `plain.scss` in `public/theme/boost/scss/preset/`. The setting `theme_boost/preset`
   lists those two plus every file uploaded through `theme_boost/presetfiles` (file area `theme_boost`, `preset`; up to
   20 `.scss` files). `theme_boost_get_main_scss_content($theme)` returns the built-in file, the stored file, or the
-  default as a fallback, using the `preset` setting of the theme it is given (`public/theme/boost/lib.php`).
+  default as a fallback, using the `preset` setting of the theme it is given (`public/theme/boost/lib.php`). The
+  stored file is always looked up in the `theme_boost` file area, whatever theme is passed. A child that passes its
+  own config, with a `preset` setting naming a file uploaded under the child, silently gets the default preset.
 - On save, an uploaded preset is compiled with the theme's pre and extra SCSS and rejected on a compile error. The
   check is skipped for the names `default.scss` and `plain.scss` and when the value did not change
   (`admin_setting_configthemepreset::validate()`, read 5.3.0).
@@ -176,7 +181,7 @@ Ways for a child theme to offer presets:
 1. **Reuse Boost's choice** (the recipe in `SKILL.md`): call
    `theme_boost_get_main_scss_content(theme_config::load('boost'))` and wrap it in your `pre.scss` and `post.scss`. The
    preset chosen in Boost's settings applies to the child.
-2. **Own setting**: declare a `preset` setting under the child's component with
+2. **Own setting** (read in the source, not run): declare a `preset` setting under the child's component with
    `new admin_setting_configthemepreset($name, $title, $description, 'default.scss', $choices, 'mytheme')` and a stored
    file setting for file area `preset`. The last argument names the theme whose `theme_mytheme` / `preset` file area
    and pre/extra SCSS are used for validation. Then read the stored file in your own main-SCSS function and fall back

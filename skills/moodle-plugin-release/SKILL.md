@@ -39,11 +39,8 @@ is read back, not assumed.
   grep -n 'moodle-plugin-ci' .github/workflows/*.yml
   ```
 
-  Exit-code semantics of `moodle-plugin-ci` 4.5 (read in its `src/Command/*.php`): `phpmd` always returns 0,
-  so read its output; `--max-warnings` exists only on `phpcs` and `phpdoc` (`grunt` has its own
-  `--max-lint-warnings`), and on any other command it aborts with "option does not exist", which looks like
-  findings but is a broken invocation; `mustache` and `grunt` need the plugin inside a Moodle checkout, as
-  in CI. The command-by-command recipe is owned by `moodle-definition-of-done`.
+  The command-by-command recipe and each command's exit-code traps (`phpmd` always returns 0, which commands
+  take `--max-warnings`) are owned by `moodle-definition-of-done`.
 - **A gate that runs only after the tag is pushed cannot fix that tag.** Anything that validates the release
   itself (a listing or metadata check, a packaging script, a release preview) runs before tagging.
 
@@ -65,9 +62,11 @@ $plugin->maturity  = MATURITY_STABLE;
 
 - `supported` must be a two-integer range, low first. `[502]` throws `coding_exception` "Incorrect syntax in
   plugin supported declaration" when the plugin is loaded; write `[502, 502]` for one branch
-  (`public/lib/classes/plugininfo/base.php:311-320`, same in 5.2 and 5.3.0).
+  (`\core\plugininfo\base::load_disk_version()`, `public/lib/classes/plugininfo/base.php`, 5.2 and 5.3.0).
 - `requires` is not below the lowest branch in `supported`. 5.3.0 is build `2026100500`
-  (`public/version.php`, 5.3.0); the 5.2 branch's builds start at `2026042000` (5.2 `public/version.php`).
+  (`public/version.php`, 5.3.0). 5.2.0 is `2026042000`: the 5.2 branching date plus release increment `00`,
+  the scheme the comments in `public/version.php` describe (read in the 5.2.2+ tree, whose own value is
+  `2026042002.01`; the 5.2.0 tag itself was not opened).
 - The Plugins directory reads the release name, maturity and supported versions from the uploaded ZIP; they
   can be overridden per version but default to what `version.php` says
   (https://moodledev.io/general/community/plugincontribution/pluginsdirectory/api).
@@ -111,8 +110,8 @@ see them. Build the ZIP, list it, and fix the repository before tagging.
   `mod_forum` as `forum/`, `theme_mytheme` as `mytheme/`. A GitHub source archive has the root
   `moodle-local_myplugin-1.4.2/`. Core's validator requires a single root directory whose name survives
   `clean_param(..., PARAM_PLUGIN)` ("rootdirinvalid" otherwise) and equals the name part of
-  `$plugin->component` ("componentmismatchname") (`public/lib/classes/update/validator.php:305-320, 391-393`,
-  5.3.0, identical in 5.2). Core's own help string names GitHub archives as the usual cause
+  `$plugin->component` ("componentmismatchname") (`\core\update\validator::validate_files_layout()` and
+  `validate_version_php()`, `public/lib/classes/update/validator.php`, 5.3.0, identical in 5.2). Core's own help string names GitHub archives as the usual cause
   (`public/lang/en/plugin.php`, `validationmsg_rootdirinvalid_help`). The admin upload page can rename the
   root while extracting when it detects the component from `version.php`, so a wrong root sometimes installs
   through the UI; it still fails for an admin who unzips into `local/` by hand, and reviewers flag it every
@@ -217,7 +216,8 @@ jobs:
 - A red run usually means a missing or expired token secret. Fix the secret, then re-run with
   `workflow_dispatch` and the tag; do not re-tag.
 - The tag-push run uses the workflow file in the tagged tree. If that file was broken, fix it on the default
-  branch and dispatch the run there with the tag as input; never move the tag.
+  branch and dispatch the run there with the tag as input; never move the tag. (Reasoned from GitHub's
+  documented event behaviour, not run.)
 
 ## 7. A pushed tag is not a published release
 
@@ -261,8 +261,9 @@ README, and demo credentials for any external service.
 - **Publication material is checked like code.** Every tool or command the text recommends is current;
   every claim about users or sites is one you can support; every screenshot is read for its proper nouns
   (course, user and site names), which must be demo data you chose, not test leftovers.
-- **Put a README caveat where admins read it too.** A limitation stated only in the README ("never uses the
-  site proxy") has been raised by a reviewer; repeat it in the setting's description string.
+- **Put a README caveat where admins read it too.** A limitation stated only in the README (for example that a
+  feature does not use the site proxy) still gets raised in review; repeat it in the setting's description
+  string.
 
 ## 9. Answering a Plugins directory reviewer
 

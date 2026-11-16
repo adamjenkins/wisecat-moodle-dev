@@ -36,8 +36,7 @@ with `method_exists()` or `class_exists()`.
   `core:t/collapseall` and `core:t/expandall`, and `core:i/notifications` and `core:t/message` are solid, not
   regular.
 - Font Awesome's SCSS is under `public/theme/boost/scss/fontawesome/` and its webfonts under `public/lib/fonts/`.
-  The Font Awesome version variable in that SCSS reports an older version than the files shipped; do not use it
-  to decide which glyphs exist.
+  The version shipped is Font Awesome Free 6.7.2, as on 5.3 (file headers and `thirdpartylibs.xml`).
 - Image resolution order is the same as 5.3.
 - There is no dark colour mode, so no inversion of image icons and no dark twin for activity icon filters.
 - The Classic theme is still in core and ships the only core example of an icon system subclass

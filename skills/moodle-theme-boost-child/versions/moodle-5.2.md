@@ -1,14 +1,14 @@
 # Boost child themes on Moodle 5.2
 
-What is specific to Moodle 5.2, the baseline, for a child of Boost. Everything here is read in the 5.2 source
-(5.2.2); nothing was run on 5.2.
+Read this when a Boost child has to run on Moodle 5.2, or when a 5.2 child is being moved forward and you need
+to know what it relied on. Everything here is read in the 5.2 source (5.2.2); nothing was run on 5.2.
 
 ## What is the same as 5.3
 
 The theme engine (`public/lib/classes/output/theme_config.php`) is the same code apart from where core fonts are
 found, and Boost's `config.php` and every file in `public/theme/boost/layout/` are identical in 5.2 and 5.3.0.
 So the recipe in `SKILL.md` (the keys to restate, the chained SCSS callbacks, the one settings object, the
-layout cascade, presets) holds on 5.2 as written. The layout cascade exists since 5.1.
+layout cascade, presets) holds on 5.2 as written.
 
 Boost's version in 5.2 is `2026042000`, the value used for `$plugin->dependencies` in the recipe.
 

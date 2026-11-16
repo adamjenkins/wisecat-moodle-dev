@@ -28,8 +28,8 @@ a theme.
 
 ## Commands
 
-From the Moodle root, the directory that holds `public/`. On 5.2 and 5.3 the root `admin/cli/` has shims for the
-general scripts only; the Behat and PHPUnit tools are reached through `public/admin/tool/`.
+From the Moodle root, the directory that holds `public/`. On 5.2 and 5.3 the general scripts are in the root
+`admin/cli/` (there is no `public/admin/cli/`); the Behat and PHPUnit tools are under `public/admin/tool/`.
 
 ```bash
 # Initialise once, with the options CI uses. Options are stored for the run.
@@ -95,11 +95,13 @@ here).
 Rules from `get_tests_for_theme()` and `get_behat_contexts_for_theme()`:
 
 - Every file matching `behat_*.php` in `tests/behat/` or its subdirectories becomes a context of the theme's suite,
-  keyed by its file name. The class inside must have exactly that name, or it is skipped as "poorly named".
+  keyed by its file name. The class inside must have exactly that name: the file name is what Behat is given as
+  the context class, and core's override check passes over a class it cannot find under that name.
 - Theme contexts are not global. A step defined by the theme exists only in its suite, so only the theme's features
   can use it. (Contexts of other plugin types are global.)
-- The context list starts from the theme's nearest parent's list (for a Boost child: core's contexts with Boost's
-  overrides already applied), minus contexts named in `blacklist.json`, plus the theme's own.
+- The context list starts from the list of the first entry in `$THEME->parents` that has one (for a Boost child:
+  core's contexts with Boost's overrides already applied), minus contexts named in `blacklist.json`, plus the
+  theme's own.
 - After merging, any context whose class is a parent class of another context in the list is removed. A theme class
   that extends `behat_navigation` therefore replaces `behat_navigation` in its suite.
 
@@ -238,5 +240,5 @@ Also from the Boost DOM: the block drawer sits outside `#page`, so a step scoped
   opens a tour that covers the page.
 - `I set the field "X"` does not match an `aria-label`: Mink matches id, name, `<label>` text and placeholder. A
   form control that has only an `aria-label` needs an id and a `<label class="visually-hidden" for>`.
-- Window sizes: `I change the viewport size to "mobile"` (also `tablet`, `small`, `medium`, `large` or `WxH`),
-  defined in `public/lib/tests/behat/behat_general.php`.
+- Window sizes: `I change viewport size to "mobile"` (also `tablet`, `small`, `medium`, `large` or `WxH`; the
+  step has no "the"), defined in `public/lib/tests/behat/behat_general.php` on 5.2 and 5.3.

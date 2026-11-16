@@ -58,8 +58,10 @@ setting does not validate the two built-in names. This is from reading the sourc
 ## Variables that became custom properties
 
 These hold a colour on 5.2 and a `var(...)` string on 5.3 (`scss/moodle/variables.scss`, both versions compared).
-Passing one to `darken()`, `lighten()`, `mix()`, `rgba()`, `tint-color()` or `shade-color()` compiles on 5.2 and is a
-compile error on 5.3 (read, not run). Setting one to a literal in pre-SCSS stops that component following the mode.
+Passing one to `darken()`, `lighten()`, `mix()`, `tint-color()` or `shade-color()` compiles on 5.2 and is a compile
+error on 5.3: "$color: var(...) is not a color." Passing one to `rgba()` compiles, but the output is
+`rgba(var(...), .9)`, which browsers drop (both read in `public/lib/scssphp/src/Compiler.php`, not run). Setting one
+to a literal in pre-SCSS stops that component following the mode.
 
 | Variables | 5.3 default |
 |---|---|

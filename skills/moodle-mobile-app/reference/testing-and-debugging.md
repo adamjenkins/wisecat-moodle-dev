@@ -47,8 +47,9 @@ strings, the first template is the one you expect, and `javascript` is what you 
 
 Enabling the mobile service through the admin page also assigns `webservice/rest:use` to the default authenticated
 role (`public/admin/classes/setting/setting/enablemobileservice.php`, 5.3.0; class in `public/lib/adminlib.php` on
-5.2). Setting the config value from the CLI (`admin/cli/cfg.php --name=enablemobilewebservice --set=1`) does not, so a
-site configured that way fails every app call for non-admin users.
+5.2). Setting the config value from the CLI (`admin/cli/cfg.php --name=enablemobilewebservice --set=1`) does not: the
+script calls `set_config()` directly and never runs the setting's `write_setting()` (`admin/cli/cfg.php`, read 5.2
+and 5.3). A site configured that way fails every app call for non-admin users until the capability is assigned.
 
 ## Level 2: the app itself
 

@@ -83,16 +83,17 @@ Run from the Moodle root. `admin/cli/` is at the root, not under `public/`.
 |---|---|
 | `php admin/cli/purge_caches.php` | Everything: caches, theme revision, lang, JavaScript revision, template revision, filters, the cache and localcache directories |
 | `php admin/cli/purge_caches.php --theme` | `theme_reset_all_caches()` only |
-| `php admin/cli/purge_caches.php --theme --js` | Flags combine. There is no `--template` flag: the browser-side template revision is bumped only by a purge with no flags, by the admin purge page, or by saving the `cachetemplates` setting |
+| `php admin/cli/purge_caches.php --theme --js` | Flags combine. There is no `--template` flag: the browser-side template revision is bumped only by a purge with no flags, by the admin purge page ("Purge all caches", or its Templates box), or by saving the `cachetemplates` setting |
 | `php admin/cli/build_theme_css.php --themes=mytheme` | Compiles left-to-right and right-to-left for that theme, stores both in the cache and localcache, bumps the per-theme revision. Without `--themes` it builds every installed theme |
-| `php admin/cli/build_theme_css.php --themes=mytheme --direction=ltr --verbose` | One direction, with timing output |
+| `php admin/cli/build_theme_css.php --themes=mytheme --direction=ltr --verbose` | One direction. `--verbose` prints the script's progress lines (which themes it found and builds); it prints no timings |
 
 - **Precompile on deploy.** After deploying new theme code, run `build_theme_css.php --themes=<name>` so the
   first visitor does not wait for a compile. It changes only that theme's revision, so other themes' CSS and all
   images stay cached.
 - `theme_reset_all_caches()` empties the caches but does not build anything; the next stylesheet request does.
-- A full purge also bumps the JavaScript revision, and Moodle clears the whole site's browser storage for a user
-  when that revision changes. Do not keep durable interface state in `localStorage`; use a user preference.
+- A full purge also bumps the JavaScript revision, and core's storage wrapper empties the site's browser storage
+  when it sees a new revision (`public/lib/amd/src/storagewrapper.js` on 5.2, `public/lib/js/esm/src/Storage.ts` on
+  5.3, read). Do not keep durable interface state in `localStorage`; use a user preference.
 - From PHP, a setting calls `theme_reset_all_caches` through `set_updatedcallback()`. Calling
   `purge_caches(['theme' => true])` does the same thing by hand.
 

@@ -14,7 +14,7 @@ it, whether a stray `node_modules/` came along) is unchecked until a reviewer or
 ## What core's installer checks, in order
 
 `\core\update\validator::execute()` runs these on the extracted package
-(`public/lib/classes/update/validator.php`, read in 5.3.0; lines 260-420 identical in 5.2):
+(`public/lib/classes/update/validator.php`, read in 5.3.0; the checks are identical in 5.2):
 
 | Check | Message key | What fails it |
 |---|---|---|
@@ -57,9 +57,9 @@ cd .. && zip -r myplugin.zip myplugin -x 'myplugin/.git/*' 'myplugin/node_module
 Never upload GitHub's "Source code (zip)" asset or a `/archive/refs/tags/...zip` download: its root is
 `<repository>-<version>/`.
 
-Releases published by the `moodlehq/moodle-plugin-release` workflow are built by that workflow, not by you.
-After the first workflow release, download that version's ZIP from the plugin's page once and list it the same
-way, so you know what users receive.
+Releases published by the `moodlehq/moodle-plugin-release` workflow are built by that workflow, not by you, and
+how it builds the ZIP was not read for this file. After the first workflow release, download that version's ZIP
+from the plugin's page once and list it the same way, so you know what users receive.
 
 ## Listing it: the pass condition
 
@@ -78,7 +78,7 @@ for the listing, test fixtures with personal data, `.upstream` copies of core fi
 
 `amd/build/` must match `amd/src/`: `moodle-plugin-ci grunt` rebuilds into a copy and fails with "File is
 stale and needs to be rebuilt" on any difference (`src/Command/GruntCommand.php`, `validatePluginFiles()`,
-moodle-plugin-ci 4.5), so a green `grunt` step on the tagged commit is the evidence that the shipped build is
+moodle-plugin-ci 4.5.11), so a green `grunt` step on the tagged commit is the evidence that the shipped build is
 current.
 
 ## The licence file
@@ -129,7 +129,7 @@ so an undeclared library also shows up as hundreds of style errors. Core's Boost
   <library>
     <location>fonts/noto-sans</location>
     <name>Noto Sans</name>
-    <description>Noto Sans font family.</description>
+    <description>Noto Sans is a global font family by Google.</description>
     <version>2.015</version>
     <license>OFL</license>
     <licenseversion>1.1</licenseversion>

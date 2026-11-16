@@ -6,7 +6,8 @@ or script must open or close a drawer.
 Read in `public/theme/boost/layout/drawers.php`, `public/theme/boost/templates/drawers.mustache`,
 `public/theme/boost/templates/drawer.mustache`, `public/theme/boost/amd/src/drawers.js`, `public/lib/blocklib.php`
 and `public/lib/classes/output/core_renderer.php` on 5.3.0. The layout file is identical in 5.2; where a template
-differs between versions it is said. Adding a region was not run.
+differs between versions it is said. Adding a block region and adding a drawer were not run: both recipes are
+read in the source.
 
 ## The page skeleton Boost builds
 

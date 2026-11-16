@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "wisecat-moodle-dev",
-  "description": "The most complete Moodle development toolkit for Claude Code: skills, slash commands, and subagents covering the entire Moodle plugin lifecycle.",
+  "description": "Skills, slash commands and subagents for building Moodle plugins and themes with Claude Code.",
   "owner": {
     "name": "Adam Jenkins",
     "email": "adam@wisecat.net"
@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "wisecat-moodle-dev",
-      "description": "19 skills + 8 commands + 2 agents for Moodle plugin scaffolding, XMLDB, web services, Hooks API, AMD/JS, PHPUnit, Behat, security, privacy, performance, accessibility, themes, mobile app, capability auditing, mustache linting, and cross-version upgrades.",
+      "description": "25 skills, 10 commands and 2 agents for Moodle 5.2 and 5.3 plugin and theme development: Boost child themes, SCSS and dark mode, layouts, renderers and theme settings; plugin scaffolding, XMLDB, web services, hooks, JavaScript, PHPUnit, Behat, CI, security, privacy, performance, accessibility, the Moodle app, upgrades and release.",
       "source": "./",
       "version": "0.1.0",
       "category": "development",

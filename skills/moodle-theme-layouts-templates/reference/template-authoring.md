@@ -41,7 +41,8 @@ lib/templates/modal.mustache                        the component's own director
   empty include.
 - The search is a `file_exists()` walk on every request. Nothing about template locations is cached, so adding an
   override file takes effect on the next PHP render.
-- Boost itself overrides `core/sticky_footer`, and adds templates in the core namespace that have no core file:
+- Boost itself overrides `core/sticky_footer` (**5.3+:** also `core/supplementary_sticky_footer`; **5.2 only:**
+  also `core/loginform`), and adds templates in the core namespace that have no core file:
   `core/login_layout`, `core/login_panel`, `core_form/element-float`, `core_form/element-float-inline`. For those,
   the "original" is Boost's file.
 - A theme cannot override a lang string through templates or any other theme mechanism; the string manager has
@@ -75,11 +76,12 @@ Available from 5.2. Run on 5.3.0 in a PHP render and in a browser-side render; t
 ```
 
 - Use it whenever the change is "something around the original". The override then never goes stale.
-- Without the `!`, an override that includes its own name includes itself and recurses until PHP runs out of
-  stack.
+- Without the `!`, an override that includes its own name includes itself and recurses until PHP fails. This
+  follows from the lookup order (the theme's file is found first); it was not run.
 - For a template that Boost overrides, `!` goes to the component's file and so skips Boost's version too. That
   is rarely what a Boost child wants for `core/sticky_footer`.
-- The same suffix works in PHP: `$OUTPUT->render_from_template('core/notification_info!', $context)`.
+- The same suffix works in PHP: `$OUTPUT->render_from_template('core/notification_info!', $context)`. The name
+  goes unchanged through the Mustache loader to the same finder (`mustache_filesystem_loader.php`; read, not run).
 
 ## Parent templates and blocks
 
@@ -163,7 +165,8 @@ bare `<li>` or `<tr>` fails HTML validation; so does an ARIA role on an element 
 **Bootstrap 5 names only.** Boost on 5.2 and 5.3 is Bootstrap 5.3. The Bootstrap 4 names still work through
 Boost's compatibility layer (`public/theme/boost/scss/moodle/bs4-compat.scss`, identical in both versions, marked
 for removal in 6.0). Under Behat with `--scss-deprecations`, and in theme designer mode, an element using a
-deprecated class gets a red dotted outline and a "Deprecated style in use" label, and the Behat step fails. That
+deprecated class gets a red dotted outline and a "Deprecated style in use" label, and the Behat step fails
+(read in `scss/moodle/deprecated.scss` and `public/lib/behat/classes/behat_session_trait.php`; not run). That
 includes classes added by JavaScript.
 
 | Bootstrap 4 | Write |

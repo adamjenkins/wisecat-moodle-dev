@@ -51,8 +51,10 @@ put on a page and rendered (on 5.3.0). The class names below are the global name
 Traps:
 
 - **A pattern with a trailing modifier is not a pattern.** `'/^[\p{L}\p{N}]+$/u'` does not end in `/`, so it falls
-  to branch 3 and is passed to `clean_param()` as an unknown type. The symptom is an exception while defaults are
-  applied during install or upgrade. Put the modifier inside the pattern: `'/(*UTF)^[\p{L}\p{N}]{3,30}$/'`, or
+  to branch 3 and is passed to `clean_param()` as an unknown type, which throws
+  `coding_exception: Unknown parameter type '<the pattern>'` (`\core\param::from_type()`,
+  `public/lib/classes/param.php`, read in 5.2 and 5.3.0). It is thrown whenever the value is validated: while
+  defaults are applied during install or upgrade, and on every save of the page. Put the modifier inside the pattern: `'/(*UTF)^[\p{L}\p{N}]{3,30}$/'`, or
   `'/(?i)^[a-z]+$/'`.
 - **`PARAM_TEXT` and `PARAM_NOTAGS` reject rather than clean.** A value containing a tag is refused with
   "validation error", it is not stripped. That is the right behaviour for a banner text; say so in the description.

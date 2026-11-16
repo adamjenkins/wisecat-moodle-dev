@@ -31,7 +31,7 @@ there.
 
 A missing partial is fatal because core's template finder throws a `moodle_exception`, and the Mustache engine
 only swallows its own unknown-template exception. A missing renderer method is silent because Mustache checks
-that the method exists before calling it.
+that the method exists before calling it (`method_exists()` in `public/lib/mustache/src/Context.php`).
 
 ## Markup that 5.2 has and 5.3 changed
 

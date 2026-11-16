@@ -28,13 +28,14 @@ for this skill.
 
 ## Mental model
 
-1. **Separate site.** `$CFG->behat_wwwroot`, `$CFG->behat_prefix` and `$CFG->behat_dataroot` in `config.php` define
+1. **A separate site.** `$CFG->behat_wwwroot`, `$CFG->behat_prefix` and `$CFG->behat_dataroot` in `config.php` define
    it (`config-dist.php`). `init.php` installs it and writes the Behat config (`behat.yml`) listing every feature
    and context class found in the Moodle tree. Never edit `behat.yml`; it is regenerated.
 2. **The run reads the Moodle tree, not your repository.** Behat executes the copy of the plugin installed under the
    Moodle root. A new `.feature` file, a new `behat_*.php` context, or a new generator entity is unknown until
-   `init.php` (or `util.php --enable`) runs again. Gherkin parses are cached by file modification time, so a copy
-   that keeps old timestamps can run the old scenario. Seen in practice.
+   `init.php` (or `util.php --enable`) runs again. Behat also caches each parsed feature and reuses the parse while
+   the cache entry is newer than the feature file (`FileCache::isFresh()` in `vendor/behat/gherkin`), so a copy that
+   keeps old timestamps can run the old scenario; `touch` the copied features. Seen in practice.
 3. **Run options are fixed at init.** `init.php --scss-deprecations`, `--no-axe`, `--no-icon-deprecations` and
    (**5.3+:**) `--colourmode=dark` are stored for the site; `run.php` has no such options. The run header prints them
    under "Run optional tests:" (`public/lib/behat/classes/util.php`, 5.3.0). Read that banner before trusting a run.
@@ -62,9 +63,10 @@ php public/admin/tool/behat/cli/init.php --parallel=3 && php public/admin/tool/b
   workflow.** With it, every step of a JavaScript scenario fails when any element on the page shows a Bootstrap 4
   compatibility class such as `.sr-only`, `.mr-2`, `.ml-auto` or `.font-weight-bold` ("Deprecated style in use",
   `look_for_deprecated_styles()` in `public/lib/behat/classes/behat_session_trait.php`; the class list is
-  `public/theme/boost/scss/moodle/bs4-compat.scss`, 5.2 and 5.3), including markup your JavaScript builds and core steps that only
-  visit your page. Fix: Bootstrap 5 names (`visually-hidden`, `me-2`, `ms-auto`, `fw-bold`). Seen in practice on 5.2
-  and 5.3. Passing `--scss-deprecations` to `run.php` instead fails with "option does not exist".
+  `public/theme/boost/scss/moodle/bs4-compat.scss`, 5.2 and 5.3), including markup your JavaScript builds and core
+  steps that only visit your page. Fix: Bootstrap 5 names (`visually-hidden`, `me-2`, `ms-auto`, `fw-bold`). Seen
+  in practice on 5.2 and 5.3. `run.php` hands options it does not know to Behat, so `--scss-deprecations` given
+  to `run.php` fails with "option does not exist".
 - **Compare the scenario count with the repository.** Before reading a result, check the summary's scenario count
   against `grep -c '^ *Scenario' tests/behat/*.feature`. A lower count means a stale or missing copy. Seen in
   practice.
@@ -104,8 +106,10 @@ Feature: Mark attendance
   `@_file_upload`, `@_switch_window` and `@_alert` mark scenarios that need those browser features.
 - **Shape that gherkinlint enforces** (core `.gherkin-lintrc`, run by `moodle-plugin-ci grunt`): Feature at column
   0, Background and Scenario at 2, steps at 4, `Examples` at 4, example rows at 6; no trailing spaces; no two empty
-  lines in a row; exactly one newline at the end of the file, so a trailing blank line fails; no duplicate feature
-  names; no file without scenarios.
+  lines in a row; a newline at the end of the file; no duplicate feature names; no file without scenarios. A blank
+  line after the last step fails as "Multiple empty lines are not allowed": the linter splits on newlines, so the
+  blank line and the final newline count as two empty lines (`no-multiple-empty-lines` in gherkin-lint 4.2.2, read
+  in its source, not run).
 - **One scenario, one claim, proved in both directions** (see the rules below). Prefer `I am on the "<identifier>"
   "<type>" page logged in as "<user>"` to clicking through navigation.
 
@@ -132,8 +136,8 @@ class behat_local_example_generator extends behat_generator_base {
 
 `switchids` turns a `course` column (shortname) and a `user` column (username) into ids through `get_course_id()`
 and `get_user_id()` of `behat_generator_base` (`public/lib/behat/classes/behat_generator_base.php`). Custom steps go
-in `tests/behat/behat_local_example.php`, class `behat_local_example extends behat_base`. Detail and the full step
-template: [reference/generators-and-steps.md](reference/generators-and-steps.md).
+in `tests/behat/behat_local_example.php`, class `behat_local_example extends behat_base`. The full step template, page resolvers and
+named selectors are in [reference/generators-and-steps.md](reference/generators-and-steps.md).
 
 ## Rules for locating and asserting
 
@@ -180,7 +184,7 @@ Each was seen in practice on shipped plugins.
 
 ## Environment facts that break scenarios
 
-- **Site home is off on new installs.** `enablemyhome` defaults to 0 on 5.2.2 and later and on 5.3
+- **Site home is off on new installs.** `enablemyhome` defaults to 0 on 5.2 and 5.3
   (`public/admin/settings/appearance.php`), so `I am on site homepage` lands on the dashboard and logged-out users go
   to the login page (`public/index.php`). A feature that needs site home sets it in the Background, as core
   features do (`public/lib/tests/behat/switch_editing_mode.feature`, 5.3.0); add `defaulthomepage` 0 too when users
@@ -194,9 +198,9 @@ Each was seen in practice on shipped plugins.
   ```
 
   Upgraded sites keep site home (an upgrade step sets `enablemyhome` to 1, `public/lib/db/upgrade.php`).
-- **User tours cover the page on a user's first visit.** A tour's backdrop blocks clicks and screenshots. Behat
-  disables tours unless a scenario enables them; in other browser automation, mark the tours complete for the test
-  users first. Seen in practice.
+- **User tours cover the page on a user's first visit.** A tour's backdrop blocks clicks and screenshots. On a
+  Behat site the shipped tours are installed disabled (`public/admin/tool/usertours/classes/manager.php`); in other
+  browser automation, mark the tours complete for the test users first. Seen in practice.
 - **Accessibility steps load axe from `/lib/behat/axe/axe.min.js`.** A web-server rule that denies paths containing
   `/behat/` (some hardened configurations do) makes every `the page should meet accessibility standards` step fail
   with "No data". Steps also need `@accessibility` and `@javascript`, and pass without checking anything when the
@@ -207,8 +211,10 @@ Each was seen in practice on shipped plugins.
   fill the form with:`), rather than clicking the chooser. The first argument is the module name, not its display
   name; the step opens `course/modedit.php?add=assign` directly, and the course may be named by idnumber, short
   name or full name (`public/course/tests/behat/behat_course.php`, `behat_session_trait::get_course_id()`, 5.2 and
-  5.3). A hand-written click path breaks across branches: on 5.2 the section's "Add an activity or resource" link
-  sits inside the section's "+" menu.
+  5.3). A hand-written click path breaks: "Add an activity or resource" is a plain button in some places and an
+  item inside the "Add content" dropdown in others (`hasactionlinks` in
+  `public/course/format/templates/local/content/activitychooserbutton.mustache`), and that dropdown's button shows
+  only an icon on 5.2 and an icon with the text on 5.3.
 - **A debugging() message fails the step that showed it.** A deprecated API called by your page (for example
   `moveto_module()` on 5.2) fails Behat even though PHPUnit passed; fix the call (`moodle-upgrade-migration`).
 - **A deprecated core step fails the scenario.** It throws "Deprecated step, rather than using this step you can:"
@@ -223,7 +229,7 @@ Each was seen in practice on shipped plugins.
 | New feature, step or generator entity, no re-init | "Undefined step", or the old scenario runs | `init.php` again; compare the scenario count |
 | Local run without `--scss-deprecations` | Green locally, red in CI on Bootstrap 4 classes | `init.php --scss-deprecations`; read the banner |
 | Missing `@<plugintype>` tag | `moodle-plugin-ci validate` fails | `@local @local_example` on every feature |
-| Trailing blank line or tab in a feature | gherkinlint fails the `grunt` step | One newline at the end, spaces only |
+| Trailing blank line, trailing spaces or tab indentation in a feature | gherkinlint fails the `grunt` step | End the file with one newline right after the last step; indent with spaces |
 | `I set the field "Name"` | Sets "Short name" or the wrong form | `id_<element>` or a scoped step |
 | Page-wide `I should not see` | Fails on the course index, or passes for nothing | Scope to the container |
 | Only positive steps for a mode switch | Every field shown in every mode passes | Negative steps for the other modes |
@@ -233,7 +239,7 @@ Each was seen in practice on shipped plugins.
 | `get_string()` text copied by memory | Expected text never matches | Copy from the lang file or the page |
 | Editing `behat.yml` | Lost on the next init | Change `config.php` or init options |
 | `I press "Save changes"` with two such buttons on the page | Presses the wrong one, or the step is ambiguous | Scope it to the form, region or dialogue |
-| `I am on site homepage` on a fresh 5.2.2+ or 5.3 site | Lands on the dashboard or login page | Set `enablemyhome` 1 in the Background |
+| `I am on site homepage` on a fresh 5.2 or 5.3 site | Lands on the dashboard or login page | Set `enablemyhome` 1 in the Background |
 | Accessibility step without `@accessibility` | The step throws | Tag the scenario `@accessibility @javascript` |
 
 ## Reference files

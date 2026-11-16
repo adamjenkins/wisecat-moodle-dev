@@ -68,8 +68,12 @@ $join = ratings::get_sql_join('r', 'mod_example', 'entry', 'e.id', $userid);   /
 ratings::export_area_ratings($userid, $context, $subcontext, 'mod_example', 'entry', $itemid, $onlyuser);
 ratings::delete_ratings($context, 'mod_example', 'entry');                      // Optional itemid.
 ratings::delete_ratings_select($context, 'mod_example', 'entry', $itemidstest, $params);
-ratings::get_users_in_context_from_sql($userlist, 'r', 'mod_example', 'entry', $insql, $params);
+ratings::get_users_in_context_from_sql($userlist, 'r', 'mod_example', 'entry', $itemidsql, $params);
 ```
+
+In `get_users_in_context_from_sql()` the fifth argument is a subquery that selects the item ids (core wraps it as
+`itemid IN (<sql>)`), not a `get_in_or_equal()` fragment; `$itemidstest` in `delete_ratings_select()` is such a
+fragment (`IN (...)` or `= ...`).
 
 Use the join in `get_contexts_for_userid()` to find items the user rated: `"... {$join->join} WHERE {$join->userwhere}"`
 with `$join->params` merged in. On one user's erasure, delete the ratings on that user's own items only. Ratings
@@ -134,9 +138,12 @@ A plagiarism plugin itself implements `\core_plagiarism\privacy\plagiarism_provi
 
 ## Grades and completion
 
-Grades written through `grade_update()` belong to `core_grades`, whose provider exports and deletes them in the
-course context for every grade item of the course (`public/grade/classes/privacy/provider.php`); the plugin
-declares the link and does nothing else. Activity completion in a module context
+Grades written through `grade_update()` belong to `core_grades`. Its provider works on the course context: it
+exports the user's grades there and deletes the `grade_grades` and `grade_grades_history` rows (and feedback
+files) of every grade item of the course; in a module context it handles only outcome-to-activity associations
+(`public/grade/classes/privacy/provider.php`). So an activity's grades go when the course context is erased for
+`core_grades`, not when the module context is erased for the activity; the plugin declares the link and does
+nothing else. Activity completion in a module context
 is removed by core's `request\helper` after the plugin's delete methods run
 (`public/privacy/classes/local/request/helper.php`). A plugin that writes grade items outside the gradebook API,
 or completion rows itself, owns that data.

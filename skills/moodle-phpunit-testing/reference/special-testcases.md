@@ -4,7 +4,7 @@ Read this when you test an external function, a routed controller (`route_testca
 settings pages, a moodleform, an HTTP client call, a hook listener, or core AI actions.
 
 Sources are the 5.2 and 5.3.0 trees, paths relative to the Moodle root; "seen in practice" marks behaviour observed
-on real plugins. 5.3-only additions are in the skill's `versions/moodle-5.3.md`.
+on real plugins. Everything here holds on 5.2 and 5.3 unless tagged.
 
 ## External functions
 
@@ -33,6 +33,8 @@ Base class `\core\tests\router\route_testcase` (`public/lib/tests/classes/router
   `$notifications = \core\notification::fetch();`, and assert on its messages. Seen in practice.
 - A green `route_testcase` does not prove a routed POST works from a browser: form encoding, sesskey and
   `$CFG->routerconfigured` are outside it. Make one real request.
+- **5.3+:** the test case also has scope assertions (`assert_route_is_scoped()` and four more); they do not exist on
+  5.2, so guard a test that calls them with `method_exists()` and `markTestSkipped()`.
 
 ## Privacy providers
 
@@ -47,9 +49,12 @@ Base class `\core\tests\router\route_testcase` (`public/lib/tests/classes/router
 
 ## Admin settings
 
-- `admin_settingpage` autoloads, but `admin_get_root()` and the setting classes in `lib/adminlib.php` do not. A test
-  that builds settings passes inside the full suite (another file loaded `adminlib.php`) and fails alone. Fix: require
-  it in `setUp()`. Seen in practice.
+- `admin_get_root()` is a function in `public/lib/adminlib.php` and is never autoloaded. **5.2 only:** the
+  `admin_settingpage` and `admin_setting_*` classes are in that file too. **5.3+:** those classes autoload
+  (`public/lib/db/legacyclasses.php` maps them into `core_admin`), the function still does not. A test that builds
+  settings passes inside the full suite (another file loaded `adminlib.php`) and fails alone with "Class not found"
+  or "Call to undefined function". Fix: require the file in `setUp()`, which is right on both versions. Seen in
+  practice.
 - Render every settings page in a test. Some settings fail only when rendered (`admin_setting_filetypes` needs
   `lang_string` labels; a `admin_setting_configtext` regex paramtype with a trailing modifier aborts install):
 
@@ -77,7 +82,8 @@ Base class `\core\tests\router\route_testcase` (`public/lib/tests/classes/router
 ## Forms
 
 - `moodleform::mock_submit($data, $files)` replaces `$_POST` (or `$_GET`) and `$_FILES` (`public/lib/formslib.php`,
-  5.2). Restore both after the test when later code in the same test reads them, or the next form sees stale input.
+  5.2 and 5.3). The test reset empties them after each test; inside one test, a second form built later still
+  sees the first form's input, so reset them (`$_POST = [];`) between the two.
 - `mock_submit()` adds `sesskey` and `_qf__<formclass>`, but not what the browser would send for disabled or hidden
   elements: `hideIf()` also disables the element, and disabled fields are not posted. Build the data like one real
   browser post, not from the full element list.

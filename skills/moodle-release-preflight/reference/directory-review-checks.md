@@ -30,7 +30,7 @@ Keys core asks for by convention (read in the 5.3.0 source):
 | Key | Who asks | Source |
 |---|---|---|
 | `pluginname` | every plugin's display name | `public/lib/classes/plugininfo/base.php` |
-| `filtername` | a filter's display name; a filter needs both this and `pluginname` | `public/lib/classes/plugininfo/filter.php` |
+| `filtername` | a filter's display name in core; the Plugins directory's scripted check also asks a filter for `pluginname`, so ship both | `public/lib/classes/plugininfo/filter.php` |
 | `modulename`, `modulenameplural` | activity names in course pages, reset and recent activity | `public/course/reset_form.php`, `public/course/recent_form.php` |
 | `pluginadministration` | an activity's settings navigation node | `public/lib/classes/navigation/settings_navigation.php` |
 | `cachedef_<area>` | one per definition in `db/caches.php` | `public/cache/classes/definition.php` |
@@ -163,8 +163,9 @@ finding was raised although the README already said it.
 ## 9. Database queries on a hot path (medium)
 
 Flagged: a filter that ran one query per ancestor context on every `format_text()` and `format_string()` call.
-Core calls each active filter's `setup()` for every one of those calls (`public/lib/classes/formatting.php` calls
-`setup_page_for_filters()`, 5.3.0), so the cost is paid on every page, even when the filter changes nothing.
+Core calls each active filter's `setup()` for every `format_text()` call, and for every `format_string()` call
+on a site that filters all strings (`public/lib/classes/formatting.php` calls `setup_page_for_filters()`,
+5.3.0), so the cost is paid on every page, even when the filter changes nothing.
 
 Command: no grep. Count queries around the hot path in a PHPUnit test and assert a ceiling:
 

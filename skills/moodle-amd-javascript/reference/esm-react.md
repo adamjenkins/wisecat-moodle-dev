@@ -14,7 +14,10 @@ file. Theme overrides of core React components are theme work: `moodle-theme-ren
 - Specifier: `@moodle/lms/<component>/<path without extension>`, for example `@moodle/lms/local_example/viewer` for
   `local/example/js/esm/src/viewer.tsx`. Every page head carries an import map that resolves `@moodle/lms/` to a
   server route, which serves `<component dir>/js/esm/build/<path>.js` (`core\output\requirements\import_map`).
-  Only `.js` and `.js.map` are served, so a WebAssembly file cannot be shipped this way.
+  Only `.js` and `.js.map` are served: any other path gets `.js` appended before the file is looked up
+  (`import_map::add_import()` `$allowedsuffixes` and `resolve_candidate_path()`,
+  `public/lib/classes/output/requirements/import_map.php`, read 5.3.0), so a WebAssembly file cannot be shipped
+  this way.
 - Mounting: `core/react_autoinit` is imported on every page; it finds each `[data-react-component]` element, imports
   the specifier in that attribute, and renders the module's default export with the JSON in `data-react-props`
   (`public/lib/js/esm/src/react_autoinit.ts`). A component module therefore default-exports a function component.
@@ -81,7 +84,8 @@ Sources: `.grunt/tasks/react.js` (5.2), `.grunt/tasks/esm.js` (5.3.0), `.grunt/t
 - The build is whole-tree on both versions: it globs every `js/esm/src` under the Moodle root and rebuilds them
   all, whatever directory you run it from. **5.3+:** it also deletes each matching `js/esm/build` directory first. In
   a shared checkout expect changes in core and other plugins; commit only your plugin's files.
-- **5.3+:** when JavaScript caching is off (`jsrev = -1`) the server prefers `<module>.dev.js` if it exists. Shipping
+- **5.3+:** when JavaScript caching is off (`jsrev = -1`) the server prefers `<module>.dev.js` if it exists
+  (`import_map.php:445-455`, read 5.3.0). Shipping
   an updated `.js` with a stale `.dev.js` makes developer sites run different code from production.
 - New build files are served under the JS revision in the URL with long cache headers: purge caches after a build.
 - moodle-plugin-ci's default grunt tasks (`amd`, `yui`, `gherkinlint`, `stylelint`) neither rebuild `js/esm` nor

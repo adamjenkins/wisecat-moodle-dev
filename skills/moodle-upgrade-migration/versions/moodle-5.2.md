@@ -27,12 +27,13 @@ section of the root `UPGRADING.md`; not run unless stated.
 | `moodle-core-notification-confirm` YUI module removed | JS error | `core/notification` `saveCancelPromise()` or `core/modal_save_cancel` | `UPGRADING.md` 5.2 |
 | `M.util.set_user_preference()` removed | JS error | `core_user/repository` `setUserPreference()` | MDL-87425 |
 | `mod/assign/renderer.php` removed | Fatal on `require_once` of it | `\mod_assign\output\renderer` autoloads | MDL-87425 |
-| Core string `datechanged` deprecated | Debugging when a course reset status uses it | Use your module's own string | listed in `public/lang/en/deprecated.txt` of the 5.2 tree (release of deprecation not checked) |
+| Core string `datechanged` deprecated | Debugging when a course reset status uses it | Use your module's own string | deprecated since 4.5: listed in `lang/en/deprecated.txt` at the 4.5.0 tag, not at 4.4.0 |
 | Fresh installs have `enablemyhome = 0` (existing sites get 1 by an upgrade step) | `/` sends logged-in users to their start page; Behat "I am on site homepage" lands elsewhere | `set_config('enablemyhome', 1)` in the test or site setup when the site home is needed | `public/admin/settings/appearance.php`, `public/lib/db/upgrade.php` step `2026022700.01` |
 
-The fixes above are valid on 5.2 and 5.3. Whether the `cmactions` methods `delete()`, `duplicate()`,
-`move_before()` and `move_end_section()` exist before 5.2 was not checked; a plugin that also supports 5.1 guards
-each with `method_exists(\core_courseformat\local\cmactions::class, 'delete')`.
+The fixes above are valid on 5.2 and 5.3. The `cmactions` methods `delete()`, `duplicate()`, `move_before()` and
+`move_end_section()` are new in 5.2: at the 5.1.0 tag the class has only `rename()`, `set_visibility()` and
+`set_groupmode()`. A plugin that also supports 5.1 guards each call with
+`method_exists(\core_courseformat\local\cmactions::class, 'delete')`.
 
 ## The 5.2 functions a 5.3 port deprecates
 

@@ -51,7 +51,8 @@ class cleanup extends \core\task\scheduled_task {
 - `db/tasks.php` is read on upgrade: a new task or changed default needs a version bump. Check it exists with
   `php admin/cli/scheduled_task.php --list | grep local_example`.
 - Administrators can override the schedule in the UI or with `$CFG->scheduled_tasks` in `config.php`; once a task
-  is customised, a new default in `db/tasks.php` does not replace the administrator's schedule.
+  is customised, a new default in `db/tasks.php` does not replace the administrator's schedule
+  (`manager::reset_scheduled_tasks_for_component()` skips a task whose `is_customised()` is true).
 - Scheduled tasks run as the cron user, a copy of the main admin (`\core\cron::setup_user()`, 5.3.0). Code that must
   act for a particular user belongs in an ad-hoc task with `set_userid()`.
 - Keep `blocking` at 0. A blocking task stops every other task from running while it runs.
@@ -75,7 +76,8 @@ class cleanup extends \core\task\scheduled_task {
   it before queueing. Override `retry_until_success()` to return `false` for a task that must run at most once.
 - To wait for something without counting a failure (a remote service is busy, a lock is held), call
   `$this->set_soft_retry_delay()` (exponential) or `set_soft_retry_delay($seconds)` from `execute()` and return
-  normally (present on 5.2.2+ and 5.3; `adhoc_task.php`).
+  normally (`adhoc_task.php`; present from 5.2.2 and on 5.3, absent from 5.2.0 and 5.2.1, so a plugin whose
+  `requires` is 5.2.0 guards the call with `method_exists()`).
 - Make `execute()` safe to run twice: a task can fail after doing part of its work, and the retry starts again from
   the top.
 
@@ -138,5 +140,6 @@ In PHPUnit, run queued ad-hoc tasks with `$this->run_all_adhoc_tasks()` and a sc
 ## Upgrade steps
 
 Never call grade, modinfo or course APIs from `db/upgrade.php`; queue an ad-hoc task from the upgrade step and let
-cron do the work (`moodle-upgrade-migration`). On 5.3, `queue_adhoc_task()` from an upgrade step tolerates the
-`task_adhoc.identityhash` column not existing yet; see the 5.3 version file.
+cron do the work (`moodle-upgrade-migration`). **5.3+:** `queue_adhoc_task()` called from an upgrade step that
+runs before the `task_adhoc.identityhash` column exists queues the task without duplicate detection instead of
+failing (`public/lib/classes/task/manager.php`, 5.3.0).

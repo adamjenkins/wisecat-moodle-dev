@@ -36,7 +36,8 @@ The maintenance layout renders while the site may have no database, no caches an
   theme ships `theme_mytheme\output\core_renderer_maintenance extends \core_renderer_maintenance`.
 - **`core_renderer_maintenance` blanks what needs the database:** `block()`, `blocks()`, `blocks_for_region()`,
   `course_content_header()`, `course_content_footer()`, `course_header()`, `course_footer()`, `custom_menu()`,
-  `file_picker()` all return an empty string.
+  `file_picker()`, `lang_menu()` and `login_info()` all return an empty string
+  (`public/lib/classes/output/core_renderer_maintenance.php`).
 - **The layout file must make no database or cache call.** Boost's own file calls `format_string($SITE->shortname,
   true, ["escape" => false])` with no context for that reason. In a copied maintenance layout: no
   `get_config()`, no `context_*::instance()`, no `get_user_preferences()`, no `$OUTPUT->blocks()`, no navigation.
@@ -87,7 +88,8 @@ content in a plain container, and the theme's SCSS applies to it. Rules can be s
 ## Embedded and redirect
 
 - `embedded` pages sit inside an iframe or object and need all the space: no navbar, no header, no footer.
-  `$CFG->additionalhtmltopofbody` and `additionalhtmlfooter` are skipped on this layout by core.
+  `$CFG->additionalhtmltopofbody`, `additionalhtmlfooter` and `additionalhtmlbottomofbody` are skipped on this
+  layout by core.
 - `layout/embedded.php` renders `side-pre` with fake blocks only
   (`$OUTPUT->blocks('side-pre', [], 'aside', true)`).
 - `redirect` reuses the same file with no regions. It is the page shown between two requests; keep it free of

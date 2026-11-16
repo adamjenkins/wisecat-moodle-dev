@@ -154,7 +154,7 @@ grep -rniE '#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|\b(bg|text)-(white|black|light|dark
 
 ## Testing pointers
 
-`php admin/tool/behat/cli/init.php --colourmode=dark` (5.3 only) turns the feature on and renders every scenario in
+`php public/admin/tool/behat/cli/init.php --colourmode=dark` (5.3 only, from the Moodle root) turns the feature on and renders every scenario in
 dark mode; a user preference `theme_boost_colourmode` pins the mode for one scenario. Accessibility scenarios run on
 such a site check the same assertions in dark mode. The full recipes are in `moodle-theme-testing-release`.
 

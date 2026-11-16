@@ -14,7 +14,9 @@ settings. It is one HTML form: every tab's fields are drawn and saved together, 
 a tab the admin is not looking at. Signs that the page is outgrown:
 
 - The page is slow to draw because every tab runs its queries (file areas, course lists) on each load.
-- Admins lose their place: a save reloads the page on the first tab unless the URL carries `activetab=<tab name>`.
+- Admins lose their place: after a successful save core redirects to the page URL, which has no `activetab`
+  parameter, and the tabs class then opens the first tab (`public/admin/settings.php`,
+  `public/theme/boost/classes/admin_settingspage_tabs.php`; read, not run).
 - Many dependencies between fields. Each `hide_if()` adds to one JSON blob on the page.
 
 ## Keep `settings.php` thin
@@ -78,8 +80,9 @@ When one page is not enough, the theme adds an admin category and puts pages in 
    `admin/settings.php?section=themesetting<name>` (`public/admin/themeselector.php`). Either keep a real page of
    that name (the first of the theme's pages, replacing `$settings` as usual) and add the others to the category,
    or redirect: `settings.php` is included while the admin tree is being built, so a `redirect()` there, guarded by
-   a comparison of `$PAGE->url` with that section URL, runs before core reports the missing section. Keeping a real
-   page is simpler and has no redirect during tree building.
+   `$ADMIN->fulltree && $PAGE->has_set_url()` and a comparison of `$PAGE->url` with that section URL, runs before
+   core reports the missing section (the pattern of one large public theme; read, not run). Keeping a real page
+   is simpler and has no redirect during tree building.
 2. **Pages in the category must exist when the tree is built without settings.** Core builds the tree with
    `$ADMIN->fulltree` false on ordinary pages, to draw the administration navigation and the search index of page
    names. A page that is created only inside `if ($ADMIN->fulltree)` is missing from the navigation. So: create the
@@ -140,8 +143,7 @@ page outside the admin tree.
   single point to add per-course or per-category overrides later.
 - **Read the theme's own settings with `get_config()`, never through `$theme->settings`.** A parent theme's
   callbacks receive the active theme's object, so under a child theme `$theme->settings` holds the child's rows. A
-  large Boost child theme fixed exactly this bug and now rejects any pull request whose diff contains
-  `theme->settings->`.
+  CI check that rejects `theme->settings->` in a diff keeps the rule in force.
 - **String constants for select values.** Define the stored keys once (class constants) and use them in
   `settings.php` and in the reading code, instead of repeating `'yes'` and `'no'` literals.
 - **Generated option lists** for sizes, percentages and durations (a helper that returns the array).
@@ -195,8 +197,9 @@ Other points for parent themes:
   `theme_config::load('mytheme')->setting_file_url()`, not with the `$theme` passed to the callback.
 - A child theme adds its page to the parent's admin category with `$ADMIN->add('theme_parent', $page)`. Theme
   settings files are included in alphabetical order of theme name (`core_component::get_plugin_list('theme')`), so
-  this works only when the child's name sorts after the parent's; otherwise `add()` reports "parent does not
-  exist" and the page is dropped.
+  this works only when the child's name sorts after the parent's; otherwise `add()` emits the debugging message
+  "parent does not exist!", returns false, and the page is dropped (read in `admin_category::add()`, 5.2 and
+  5.3.0; not run).
 - Check each release that the parent does not force children to reimplement a setting: test with a minimal child
   theme active.
 

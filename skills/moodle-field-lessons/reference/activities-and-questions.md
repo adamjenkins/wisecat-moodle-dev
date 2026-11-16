@@ -14,13 +14,16 @@ The per-type file list and base classes are in `moodle-plugin-development`. Samp
 - **Core's `create_module()` needs `introeditor`** (`['text' => ..., 'format' => FORMAT_HTML, 'itemid' => 0]`) for
   every module that supports `FEATURE_MOD_INTRO`, and throws `createmodulemissingattribut` without it; the test
   generator's `intro`/`introformat` fields do not apply there (`public/course/lib.php`, `create_module()`).
-- **A module calendar event with a `groupid` is shown to that group's members only**; a teacher with
-  `accessallgroups` who is in no group never sees it (`public/calendar/classes/local/event/strategies/raw_event_retrieval_strategy.php`).
-  Give teachers another surface (the activity page, a report).
+- **A module calendar event with a `groupid` is shown to that group's members only.** Core treats it as a group
+  override: a teacher with `accessallgroups` who is not in the group gets only events whose `eventtype` is `group`
+  (`public/calendar/classes/local/event/strategies/raw_event_retrieval_strategy.php`, read in 5.3.0). Give
+  teachers another surface (the activity page, a report).
 - **Declaring `FEATURE_COMPLETION_HAS_RULES` requires `classes/completion/custom_completion.php`**; test repeated
   and degenerate attempts (zero answers, a retake after completion), not only the happy path.
-- **The module generator skips `add_moduleinfo()` and `edit_module_post_actions()`**, so code hooked there (and the
-  libraries they need) is untested by generator fixtures; test create and update through them or the real form.
+- **The module generator calls `add_moduleinfo()` but never builds the module's `mod_form`**
+  (`public/lib/testing/generator/module_generator.php`, `create_instance()`, 5.2 and 5.3), so the form's
+  `validation()`, `data_preprocessing()` and `data_postprocessing()`, and `update_moduleinfo()`, are untested by
+  generator fixtures. Test create and update through the real form (a Behat scenario) as well.
 
 ## Grades and assignments from code
 

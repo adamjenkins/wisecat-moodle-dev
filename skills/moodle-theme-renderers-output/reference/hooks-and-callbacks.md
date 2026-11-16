@@ -37,8 +37,8 @@ reading it there fixes the theme before the script has set its course and contex
 
 ## Output hooks
 
-All are in the namespace `\core\hook\output`. Each has a public read-only `$renderer` property except the two
-configuration hooks at the end.
+All are in the namespace `\core\hook\output`. Each has a public read-only `$renderer` property except
+`extend_url` and the two configuration hooks at the end.
 
 | Hook class | Dispatched from | What a callback can do | 5.2 |
 |---|---|---|---|
@@ -50,8 +50,8 @@ configuration hooks at the end.
 | `after_standard_main_region_html_generation` | `core_renderer::standard_after_main_region_html()` | `add_html($html)`: after the main region | yes |
 | `before_footer_html_generation` | `core_renderer::footer()`, before the footer is built | `add_html($html)`: last chance to require JavaScript or add hidden markup | yes |
 | `before_standard_footer_html_generation` | `core_renderer::standard_footer_html()` | `add_html($html)`: inside the standard footer | yes |
-| `extend_url` | the mobile app tool only, for the URL it adds to the page (no general dispatch found by `grep` in 5.3.0) | `add_param(...)` | yes |
-| `before_requirejs_config` | building the RequireJS configuration | Map AMD module names to ESM modules | **5.3+** |
+| `extend_url` | the mobile app tool only, for the web manifest URL it adds to `<head>` (no other dispatch found by `grep` in 5.3.0) | `add_param($name, $value)` | yes |
+| `before_requirejs_config` | building the RequireJS configuration | `add_requirejs_esm_map_entry($key, $value)`, `add_requirejs_esm_map_entries($entries)`: replace an AMD module with an ESM module | **5.3+** |
 | `before_import_map_config` | building the page's import map | `add_import(...)`: add an ESM specifier | **5.3+** |
 
 Notes:

@@ -36,10 +36,10 @@ supports 5.3, where Classic is gone.
 ## Templates copied from 5.3
 
 A layout or template copied from 5.3.0 can include partials that 5.2 lacks: Boost's 5.3 `drawers.mustache` uses
-`core/secondarymoremenu`, which is not in 5.2's `public/lib/templates/`. Mustache lint resolves partials in the theme
-and the component only, and whether it reports a partial missing on the branch it runs against was not established.
-Only a page render on a 5.2 row shows the failure, so the theme's Behat feature must load every copied layout on
-5.2 too, and the copies are made from the lowest supported branch or kept per branch.
+`core/secondarymoremenu`, which is not in 5.2's `public/lib/templates/`. Mustache lint does not report it: a partial
+the linter cannot find renders as nothing (read in the linter bundled with moodle-plugin-ci 4.5.11 and its Mustache
+library, not run). Only a page render on a 5.2 row shows the failure, so the theme's Behat feature must load every
+copied layout on 5.2 too, and the copies are made from the lowest supported branch or kept per branch.
 
 ## What is the same
 
@@ -48,4 +48,5 @@ Only a page render on a 5.2 row shows the failure, so the theme's Behat feature 
 - PHPUnit 11.5, `theme_mytheme_testsuite`, the compile fallback in `theme_config::get_css_content()`.
 - The ZIP validator (`public/lib/classes/update/validator.php`), the theme selector's screenshot and `choosereadme`,
   and the plugins page icon.
-- Boost's `thirdpartylibs.xml` on 5.2 lists Bootstrap, not fonts; a theme's own entries follow the same format.
+- Boost's `thirdpartylibs.xml` on 5.2 lists Bootstrap, Font Awesome and the design system, not fonts; a theme's own
+  entries follow the same format.

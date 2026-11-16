@@ -16,7 +16,9 @@ The global classes and functions that `lib/externallib.php` aliased on 5.2 are d
 | `external_generate_token()`, `external_create_service_token()` | `\core_external\util::generate_token()` |
 | `external_generate_token_for_current_user()`, `external_log_token_request()`, `external_validate_format()`, `external_delete_descriptions()` | the `\core_external\util` method of the same purpose |
 
-- The old class names now resolve through the renamed-classes list and emit a deprecation notice.
+- The old class names now resolve through the renamed-classes list, and the autoloader emits a developer
+  `debugging()` notice ("Class 'external_api' has been renamed for the autoloader and is now deprecated"), which
+  fails a PHPUnit or Behat run (`public/lib/classes/component.php`, read in 5.3.0, not run).
 - The old functions are final deprecations on 5.3: they are stubs marked `final: true`, so calling one throws a
   `coding_exception` (`public/lib/externallib.php` and `public/lib/classes/deprecation.php`,
   `emit_deprecation_notice()`, 5.3.0). Code that still calls `external_format_string()` breaks.

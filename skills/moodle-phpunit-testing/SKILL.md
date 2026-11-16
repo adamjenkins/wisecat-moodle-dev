@@ -67,8 +67,8 @@ php public/admin/tool/phpunit/cli/util.php --drop && php public/admin/tool/phpun
   and deprecations, and `moodle-plugin-ci phpunit --fail-on-warning` does the same. Fix the warning; do not add a
   flag to hide it.
 - **"Moodle PHPUnit environment was initialised for different version" means some component on disk changed**
-  (`public/lib/phpunit/bootstraplib.php`, 5.3.0), not that yours is broken. Re-run `init.php`. When your own schema change is not picked up, bump the plugin's `$plugin->version` or use
-  `util.php --drop` then `init.php`.
+  (`public/lib/phpunit/bootstraplib.php`, 5.2 and 5.3), not that yours is broken. Re-run `init.php`. When your own
+  schema change is not picked up, bump the plugin's `$plugin->version` or use `util.php --drop` then `init.php`.
 - **Run each new test file alone once**, and the whole suite in reverse order once
   (`vendor/bin/phpunit --testsuite local_example_testsuite --order-by=reverse`). Alone catches a missing
   `require_once` that another file happened to load; reverse order catches tests that depend on each other.
@@ -116,10 +116,12 @@ What moodle-cs enforces on test files (moodle-cs 3.7, `moodle/Sniffs/PHPUnit/`):
 
 - File `tests/<name>_test.php`, class `<name>_test`, namespace of the component (a file in `tests/local/` uses
   `local_example\local`). The class is `final` (warning `UnitTestClassesFinal`).
-- Coverage: a `#[CoversClass]`, `#[CoversFunction]`, `#[CoversMethod]` or `#[CoversNothing]` attribute, or an
-  `@covers` docblock tag, at class or method level. A test with none gets the warning "is missing any coverage
-  information". Attributes are recognised only when phpcs knows the branch is 5.0 or later; below 5.0 the docblock
-  must sit directly above `class`, so run phpcs with `--runtime-set moodleBranch 502` (or your lowest branch).
+- Coverage: a `#[CoversClass]`, `#[CoversTrait]`, `#[CoversFunction]`, `#[CoversMethod]` or `#[CoversNothing]`
+  attribute on the class (on a method the sniff accepts only `#[CoversNothing]`), or an `@covers` docblock tag at
+  class or method level. A test with none gets the warning "is missing any coverage information, own or at class
+  level". The attributes are ignored only when phpcs knows the branch is below 5.0 (`TestCaseCoversSniff`,
+  `AbstractTestCaseSniff::shouldCheckTestCaseAttributes()`); with an unknown branch, or 5.0 and later, they count.
+  Tell phpcs the lowest branch you support with `--runtime-set moodleBranch 502`.
 - `setUp()`, `tearDown()`, `setUpBeforeClass()` and `tearDownAfterClass()` call their parent exactly once
   (`ParentSetUpTearDownSniff`; "must call to parent::setUp() only once"). Calling the parent does not reset the
   database; `resetAfterTest()` does.
@@ -167,15 +169,19 @@ $clock = $this->mock_clock_with_frozen(1893456000);   // 2030-01-01 00:00 UTC.
 
 Code that calls `time()` directly does not see the mocked clock; read the time through `\core\clock` in new code.
 `redirectHook()`, `assertDebuggingCalled()`, `get_mocked_http_client()` and `get_mocked_string_manager()` are on the
-same class. Generators, special test cases and PostgreSQL detail are in the reference files below.
+same class. The helper classes behind them have namespaced, autoloaded names on 5.2 and 5.3
+(`\core\test\phpunit\phpunit_util`, `\core\test\phpunit\event_sink`, `message_sink`, `phpmailer_sink`,
+`\core\test\testing_util`); the old global names (`\phpunit_util`, `\phpunit_event_sink`) keep working without
+debugging until 6.0 (MDL-87716, `public/lib/UPGRADING.md` under 5.2). Generators, special test cases and
+PostgreSQL detail are in the reference files below.
 
 - **Prefer the real test database to a mocked `$DB`.** The reset makes real rows cheap, and a mocked
   `moodle_database` tests your expectations of the DML API rather than the SQL. When a collaborator must be faked,
   inject it: obtain it in production code through `\core\di::get()` and replace it in the test with
   `\core\di::set(\local_example\remote\api::class, $mock)`. Never assign to the global `$DB`.
 - **Coverage:** `vendor/bin/phpunit --coverage-text --testsuite local_example_testsuite` needs pcov or Xdebug loaded.
-  `--group <name>` selects tests tagged `#[\PHPUnit\Framework\Attributes\Group('<name>')]`; Moodle does not add
-  groups for you, so `--testsuite` is the reliable selector.
+  `--group <name>` selects tests tagged `#[\PHPUnit\Framework\Attributes\Group('<name>')]` (PHPUnit 11 behaviour,
+  not run for this skill); `--testsuite` is the selector that `init.php` builds for every component.
 - **A code path behind an optional PHP extension runs only where the extension is loaded.** An `if
   (extension_loaded('imagick'))` branch is skipped on a site with GD only and runs on every CI row, so it fails
   there first. Load the extension locally (`php -d extension=imagick.so vendor/bin/phpunit ...`) or treat that branch
@@ -200,9 +206,11 @@ Each was seen in practice on shipped plugins.
   ```
 
   Use `$PAGE->get_renderer()` in tests, not `$OUTPUT`, which is not a page renderer outside a real request.
-- **The bootstrap preloads what a page does not.** Free functions from `course/lib.php`, `lib/filelib.php` and
-  `question/engine/lib.php` work in PHPUnit without a `require_once`. Fix: add the `require_once` in the file that
-  calls them, and make one real web request to every new entry point before calling the work done.
+- **A test process has loaded libraries a page has not.** The data generator requires `course/lib.php`
+  (`public/lib/testing/generator/data_generator.php`), `get_file_storage()` requires `lib/filelib.php`, and every
+  earlier test in the same run leaves its own `require_once` files loaded. Symptom: free functions from those
+  files work in PHPUnit and the page dies with "Call to undefined function". Fix: add the `require_once` in the
+  file that calls them, and make one real web request to every new entry point before calling the work done.
 - **`CLI_SCRIPT` is true under PHPUnit.** A `if (CLI_SCRIPT) { return; }` guard short-circuits every positive test,
   and a suite that only asserts `false` then passes against broken code. Fix: inject the condition, and give every
   negative test a positive twin that must pass.
@@ -223,8 +231,9 @@ Each was seen in practice on shipped plugins.
   or cast both sides with `intval`/`array_map('intval', ...)`.
 - **Read core return shapes before asserting on them.** Many core `export_for_template()` results are stdClass
   objects, not arrays (`action_link` exports `$x->attributes`). Fix: open the method's `return` statement.
-  Since 5.2.2, `block_myoverview` and some exporters return numeric entities (`&#60;`) where earlier builds returned
-  named ones (`&lt;`) (MDL-79755, `UPGRADING.md` of 5.2.2 and 5.3.0); compare decoded text,
+  Since 5.2.2, `block_myoverview` returns fields such as the course full name with numeric entities (`&#60;`) and
+  unencoded quotes where earlier builds returned named ones (`&lt;`) (MDL-79755, `UPGRADING.md` of 5.2.2 and
+  5.3.0); compare decoded text,
   `html_entity_decode($value, ENT_QUOTES | ENT_HTML5)`, when a test must pass on 5.2.0 to 5.2.1 as well.
 - **`isset($PAGE->cm)` is always false and `empty($PAGE->cm)` always true.** `moodle_page` has `__get()` but no
   `__isset()` (`public/lib/pagelib.php`, 5.2 and 5.3), so a guard written that way skips the branch in tests and on
@@ -273,8 +282,8 @@ Each was seen in practice on shipped plugins.
 
 | File | Read it when |
 |---|---|
-| [reference/generators-and-fixtures.md](reference/generators-and-fixtures.md) | You write a plugin data generator, create activities, quiz attempts, enrolments or users for a test, change module order, or back up and restore a course inside a test |
-| [reference/special-testcases.md](reference/special-testcases.md) | You test an external function, a routed controller (`route_testcase`), a privacy provider, admin settings pages, an HTTP client call, a block class, or core AI actions |
+| [reference/generators-and-fixtures.md](reference/generators-and-fixtures.md) | You write a plugin data generator, create activities, quiz attempts, grades, enrolments or users for a test, instantiate a block class, change module order, or back up and restore a course inside a test |
+| [reference/special-testcases.md](reference/special-testcases.md) | You test an external function, a routed controller (`route_testcase`), a privacy provider, admin settings pages, a moodleform or dynamic form, an HTTP client call, a hook listener, or core AI actions |
 | [reference/postgresql-and-isolation.md](reference/postgresql-and-isolation.md) | A test touches transactions, event observers, message processors, the log store or `perf_get_reads()`, or passes on MySQL/MariaDB and fails on PostgreSQL |
 
 ## Version notes

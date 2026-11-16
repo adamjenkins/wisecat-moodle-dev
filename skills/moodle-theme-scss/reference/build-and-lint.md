@@ -47,7 +47,7 @@ From `.stylelintrc` at the Moodle root. The syntax is `postcss-scss`.
 | `declaration-block-no-duplicate-properties` | no repeated property in a block | fallback-then-override pairs |
 | `declaration-block-no-shorthand-property-overrides` | a shorthand must not follow its longhand | `border-left-color` then `border` |
 | `property-no-unknown`, `selector-type-no-unknown`, `selector-pseudo-class-no-unknown`, `unit-no-unknown` | known names only | vendor experiments, typos |
-| `csstree/validator` | values must parse as valid CSS for the property | `container-type`, `@container`, `clamp()` in `font-size` were rejected on 5.3 |
+| `csstree/validator` | values must parse as valid CSS for the property | `container-type`, `@container`, `clamp()` in `font-size` were reported as rejected on 5.3 (not re-run for this file) |
 | `block-no-empty`, `no-empty-source` | no empty blocks or files | placeholders |
 | `color-hex-case: lower`, `color-hex-length: short`, `length-zero-no-unit`, `max-line-length: 132`, `no-extra-semicolons` | warnings | `#FFFFFF`, `0px`, long selectors |
 | `selector-list-comma-newline-after` | one selector per line in a list | `.a, .b {` |
@@ -101,14 +101,16 @@ of the theme's rules; with developer debugging a message named the error; with d
 
 Ways to see the message:
 
-1. Command line, with `$CFG->debug = E_ALL;` and `$CFG->debugdisplay = 1;` in a development `config.php`:
-   `php admin/cli/build_theme_css.php --themes=mytheme --direction=ltr` (add `--verbose` for progress). The script
-   exists on 5.2 and 5.3. It stores what it built in the cache and raises the theme's sub-revision, including when
-   the build was the fallback, so run it again (or purge caches) after the fix.
+1. Command line, from the Moodle root, with `$CFG->debug = E_ALL;` and `$CFG->debugdisplay = 1;` in a development
+   `config.php`: `php admin/cli/build_theme_css.php --themes=mytheme --direction=ltr` (add `--verbose` for
+   progress). The script exists on 5.2 and 5.3. It calls `get_css_content()`, stores what it built in the cache and
+   raises the theme's sub-revision, including when the build was the fallback, so run it again (or purge caches)
+   after the fix (`theme_build_css_for_themes()` in `public/lib/outputlib.php`, read; the message was seen on 5.3.0
+   through a separate compile script, not through this one).
 2. The PHP error log of the web server, after requesting the stylesheet URL.
 3. A PHPUnit test that calls `theme_config::load('mytheme')->get_css_content()`: an unexpected `debugging()` call
-   fails the test and prints the message, and an assertion on one of the theme's own selectors catches the fallback
-   even if debugging is off.
+   fails the test and prints the message (how core's test case treats `debugging()`; not run with a broken theme),
+   and an assertion on one of the theme's own selectors catches the fallback even if debugging is off.
 4. For an uploaded preset, the settings page itself: saving compiles the preset and shows the compiler message.
 
 Messages and their usual cause:
@@ -118,10 +120,11 @@ Messages and their usual cause:
 | "file not found for @import" | An import path that exists on the other Moodle version only, or a file outside the import paths |
 | "Undefined variable" | A Bootstrap, Boost or token variable used in pre-SCSS; a 5.3-only variable on 5.2; a `$mds-*` variable on the plain preset |
 | "Undefined mixin" | `dark-mode` on 5.2; a mixin used in pre-SCSS |
-| an argument "must be a color" or a similar type error | A colour function applied to a variable that holds `var(...)` on 5.3 |
+| "$color: var(--bs-...) is not a color." | `darken()`, `lighten()`, `mix()`, `tint-color()` or `shade-color()` applied to a variable that holds `var(...)` on 5.3. `rgba()` on such a variable gives no message: it emits `rgba(var(...), .9)`, which browsers drop |
 | "Can't import scss file" (a separate debugging message, not a failure) | An import that resolves outside the theme directories (**5.3+:** and outside `lib/bundles`), or without the `.scss` extension; the import is skipped |
 
-The exact wording of the type-error messages was not captured; the first row was seen on 5.3.0.
+The first row was seen on 5.3.0. The other wordings were read in the compiler
+(`public/lib/scssphp/src/Compiler.php`, `findImport()` and `assertColor()`), not captured from a run.
 
 Other facts about the build:
 
@@ -129,9 +132,10 @@ Other facts about the build:
   theme that compiles under one may fail under the other; nothing here was checked with SassC.
 - In theme designer mode the SCSS is compiled on request and cached for a few seconds, with source maps in the LTR
   build; in production the compile happens once per theme revision and direction.
-- With `$THEME->usefallback` on (Boost sets it, children inherit it), the first stylesheet request after a purge can
-  be answered with the previous build while the new one compiles; the next request gets the new one. A theme may set
-  `$THEME->usefallback = false;` while it is being developed. Caches and revisions are covered in
+- With `$THEME->usefallback = true` in the theme's own `config.php` (Boost sets it; the key is not inherited, and
+  the default is false), the first stylesheet request after a purge can be answered with the previous build while
+  the new one compiles; the next request gets the new one (`public/theme/styles.php`, read). A theme may leave it
+  off while it is being developed. Caches and revisions are covered in
   `moodle-theme-development`.
 
 ## A precompiled fallback stylesheet: usually not worth it
@@ -162,8 +166,9 @@ Consequences for a child theme:
 If you still want one, the shape core's former Classic theme used on 5.2 was: one entry file importing the same
 pieces, in the same order, as the `scss` closure concatenates (`pre`, the preset, `post`), compiled with dart Sass
 with the child's and Boost's `scss/` directories as load paths, committed as `style/moodle.css`, and returned by the
-callback. The command was not run for this file, and whether the CI grunt step then reports the committed CSS as
-changed is unknown.
+callback. The command was not run for this file. By reading moodle-plugin-ci's grunt command, the CI step reports
+only `.js`, `.js.map` and `.css` files that its own tasks changed, and no task rebuilds a third-party theme's CSS,
+so a committed fallback is neither checked nor reported as stale.
 
 Official pages: https://moodledev.io/general/development/policies/codingstyle/css and
 https://moodledev.io/docs/5.3/apis/plugintypes/theme/styles

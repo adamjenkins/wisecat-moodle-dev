@@ -92,7 +92,7 @@ export const init = () => {
   neutral state.
 - **A one-shot flag must be removed by the code that acts on it.** A preference or config value meaning "do this on
   the next request" (purge something, show a notice once) that is read and not cleared makes the action happen on
-  every page load. A large public theme shipped exactly this with a cache purge.
+  every page load: with a cache purge as the action, the site purges on every request.
 
 ## Why not localStorage
 
@@ -205,9 +205,8 @@ Rules:
 
 - **The two interfaces together are a complete provider.** `user_preference_provider` is a request provider, so no
   context or delete methods are needed for preferences: core deletes a user's preferences itself.
-- **A null provider in a theme that sets a preference is a defect.** The export leaves the preference out. A large
-  public theme shipped this way until a later release corrected it. Change the provider in the same commit that adds
-  the first preference.
+- **A null provider in a theme that sets a preference is a defect.** The export leaves the preference out, and a
+  Plugins directory reviewer will flag it. Change the provider in the same commit that adds the first preference.
 - **One `add_user_preference()` per preference name.** There is no wildcard. For numbered preferences
   (`theme_mytheme_banner1dismissed`, `...2dismissed`) loop over the possible numbers in both methods.
 - **Every string named in the provider must exist** in the theme's lang file. The same core test checks the reason

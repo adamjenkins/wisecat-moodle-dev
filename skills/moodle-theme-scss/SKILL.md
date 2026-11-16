@@ -40,8 +40,8 @@ parts and compiles them with scssphp 1.12.1 (the same compiler version in 5.2 an
                            your post.scss     rules; every variable, mixin and function now exists
 3. extra-SCSS callbacks  every parent's extrascsscallback, base first, then the theme's own.
                          Boost's emits: the raw SCSS setting (scss) and the background image rules.
-then post_process():     [[pix:...]] and [[font:...]] become URLs, csspostprocess runs,
-                         the all-rtl build is flipped, and the result is minified.
+then post_process():     [[pix:...]] and [[font:...]] become URLs, csspostprocess runs and
+                         the all-rtl build is flipped; get_css_content() then minifies the result.
 ```
 
 - Every callback receives the theme being compiled, so Boost's callbacks read the child's settings: a `brandcolor`
@@ -67,7 +67,8 @@ $THEME->scss = function ($theme) {
 };
 $THEME->prescsscallback = 'theme_mytheme_get_pre_scss';
 $THEME->extrascsscallback = 'theme_mytheme_get_extra_scss';
-// Leave editor_scss, usefallback and precompiledcsscallback unset: Boost's are used.
+// Leave editor_scss and precompiledcsscallback unset: Boost's are used. usefallback is not inherited
+// (default false); whether to restate it is in moodle-theme-boost-child.
 ```
 
 ```php
@@ -208,9 +209,12 @@ enables the feature, the child's pages get `<html data-bs-theme="dark">`. Write 
    palette (cascade reasoning; not checked in a browser). Set the SCSS variable in pre-SCSS, or scope light values:
    `:root:not([data-bs-theme="dark"]) { ... }`.
 6. **5.3+:** some variables that were colours in 5.2 are `var(...)` strings in 5.3 (`$state-*-bg`, `$state-*-border`,
-   `$dialogue-*`, `$card-bg`, `$card-border-color` and about forty more). `darken($state-success-bg, 5%)` or
-   `rgba($dialogue-base-bg, .9)` compiles on 5.2 and is a compile error on 5.3 (read; scssphp colour functions need a
-   colour). Derive from `$success`, `$gray-*` or a literal instead. The list is in the 5.3 version notes.
+   `$dialogue-*`, `$card-bg`, `$card-border-color` and about forty more). `darken($state-success-bg, 5%)`, and likewise
+   `lighten()`, `mix()`, `tint-color()` and `shade-color()`, compiles on 5.2 and is a compile error on 5.3:
+   "$color: var(--bs-state-success-bg) is not a color." `rgba($dialogue-base-bg, .9)` does not fail: it is emitted as
+   `rgba(var(...), .9)`, which browsers drop, so the declaration silently has no effect (both read in
+   `public/lib/scssphp/src/Compiler.php`, not run). Derive from `$success`, `$gray-*` or a literal instead. The list
+   is in the 5.3 version notes.
 7. **5.3+:** setting `$card-bg`, `$card-border-color`, `$state-*-bg` or `$input-border-color` to a literal stops that
    component following the mode. Set a colour the dark palette can re-point (a `var(--bs-...)`), as Boost does.
 8. Icons drawn as Font Awesome glyphs follow the text colour. An `<img>` icon keeps its baked-in colours; Boost
@@ -274,7 +278,8 @@ so in a browser the message goes only to the PHP error log.
 
 To see the error, compile from the command line with developer debugging on (`$CFG->debug = E_ALL;` and
 `$CFG->debugdisplay = 1;` in a development `config.php`); the message "Error while compiling SCSS: ..." names the
-cause (**run 5.3.0** for the message; the command below reaches the same code, read):
+cause (**run 5.3.0** for the message, seen with a separate compile script; the command below calls the same
+`get_css_content()` through `theme_build_css_for_themes()`, read in `public/lib/outputlib.php`, not run):
 
 ```bash
 php admin/cli/build_theme_css.php --themes=mytheme --direction=ltr
@@ -285,11 +290,11 @@ php admin/cli/build_theme_css.php --themes=mytheme --direction=ltr
 - A PHPUnit test that calls `theme_config::load('mytheme')->get_css_content()` and asserts one of the theme's own
   selectors is in the result catches every case here, because the fallback contains none of them
   (`moodle-theme-testing-release` has the test).
-- Usual causes: a 5.2-only import path on 5.3; a 5.3-only mixin or partial on 5.2; a colour function applied to a
-  `var(...)` variable; an undefined variable in pre-SCSS; invalid SCSS typed into a raw SCSS setting.
-- A different effect with the same look: with `usefallback` on (inherited from Boost), the first stylesheet request
-  after a purge can be answered with the previous build while the new one compiles. Reload once before debugging.
-  Cache behaviour is in `moodle-theme-development`.
+- Usual causes: a 5.2-only import path on 5.3; a 5.3-only mixin or partial on 5.2; `darken()` or `mix()` applied to
+  a `var(...)` variable; an undefined variable in pre-SCSS; invalid SCSS typed into a raw SCSS setting.
+- A different effect with the same look: when the theme's own `config.php` sets `$THEME->usefallback = true` (the
+  key is not inherited from Boost), the first stylesheet request after a purge can be answered with the previous
+  build while the new one compiles. Reload once before debugging. Cache behaviour is in `moodle-theme-development`.
 
 ## Cascade facts that decide whether a rule applies
 
@@ -314,7 +319,7 @@ php admin/cli/build_theme_css.php --themes=mytheme --direction=ltr
   `.custom-select`, `.media`) still work only through Boost's compatibility layer, removal planned for 6.0. Each use
   shows a red "Deprecated style in use" marker in theme designer mode and fails Behat runs started with
   `--scss-deprecations` (`public/theme/boost/scss/moodle/deprecated.scss`, `bs4-compat.scss`; read 5.2 and 5.3,
-  identical). Write `.ms-2`, `.float-end`, `.fw-bold`, `.visually-hidden` in templates and in markup built by
+  identical; the Behat failure was not run). Write `.ms-2`, `.float-end`, `.fw-bold`, `.visually-hidden` in templates and in markup built by
   JavaScript.
 - Boost's fixed navbar is `$navbar-height: 60px` (`scss/moodle/variables.scss`). Offsets for sticky or scrolled-to
   elements start below it, not at 0.
@@ -336,6 +341,7 @@ comments are in the build and lint reference.
 | `@import "bootstrap/functions"` (or any Bootstrap, Font Awesome or token partial) | 5.3: "file not found for @import", whole theme falls back to stock Boost (**run 5.3.0**) | Import nothing in `post.scss`; elsewhere use only the wrapper names |
 | Shipping a copy of Boost's `preset/default.scss` | A 5.3 copy fails on 5.2 (`moodle/font-stack` missing); a 5.2 copy on 5.3 loses fonts, grey body and mode-following cards (read) | Call `theme_boost_get_main_scss_content()` at compile time |
 | Variable override placed in `post.scss` | No effect on Bootstrap or Boost output | Move it to `pre.scss` or the pre-SCSS callback |
+| `darken()`, `mix()` or `rgba()` on `$state-*-bg`, `$dialogue-*` or `$card-bg` | 5.3: "is not a color" compile error and fallback; with `rgba()` a declaration that browsers drop (read) | Derive from `$success`, `$gray-*` or a literal |
 | `$gray-200`, `tint-color()` or `@include` in pre-SCSS | Compile error, silent fallback | Literals and Sass built-ins only in pre-SCSS |
 | Repeating Boost's pre or extra SCSS callback code in the child | Brand colour and raw SCSS emitted twice | Rely on the inherited callbacks; add only your own |
 | `$THEME->scss = 'main';` (a file name) in a child | Only the child's `scss/` is an import path, so `@import "moodle"` is not found (read: `core_scss::set_file()`) | Use the closure form |
@@ -347,9 +353,9 @@ comments are in the build and lint reference.
 | `background: #fff` behind inherited text | White box with light text in dark mode | `var(--bs-body-bg)` or a utility class (`bg-body`) |
 | `[[setting:brand]]` in SCSS | Printed literally; core has no such placeholder | SCSS variable from the pre-SCSS callback |
 | Raw setting value interpolated into SCSS | A bad value breaks the compile for the whole site, or injects rules | Validate with a pattern before emitting |
-| `$THEME->editor_scss = ['editor']` with no `scss/editor.scss` | Editor content loses Bootstrap, fonts and the dark palette (read 5.3.0) | Leave it unset, or ship the file |
+| `$THEME->editor_scss = ['editor']` with no `scss/editor.scss` | Editor content loses Bootstrap, fonts and the dark palette (read 5.3.0, not run) | Leave it unset, or ship the file |
 | `/* rtl:ignore */` as the last thing in a rule, or written as `//` | Directive does nothing | Put a `/* */` directive directly before a declaration |
-| Judging CSS on the first load after a purge | Old stylesheet can be served once | Reload, then check the computed style |
+| Judging CSS on the first load after a purge | With `usefallback` on, the old stylesheet can be served once | Reload, then check the computed style |
 
 ## Reference files
 

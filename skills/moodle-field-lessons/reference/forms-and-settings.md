@@ -106,20 +106,9 @@ Samples are valid on Moodle 5.2 and 5.3; source lines were read in 5.3.0 unless 
 - **A new course-wide setting must win over older per-item values** where that is what the setting promises.
   When an earlier version stored a per-item value (per section, per activity), decide the precedence explicitly
   and test on a course that already has per-item values; a fresh test course hides the conflict.
-- **`settings.php` of a `tool` (and `local`) plugin receives only `$ADMIN`**; create your own page inside
-  `if ($hassiteconfig)`, or `$settings->add()` on null crashes the upgrade.
-
-  ```php
-  if ($hassiteconfig) {
-      $settings = new admin_settingpage('tool_myplugin_settings',
-          new lang_string('pluginname', 'tool_myplugin'));
-      $ADMIN->add('tools', $settings);
-      if ($ADMIN->fulltree) {
-          // Add settings.
-      }
-  }
-  ```
-
+- **`settings.php` of a `tool` or `local` plugin receives `$ADMIN` and `$hassiteconfig` but no `$settings`**:
+  create an `admin_settingpage` inside `if ($hassiteconfig)` and add it with `$ADMIN->add('tools', $page)`, or
+  `$settings->add()` on null crashes the upgrade (`moodle-plugin-development` has the recipe for each type).
 - **An `admin_externalpage` guarded by a custom capability** goes outside the `if ($hassiteconfig)` block (core
   precedent: `public/report/log/settings.php`), or non-admin holders of the capability get "Access denied".
 - **Without `moodle/backup:userinfo`** the backup "Include users" setting is a hidden input, not an unticked

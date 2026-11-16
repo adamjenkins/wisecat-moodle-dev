@@ -30,32 +30,31 @@ that is not declared there shows up as hundreds of phpcs errors, the only signal
 The Plugins directory review applies the submission guidelines, and moodle-plugin-ci is only the automated part of
 it. Every rule below is in the guidelines and none is checked by the standard workflow. The licence file
 (by far the most frequent), ZIP root, missing strings, prefixes, capability, `PARAM_RAW` and `mkdir` rows are ones
-reviewers have raised on plugins whose CI was green. The check on the right catches it before
-submission.
+reviewers have raised on plugins whose CI was green. Each row gives the quickest check and the skill that owns
+the full rule and its fix.
 
-| Rule | Check before submitting |
-|---|---|
-| The package includes a licence file in its root | `LICENSE` with the full GPL v3 text in the repository root, committed and pushed before the tag; then `unzip -Z1 plugin.zip \| grep -x 'example/LICENSE'` on the built ZIP |
-| The ZIP's single root folder is the plugin name without its type (`example/` for `local_example`) | `unzip -Z1 plugin.zip \| cut -d/ -f1 \| sort -u` prints exactly one line; never upload a GitHub source archive (`moodle-local_example-1.0.0/`) |
-| `.gitattributes` does not drop required files | `export-ignore` lines leave `LICENSE`, `version.php`, `lang/en` and `amd/build` in the archive; check the ZIP listing, not the repository |
-| Every string the code or core asks for exists | for each `db/caches.php` definition, `cachedef_<area>`; `pluginname` for every type, a filter included; `choosereadme` for a theme; every literal `get_string('x', 'local_example')` and `{{#str}} x, local_example }}` key |
-| Global functions, classes and constants carry the full frankenstyle prefix | `grep -rnE '^\s*function [a-z_0-9]+' --include=*.php .` outside `classes/` and `tests/`: every name starts with the component (or `xmldb_`), including helpers in page and CLI scripts |
-| Each page and web service function checks a capability, not only `require_login()` | for each script with `require_login`, a `require_capability` or `has_capability`; sibling actions make the same checks as the main one |
-| Input uses the narrowest `PARAM_*` type | `grep -rn 'PARAM_RAW' --include=*.php .`; each hit gets a narrower type or a one-line reason in a comment |
-| Directories use core's helpers and permissions | `grep -rn 'mkdir(' --include=*.php .`; expect `make_temp_directory()`, `make_request_directory()` or `$CFG->directorypermissions` |
-| A privacy provider exists and is complete | `classes/privacy/provider.php`; run core's privacy test once on a site with the plugin installed (`moodle-privacy-gdpr`) |
-| An activity module implements backup and restore | `backup/moodle2/`; for course-scoped tables in other plugin types, decide and document why they are or are not backed up |
-| The plugin works on PostgreSQL as well as MySQL | a blocking PostgreSQL row for every branch, and tests that reach the SQL |
-| Bundled third-party code, fonts and media are declared | one `thirdpartylibs.xml` entry per library, font or icon set, with its licence |
+| Rule | Quick check before submitting | Owner |
+|---|---|---|
+| The package includes a licence file in its root | `unzip -Z1 plugin.zip \| grep -x 'example/LICENSE'` on the built ZIP | `moodle-plugin-release` |
+| The ZIP's single root folder is the plugin name without its type (`example/` for `local_example`) | `unzip -Z1 plugin.zip \| cut -d/ -f1 \| sort -u` prints exactly one line | `moodle-plugin-release` |
+| `.gitattributes` does not drop required files | Read the ZIP listing, not the repository: `LICENSE`, `version.php`, `lang/en` and `amd/build` are in it | `moodle-plugin-release` |
+| Bundled third-party code, fonts and media are declared | One `thirdpartylibs.xml` entry per library, font or icon set, with its licence | `moodle-plugin-release` |
+| Every string the code or core asks for exists | `cachedef_<area>` for each `db/caches.php` definition; `pluginname` for every type, a filter included; `choosereadme` for a theme; every literal `get_string()` and `{{#str}}` key | `moodle-release-preflight` |
+| Global functions, classes and constants carry the full frankenstyle prefix | `grep -rnE '^\s*function [a-z_0-9]+' --include=*.php .` outside `classes/` and `tests/`: every name starts with the component (or `xmldb_`) | `moodle-release-preflight` |
+| Each page and web service function checks a capability, not only `require_login()` | Each script with `require_login` also has `require_capability` or `has_capability`; sibling actions make the same checks | `moodle-release-preflight` |
+| Input uses the narrowest `PARAM_*` type | `grep -rn 'PARAM_RAW' --include=*.php .` | `moodle-release-preflight` |
+| Directories use core's helpers and permissions | `grep -rn 'mkdir(' --include=*.php .` | `moodle-release-preflight` |
+| An activity module implements backup and restore | `backup/moodle2/` exists; for course-scoped tables in other plugin types the decision is written in the README | `moodle-release-preflight` |
+| A privacy provider exists and is complete | `classes/privacy/provider.php`; run core's privacy test once on a site with the plugin installed | `moodle-privacy-gdpr` |
+| The plugin works on PostgreSQL as well as MySQL | A blocking PostgreSQL row for every branch, and tests that reach the SQL | this skill |
 
 ## Traps
 
 - **A licence file added after the tag, or committed and not pushed, is still missing from the reviewed ZIP.**
-  Build the ZIP from the tag you submit and list it.
+  Build the ZIP from the tag you submit and list it (`moodle-plugin-release`).
 - **`validate` and the reviewer's tooling can disagree.** `validate` asks a filter for `filtername`; review asked
   for `pluginname` too. Satisfy both.
-- **A reviewer's suggested fix is not always right.** A suggested `PARAM_*` type can strip characters valid input
-  needs; check the suggestion against real input, and answer with the reason when you keep the original. A reasoned
-  answer is accepted.
+- **A reviewer's suggested fix is not always right.** Test it against real input before applying it; how to
+  answer is in `moodle-plugin-release`.
 - **Reviewers often link 4.5 documentation pages.** Read the page for your branch; the rule is the same, the
   details may not be.

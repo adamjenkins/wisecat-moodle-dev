@@ -37,6 +37,9 @@ Checks run in this order; the first match wins (`RTLCSS::processRule()`).
 | 9 | `background`, `background-position`, `background-position-x` | `left` / `right` keywords swapped; a `%` or unitless x position becomes `100 - x` |
 | 10 | name contains `cursor` | `e` and `w` swapped in the `*-resize` values |
 
+The method also has branches for names containing `shadow` and for `transform`, placed before `background`. Both
+are empty (marked as to-do in the library), so those properties are matched and left unchanged.
+
 ## What is not flipped
 
 Each of these is wrong in RTL until corrected by hand.
@@ -45,7 +48,8 @@ Each of these is wrong in RTL until corrected by hand.
   `translateX(-100%)` slides the wrong way.
 - `box-shadow` and `text-shadow` x offsets.
 - Gradient angles and directions, and every `background-image` value; `calc()` background positions.
-- `border-radius` written with a slash.
+- `border-radius` written with a slash. The library has code for it, but core's tests list the slash forms as not
+  supported; check the RTL sheet before relying on it.
 - `inset: a b c d` (not in the shorthand list, so the 2nd and 4th values stay). 2- and 3-value shorthands are
   symmetric and need nothing.
 - Anything outside a served stylesheet: inline `style=""`, styles set from JavaScript, SVG content, URLs inside

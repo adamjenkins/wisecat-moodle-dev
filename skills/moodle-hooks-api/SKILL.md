@@ -281,7 +281,7 @@ Cover both branches: the callback acts, and the callback returns early (guest, w
   page is answered `500 Internal Server Error` by the bootstrap renderer, or `404 Not Found` by
   `core_renderer::fatal_error()` when output has not started, whatever `http_response_code()` you set first
   (`public/lib/classes/output/bootstrap_renderer.php` `early_error()`, `core_renderer.php` `fatal_error()`, read in
-  5.3.0). The same holds for an `after_require_login()` callback. To refuse with a real 403, send it and stop:
+  5.3.0, not run). The same holds for an `after_require_login()` callback. To refuse with a real 403, send it and stop:
 
   ```php
   public static function after_config(\core\hook\after_config $hook): void {
