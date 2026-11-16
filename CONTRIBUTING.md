@@ -72,7 +72,8 @@ Detail that most tasks do not need goes in `skills/<name>/reference/<topic>.md`.
   only that file and `SKILL.md` has everything.
 - One hop only: a reference file does not send the reader to another reference file.
 - Reference files have no line cap, but one file is one topic. Split by the question the reader is asking.
-- Link with a relative Markdown link: `[reference/rtl.md](reference/rtl.md)`. The adapter generator copies the
+- Link with a relative Markdown link whose text and target are both the file's path inside the skill directory
+  (`reference/<topic>.md`), as the Reference files table of any skill does. The adapter generator copies the
   files and rewrites these links.
 
 ### 3. Version files: built to take a new Moodle version
