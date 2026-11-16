@@ -60,9 +60,9 @@ jobs:
       - name: Adapters in sync with prompts
         run: |
           python3 scripts/build-adapters.py >/dev/null
-          if ! git diff --quiet adapters/; then
+          if [ -n "$(git status --porcelain adapters/)" ]; then
             echo "::error::adapters/ out of sync — run: python3 scripts/build-adapters.py && commit"
-            git --no-pager diff --stat adapters/
+            git status --porcelain adapters/
             exit 1
           fi
           echo "Adapters in sync."

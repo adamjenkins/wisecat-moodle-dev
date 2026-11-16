@@ -21,6 +21,21 @@ Other assistants (Cursor, Copilot, Aider, Continue, …) consume different forma
 
 Each `build_*` function is independent. Add one to support a new assistant.
 
+Every run deletes the generated trees first, so a removed skill disappears from `adapters/` too.
+
+## A skill's extra files
+
+A skill may carry files beside `SKILL.md`: `reference/<topic>.md` (read only when a stated condition applies) and
+`versions/moodle-X.Y.md` (what is specific to one Moodle version). An adapter must deliver them, or the links in
+the skill body lead nowhere:
+
+- `copy_extras(data, dest)` copies them to `<dest>/moodle-skill-files/<skill>/`.
+- `rewrite_extra_links(body, prefix, name)` rewrites the body's links to point at the copies. `prefix` is the
+  path from the directory of the file you write to the directory that holds `moodle-skill-files/`
+  (`"../"` when the skill file is one level down, `""` when it is beside it).
+
+A new `build_<tool>()` calls both. `install.sh` copies `moodle-skill-files/` with the rest of the tree.
+
 ## Adding a new adapter — checklist
 
 1. **Decide output layout** matching the target's expected paths. Examples:
@@ -35,10 +50,11 @@ Each `build_*` function is independent. Add one to support a new assistant.
        out_root = ADAPTERS / "mytool"
        out_root.mkdir(parents=True, exist_ok=True)
        # write files for each skill/agent/command
-       for fm, body, _ in items["skills"]:
-           (out_root / "skills" / f"{fm['name']}.md").write_text(
-               f"# {fm['name']}\n\n{body}"
+       for fm, body, name in items["skills"]:
+           (out_root / "skills" / f"{name}.md").write_text(
+               f"# {name}\n\n{rewrite_extra_links(body, '../', name)}"
            )
+       copy_extras(items, out_root)
    ```
 
 3. **Register it** in `main()`:
@@ -61,14 +77,14 @@ Each `build_*` function is independent. Add one to support a new assistant.
 
 ## Design rules
 
-- **Verbatim body reuse.** Skills are written for Claude but read fine to humans. Don't rewrite — just wrap with target-specific headers.
+- **Verbatim body reuse.** Skills are written for Claude but read fine to humans. Don't rewrite — just wrap with target-specific headers. The one change is the link rewrite above.
 - **Frontmatter mapping must be lossless.** If the target supports activation triggers, map `description` → that field. If not, prepend the description as the first line of the body.
 - **One file per skill/command/agent** wherever the target supports it. Avoid mega-prompts unless the target only takes a single system prompt (then use the `generic` adapter pattern).
 - **No external dependencies in the generator.** It must run on `python3` stdlib only.
 
 ## Testing
 
-- `tests/run.sh` — checks adapters regenerate cleanly + match committed output.
+- `tests/run.sh` — checks adapters regenerate cleanly and match the committed tree, links resolve, and runs the unit tests.
 - `python3 -m unittest tests.test_build_adapters` — unit tests for `parse()` and `load_all()`. Add cases for any new helpers.
 - CI fails if `adapters/` differs from generator output → guarantees the committed tree is reproducible.
 

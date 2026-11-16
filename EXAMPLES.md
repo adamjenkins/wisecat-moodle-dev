@@ -1,6 +1,6 @@
 # Example Prompts
 
-Real prompts that activate this plugin's skills. Drop into Claude Code after installing `moodle-dev`.
+Real prompts that activate this plugin's skills. Drop into Claude Code after installing `wisecat-moodle-dev`.
 
 ## Scaffolding
 

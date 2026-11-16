@@ -63,5 +63,38 @@ class LoadAllTests(unittest.TestCase):
         self.assertIn("moodle-reviewer", agent_names)
 
 
+class ExtraFilesTests(unittest.TestCase):
+    def test_rewrites_links_to_reference_and_version_files(self) -> None:
+        body = "See [a](reference/rtl.md), [b](versions/moodle-5.3.md#x), [c](reference.md) and [d](https://e.org/f.md)."
+        out = ba.rewrite_extra_links(body, "../", "moodle-x")
+        self.assertIn("](../moodle-skill-files/moodle-x/reference/rtl.md)", out)
+        self.assertIn("](../moodle-skill-files/moodle-x/versions/moodle-5.3.md#x)", out)
+        self.assertIn("](../moodle-skill-files/moodle-x/reference.md)", out)
+        self.assertIn("](https://e.org/f.md)", out)
+
+    def test_rewrite_is_not_applied_twice(self) -> None:
+        once = ba.rewrite_extra_links("[a](reference/rtl.md)", "", "moodle-x")
+        self.assertEqual(once, ba.rewrite_extra_links(once, "", "moodle-x"))
+
+    def test_every_extra_file_is_copied_into_every_adapter(self) -> None:
+        items = ba.load_all()
+        ba.main()
+        roots = {
+            "cursor": ROOT / "adapters/cursor/.cursor",
+            "copilot": ROOT / "adapters/copilot/.github",
+            "aider": ROOT / "adapters/aider",
+            "continue": ROOT / "adapters/continue",
+            "generic": ROOT / "adapters/generic",
+        }
+        for _, _, name in items["skills"]:
+            for rel in ba.skill_extras(ROOT / "skills" / name):
+                for target, base in roots.items():
+                    self.assertTrue((base / ba.EXTRAS_DIR / name / rel).is_file(), f"{target}: {name}/{rel}")
+
+    def test_cursor_rules_attach_to_stylesheets(self) -> None:
+        self.assertIn("**/*.scss", ba.CURSOR_GLOBS)
+        self.assertIn("**/*.css", ba.CURSOR_GLOBS)
+
+
 if __name__ == "__main__":
     unittest.main()

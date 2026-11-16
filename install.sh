@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# moodle-dev installer for non-Claude-Code assistants.
+# wisecat-moodle-dev installer for non-Claude-Code assistants.
 #
 # Usage:
 #   ./install.sh <target> [--dest <dir>]
@@ -11,6 +11,8 @@
 #   continue  -> copies config.yaml + rules + prompts into <dest>/.continue
 #   generic   -> writes adapters/generic/PROMPTS.md into <dest>/MOODLE_PROMPTS.md
 #
+# Each target also gets moodle-skill-files/: the reference and version files the skills link to.
+#
 # Default <dest> is the current directory.
 
 set -euo pipefail
@@ -18,7 +20,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 usage() {
-  sed -n '2,15p' "$0"
+  sed -n '2,17p' "$0"
   exit 1
 }
 
@@ -35,7 +37,7 @@ while [ $# -gt 0 ]; do
 done
 
 dest="$(cd "$dest" && pwd)"
-echo "» Installing moodle-dev ($target) into $dest"
+echo "» Installing wisecat-moodle-dev ($target) into $dest"
 
 copy_tree() {
   src="$1"; dst="$2"
@@ -57,6 +59,7 @@ case "$target" in
     cp "$ROOT/adapters/aider/CONVENTIONS.md" "$dest/CONVENTIONS.md"
     [ -d "$ROOT/adapters/aider/skills" ] && copy_tree "$ROOT/adapters/aider/skills" "$dest/.aider/skills"
     [ -d "$ROOT/adapters/aider/commands" ] && copy_tree "$ROOT/adapters/aider/commands" "$dest/.aider/commands"
+    [ -d "$ROOT/adapters/aider/moodle-skill-files" ] && copy_tree "$ROOT/adapters/aider/moodle-skill-files" "$dest/.aider/moodle-skill-files"
     echo "Done. Add to .aider.conf.yml:"
     echo "  read:"
     echo "    - CONVENTIONS.md"
@@ -67,6 +70,7 @@ case "$target" in
     ;;
   generic)
     cp "$ROOT/adapters/generic/PROMPTS.md" "$dest/MOODLE_PROMPTS.md"
+    [ -d "$ROOT/adapters/generic/moodle-skill-files" ] && copy_tree "$ROOT/adapters/generic/moodle-skill-files" "$dest/moodle-skill-files"
     echo "Done. Paste sections from MOODLE_PROMPTS.md into your assistant's system prompt."
     ;;
   *)

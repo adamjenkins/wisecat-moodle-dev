@@ -83,6 +83,59 @@ for f in skills/*/SKILL.md; do
   fi
 done
 
+# --- Line budget: SKILL.md at most 400 lines (reference and version files are not capped) ---
+info "Skill line budget"
+for f in skills/*/SKILL.md; do
+  lines=$(wc -l < "$f")
+  [ "$lines" -le 400 ] && pass "$f: $lines lines" || fail "$f: $lines lines (budget 400): move detail to reference/"
+done
+
+# --- Directory name equals the front-matter name; name and description in the first five lines ---
+info "Skill names"
+for f in skills/*/SKILL.md; do
+  dir=$(basename "$(dirname "$f")")
+  name=$(head -5 "$f" | awk '/^name:/{print $2; exit}')
+  [ "$dir" = "$name" ] && pass "$f: directory matches name" || fail "$f: directory '$dir' != name '$name'"
+  head -5 "$f" | grep -q '^description:' && pass "$f: description in first five lines" || fail "$f: description not in the first five lines"
+done
+
+# --- Every reference and version file is listed in its SKILL.md ---
+info "Extra files are listed in their skill"
+for f in skills/*/reference/*.md skills/*/versions/*.md skills/*/reference.md; do
+  [ -f "$f" ] || continue
+  skill=$(echo "$f" | cut -d/ -f1-2)
+  rel=${f#"$skill"/}
+  grep -qF "($rel)" "$skill/SKILL.md" && pass "$f: linked from SKILL.md" || fail "$f: not linked from $skill/SKILL.md"
+done
+
+# --- Links to .md files resolve (relative to the linking file, or to the repo root) ---
+info "Intra-repo links"
+broken=0
+while IFS= read -r line; do
+  file=$(echo "$line" | cut -d: -f1)
+  target=$(echo "$line" | cut -d: -f2- | sed 's/#.*//')
+  case "$target" in http*|mailto*|"") continue ;; esac
+  if [ ! -e "$(dirname "$file")/$target" ] && [ ! -e "$target" ]; then
+    fail "$file: link target not found: $target"; broken=1
+  fi
+done < <(grep -rEo --include='*.md' '\]\([^)[:space:]]+\.md[^)[:space:]]*\)' . | sed -E 's/:\]\(/:/; s/\)$//' || true)
+[ "$broken" -eq 0 ] && pass "all .md links resolve"
+
+# --- Adapters committed are what the generator produces (new and deleted files included) ---
+info "Adapters in sync"
+if [ -d .git ]; then
+  [ -z "$(git status --porcelain adapters/)" ] && pass "adapters/ matches the generator output" \
+    || fail "adapters/ differs from the committed tree: commit the regenerated files"
+fi
+
+# --- Generator unit tests ---
+info "Generator unit tests"
+if python3 -m unittest tests.test_build_adapters >/dev/null 2>&1; then
+  pass "tests/test_build_adapters.py"
+else
+  fail "tests/test_build_adapters.py"
+fi
+
 # --- No tab characters in markdown (consistent indent) ---
 info "No tabs in markdown"
 if ! grep -rPl '\t' --include='*.md' . >/dev/null 2>&1; then

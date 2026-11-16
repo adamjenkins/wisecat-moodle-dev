@@ -1,18 +1,17 @@
 {
-  "name": "moodle-dev",
-  "version": "0.6.0",
+  "name": "wisecat-moodle-dev",
+  "version": "0.1.0",
   "description": "The most complete Moodle development toolkit: 19 skills, 8 slash commands, 2 subagents — covering scaffolding, XMLDB, capabilities, web services, Hooks API, AMD JS, PHPUnit, Behat, security, privacy/GDPR, performance, accessibility, themes, mobile, and cross-version upgrades. Ships with adapters for Cursor, Copilot, Aider, Continue.",
   "author": {
-    "name": "Saad Rahman",
-    "email": "saad.rahman010@gmail.com"
+    "name": "Adam Jenkins",
+    "email": "adam@wisecat.net"
   },
-  "homepage": "https://github.com/SaadRahman01/claude-moodle-dev",
-  "repository": "https://github.com/SaadRahman01/claude-moodle-dev",
+  "homepage": "https://github.com/adamjenkins/wisecat-moodle-dev",
+  "repository": "https://github.com/adamjenkins/wisecat-moodle-dev",
   "license": "MIT",
   "keywords": [
     "moodle",
     "moodle-plugin",
-    "moodle-dev",
     "php",
     "lms",
     "edtech",
@@ -26,6 +25,9 @@
     "wcag",
     "security",
     "claude-code",
-    "claude-plugin"
+    "claude-plugin",
+    "moodle-theme",
+    "boost",
+    "scss"
   ]
 }

@@ -1,12 +1,12 @@
 # Auto-request review for any change.
-*                       @SaadRahman01
+*                       @adamjenkins
 
 # Canonical sources — extra scrutiny on these.
-/skills/                @SaadRahman01
-/agents/                @SaadRahman01
-/commands/              @SaadRahman01
-/.claude-plugin/        @SaadRahman01
-/scripts/               @SaadRahman01
+/skills/                @adamjenkins
+/agents/                @adamjenkins
+/commands/              @adamjenkins
+/.claude-plugin/        @adamjenkins
+/scripts/               @adamjenkins
 
 # Generated — should only change via scripts/build-adapters.py.
-/adapters/              @SaadRahman01
+/adapters/              @adamjenkins

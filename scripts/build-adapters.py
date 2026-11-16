@@ -12,10 +12,21 @@ This script regenerates equivalents for:
   - Continue  -> adapters/continue/config.yaml + rules/*.md
   - Generic   -> adapters/generic/PROMPTS.md (one big file, copy/paste friendly)
 
-Frontmatter is parsed from each source file. Body is reused verbatim.
+Frontmatter is parsed from each source file. Body is reused verbatim, except that
+links to a skill's own extra files are rewritten.
+
+A skill may carry extra files beside SKILL.md (reference/<topic>.md,
+versions/moodle-X.Y.md). They are copied into every adapter tree under
+moodle-skill-files/<skill>/, and the links to them in the skill body are
+rewritten to point at the copies.
+
+Every run deletes the generated trees first, so a removed skill or file
+disappears from adapters/ too.
 """
 from __future__ import annotations
+import json
 import re
+import shutil
 from pathlib import Path
 from textwrap import dedent
 
@@ -26,6 +37,41 @@ COMMANDS = ROOT / "commands"
 ADAPTERS = ROOT / "adapters"
 
 FM_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
+
+# Generated trees. Each is deleted and rebuilt on every run.
+TARGETS = ("cursor", "copilot", "aider", "continue", "generic")
+# Directory, inside each adapter tree, that holds the skills' extra files.
+EXTRAS_DIR = "moodle-skill-files"
+# A Markdown link to one of a skill's own extra files: (reference/x.md), (versions/moodle-5.3.md#a), (reference.md).
+EXTRA_LINK_RE = re.compile(r"\]\(((?:reference|versions)/[^)\s#]+|reference\.md)(#[^)\s]*)?\)")
+# File globs a skill's Cursor rule attaches to.
+CURSOR_GLOBS = ["**/*.php", "**/*.mustache", "**/amd/src/**/*.js", "**/*.scss", "**/*.css"]
+
+
+def manifest() -> dict:
+    return json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
+
+
+def skill_extras(skill_dir: Path) -> list[Path]:
+    """Every file in a skill directory other than SKILL.md, as paths relative to it, sorted."""
+    return sorted(p.relative_to(skill_dir) for p in skill_dir.rglob("*")
+                  if p.is_file() and p.name != "SKILL.md")
+
+
+def rewrite_extra_links(body: str, prefix: str, name: str) -> str:
+    """Point links to a skill's extra files at the copies under <prefix>/<EXTRAS_DIR>/<name>/."""
+    base = f"{prefix}{EXTRAS_DIR}/{name}/"
+    return EXTRA_LINK_RE.sub(lambda m: f"]({base}{m.group(1)}{m.group(2) or ''})", body)
+
+
+def copy_extras(data, dest: Path) -> None:
+    """Copy every skill's extra files to <dest>/<EXTRAS_DIR>/<skill>/."""
+    for _, _, name in data["skills"]:
+        for rel in skill_extras(SKILLS / name):
+            target = dest / EXTRAS_DIR / name / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(SKILLS / name / rel, target)
+            print(f"  wrote {target.relative_to(ROOT)}")
 
 
 def parse(path: Path) -> tuple[dict, str]:
@@ -73,11 +119,12 @@ def build_cursor(data) -> None:
         front = dedent(f"""\
             ---
             description: {fm.get('description', name)}
-            globs: ["**/*.php", "**/*.mustache", "**/amd/src/**/*.js"]
+            globs: {json.dumps(CURSOR_GLOBS)}
             alwaysApply: false
             ---
             """)
-        write(base / f"{name}.mdc", front + body)
+        write(base / f"{name}.mdc", front + rewrite_extra_links(body, "../", name))
+    copy_extras(data, base.parent)
     for fm, body, name in data["agents"]:
         front = dedent(f"""\
             ---
@@ -113,7 +160,8 @@ def build_copilot(data) -> None:
             tools: ['codebase', 'search', 'editFiles', 'runCommands']
             ---
             """)
-        write(base / "chatmodes" / f"{name}.chatmode.md", front + body)
+        write(base / "chatmodes" / f"{name}.chatmode.md", front + rewrite_extra_links(body, "../", name))
+    copy_extras(data, base)
     for fm, body, name in data["agents"]:
         front = dedent(f"""\
             ---
@@ -150,7 +198,9 @@ def build_aider(data) -> None:
     write(base / "CONVENTIONS.md", "\n".join(conv) + "\n")
     # Skills/commands as plain MD aider can /read-only
     for fm, body, name in data["skills"]:
-        write(base / "skills" / f"{name}.md", f"# {name}\n\n> {fm.get('description', '')}\n\n{body}")
+        write(base / "skills" / f"{name}.md",
+              f"# {name}\n\n> {fm.get('description', '')}\n\n{rewrite_extra_links(body, '../', name)}")
+    copy_extras(data, base)
     for fm, body, name in data["commands"]:
         write(base / "commands" / f"{name}.md", f"# /{name}\n\n> {fm.get('description', '')}\n\n{body.replace('$ARGUMENTS', '<args>')}")
 
@@ -161,8 +211,12 @@ def build_continue(data) -> None:
     rules = []
     for fm, body, name in data["skills"]:
         rules.append({"name": name, "desc": fm.get("description", "")})
-        write(base / "rules" / f"{name}.md", f"---\nname: {name}\ndescription: {fm.get('description', '')}\n---\n\n{body}")
-    yaml_lines = ["name: moodle-dev", "version: 0.3.0", "schema: v1", "rules:"]
+        write(base / "rules" / f"{name}.md",
+              f"---\nname: {name}\ndescription: {fm.get('description', '')}\n---\n\n"
+              f"{rewrite_extra_links(body, '../', name)}")
+    copy_extras(data, base)
+    meta = manifest()
+    yaml_lines = [f"name: {meta['name']}", f"version: {meta['version']}", "schema: v1", "rules:"]
     for r in rules:
         yaml_lines.append(f"  - uses: ./rules/{r['name']}.md")
     yaml_lines.append("prompts:")
@@ -178,14 +232,16 @@ def build_continue(data) -> None:
 def build_generic(data) -> None:
     print("Generic...")
     out = ["# Moodle Development Prompts (agent-agnostic)", "",
-           "Drop these into any LLM coding assistant. Each section is self-contained.",
+           "Drop these into any LLM coding assistant. Links to `moodle-skill-files/` are files beside this one:",
+           "open one only when the skill says its condition applies.",
            ""]
     out.append("## Skills (load on relevant tasks)\n")
     for fm, body, name in data["skills"]:
         out.append(f"### {name}\n")
         out.append(f"> {fm.get('description', '')}\n")
-        out.append(body)
+        out.append(rewrite_extra_links(body, "", name))
         out.append("\n---\n")
+    copy_extras(data, ADAPTERS / "generic")
     out.append("## Agents (specialized review/scaffolding)\n")
     for fm, body, name in data["agents"]:
         out.append(f"### {name}\n")
@@ -204,12 +260,14 @@ def build_generic(data) -> None:
 def main() -> None:
     data = load_all()
     print(f"Loaded {len(data['skills'])} skills, {len(data['agents'])} agents, {len(data['commands'])} commands.\n")
+    for target in TARGETS:
+        shutil.rmtree(ADAPTERS / target, ignore_errors=True)
     build_cursor(data)
     build_copilot(data)
     build_aider(data)
     build_continue(data)
     build_generic(data)
-    print("\nDone. Commit the regenerated files under adapters/.")
+    print("\nDone. Commit the regenerated files under adapters/, including new and deleted ones.")
 
 
 if __name__ == "__main__":

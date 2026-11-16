@@ -35,5 +35,5 @@ body:
   - type: input
     id: plugin-version
     attributes:
-      label: moodle-dev plugin version
+      label: wisecat-moodle-dev plugin version
       placeholder: "0.2.0"

@@ -6,14 +6,13 @@ Only the latest minor release receives security updates. Pin to a tagged release
 
 | Version | Supported |
 |---------|-----------|
-| 0.4.x   | yes       |
-| < 0.4   | no        |
+| 0.1.x   | yes       |
 
 ## Reporting a Vulnerability
 
 **Do not open a public issue for security reports.**
 
-Email: **saad.rahman010@gmail.com** with subject `[moodle-dev security]`.
+Email: **adam@wisecat.net** with subject `[wisecat-moodle-dev security]`.
 
 Include:
 - Affected skill / command / agent / adapter file

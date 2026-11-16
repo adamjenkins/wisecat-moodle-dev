@@ -1,17 +1,17 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "moodle-dev",
+  "name": "wisecat-moodle-dev",
   "description": "The most complete Moodle development toolkit for Claude Code: skills, slash commands, and subagents covering the entire Moodle plugin lifecycle.",
   "owner": {
-    "name": "Saad Rahman",
-    "email": "saad.rahman010@gmail.com"
+    "name": "Adam Jenkins",
+    "email": "adam@wisecat.net"
   },
   "plugins": [
     {
-      "name": "moodle-dev",
+      "name": "wisecat-moodle-dev",
       "description": "19 skills + 8 commands + 2 agents for Moodle plugin scaffolding, XMLDB, web services, Hooks API, AMD/JS, PHPUnit, Behat, security, privacy, performance, accessibility, themes, mobile app, capability auditing, mustache linting, and cross-version upgrades.",
       "source": "./",
-      "version": "0.6.0",
+      "version": "0.1.0",
       "category": "development",
       "tags": [
         "moodle",

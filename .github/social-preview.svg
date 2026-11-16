@@ -45,7 +45,7 @@
 
   <!-- Title -->
   <text x="80" y="220" font-family="-apple-system, system-ui, sans-serif" font-size="96" font-weight="800" fill="#ffffff" letter-spacing="-3">
-    moodle-dev
+    wisecat-moodle-dev
   </text>
 
   <!-- Subtitle -->
@@ -104,7 +104,7 @@
 
   <!-- Repo url -->
   <text x="80" y="610" font-family="ui-monospace, Menlo, monospace" font-size="16" fill="#4b5563">
-    github.com/SaadRahman01/claude-moodle-dev
+    github.com/adamjenkins/wisecat-moodle-dev
   </text>
 
   <!-- Big Moodle M -->
