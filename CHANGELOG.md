@@ -32,6 +32,14 @@ entries below are what changed here.
   order. Checks that were listed twice (a login-only page; course tables with no backup) have one home each. The
   reference files' sections carry the same IDs. The minor gates and the frankenstyle grep moved to the
   directory-review reference to keep `SKILL.md` under 400 lines.
+- Skill `moodle-marketplace-package`: one folder per release with everything a Plugins directory submission
+  needs: `listing.txt` with every field (the full description in HTML), `listing.md` with where each claim and
+  screenshot came from, the screenshots and the ZIP.
+- Skill `moodle-language-pack` and command `/add-language-pack <code>`: a translation of a plugin's strings,
+  kept outside the plugin, checked for missing keys and placeholders, and how to view it on a test site.
+- Skill `moodle-walkthrough`: a walkthrough of a plugin or theme on a real site as each role, with screenshots,
+  a report written in Markdown and a PDF made from it. The Markdown stays beside the PDF, with relative image
+  links, so it can be read later.
 - README installation section: shell commands, project scope, how to check, update and remove the plugin, the
   clash with the `moodle-dev` plugin, and what to do after `install.sh` for each assistant.
 - Adapters carry the reference and version files (`moodle-skill-files/`) with working links, and Cursor rules

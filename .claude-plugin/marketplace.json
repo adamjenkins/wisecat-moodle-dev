@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "wisecat-moodle-dev",
-      "description": "25 skills, 10 commands and 2 agents for Moodle 5.2 and 5.3 plugin and theme development: Boost child themes, SCSS and dark mode, layouts, renderers and theme settings; plugin scaffolding, XMLDB, web services, hooks, JavaScript, PHPUnit, Behat, CI, security, privacy, performance, accessibility, the Moodle app, upgrades and release.",
+      "description": "28 skills, 11 commands and 2 agents for Moodle 5.2 and 5.3 plugin and theme development: Boost child themes, SCSS and dark mode, layouts, renderers and theme settings; plugin scaffolding, XMLDB, web services, hooks, JavaScript, PHPUnit, Behat, CI, security, privacy, performance, accessibility, the Moodle app, upgrades, release, Marketplace listings, language packs and walkthroughs with screenshots.",
       "source": "./",
       "version": "0.1.0",
       "category": "development",

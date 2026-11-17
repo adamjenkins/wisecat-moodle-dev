@@ -166,27 +166,44 @@ Real prompts that activate this plugin's skills. Drop into Claude Code after ins
 46. **Coding style**
     > Run `phpcs --standard=moodle public/local/attendance` and fix every reported issue.
 
+## Walkthrough, listing and translation
+
+47. **Make the walkthrough**
+    > Make the walkthrough for `mod_sharedgarden`: every screen as admin, teacher and student, desktop and phone, with screenshots and a PDF report.
+
+    Builds demo data for the walkthrough, takes and reads each screenshot, and writes `WALKTHROUGH-YYYY-MM-DD.md` with a PDF made from it in the project's notes directory. Later, "in that walkthrough ..." is answered from the Markdown copy.
+
+48. **Make the Marketplace package**
+    > Make the Marketplace package for `local_scribbles` 0.1.1.
+
+    Writes `marketplace-0.1.1/` in the project's notes directory: `listing.txt` with every form field (the full description in HTML, the source control and bug tracker URLs), `listing.md` saying how each claim was checked, the screenshots in upload order and the ZIP.
+
+49. **Add a language pack**
+    > `/add-language-pack ja`
+
+    Translates every string of the current plugin into Japanese, saves it as `lang-ja/<file>.php` in the project's notes directory, and checks it for missing keys and changed placeholders.
+
 ## CLI
 
-47. **CLI script**
+50. **CLI script**
     > Add `cli/recompute.php` for `local_attendance` — accepts `--courseid=N --dry-run`. Use `clilib.php`, exit codes, locks via `\core\lock\lock_config`.
 
 ## Slash commands
 
-48. **Scaffold a Boost child theme**
+51. **Scaffold a Boost child theme**
     > `/moodle-new-theme campus "brand colour, rounder cards, a footer note"`
 
     Asks for anything missing (name, what the theme must change, supported versions, copyright holder), then writes the child theme from the theme skills. It writes files; it does not install or compile them.
 
-49. **Check a theme without running it**
+52. **Check a theme without running it**
     > `/moodle-theme-check public/theme/campus`
 
     Reads the theme and reports each finding with `file:line`: restated config keys, import paths and colour functions that fail on one version, dark mode, hook guards, copied layouts, settings plumbing, tests, package files. It ends with what a static check cannot show (the compile, the page, the ZIP).
 
-50. **Lint a theme's template overrides**
+53. **Lint a theme's template overrides**
     > `/moodle-mustache-lint public/theme/campus/templates`
 
     For a theme it also checks override paths (`templates/<component>/`), the `!` include, and overrides that no longer have an effect on 5.3.
 
-51. **Scaffold a plugin**
+54. **Scaffold a plugin**
     > `/moodle-new-plugin local attendance`

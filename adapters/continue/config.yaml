@@ -10,6 +10,8 @@ rules:
   - uses: ./rules/moodle-definition-of-done.md
   - uses: ./rules/moodle-field-lessons.md
   - uses: ./rules/moodle-hooks-api.md
+  - uses: ./rules/moodle-language-pack.md
+  - uses: ./rules/moodle-marketplace-package.md
   - uses: ./rules/moodle-mobile-app.md
   - uses: ./rules/moodle-performance.md
   - uses: ./rules/moodle-phpunit-testing.md
@@ -26,8 +28,12 @@ rules:
   - uses: ./rules/moodle-theme-settings.md
   - uses: ./rules/moodle-theme-testing-release.md
   - uses: ./rules/moodle-upgrade-migration.md
+  - uses: ./rules/moodle-walkthrough.md
   - uses: ./rules/moodle-web-services.md
 prompts:
+  - name: add-language-pack
+    description: Translate a Moodle plugin's strings into one language and save the pack in the project's notes directory, not the plugin.
+    prompt: ./prompts/add-language-pack.md
   - name: moodle-bump-version
     description: Bump $plugin->version in version.php and add an upgrade.php step for a Moodle plugin.
     prompt: ./prompts/moodle-bump-version.md

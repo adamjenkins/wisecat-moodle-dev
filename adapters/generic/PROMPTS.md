@@ -2381,6 +2381,339 @@ Cover both branches: the callback acts, and the callback returns early (guest, w
 
 ---
 
+### moodle-language-pack
+
+> Use when asked to translate a Moodle plugin's strings into another language, "add a language pack" (es, ja, pt_br, zh_tw ...), update an existing translation after lang/en changed, or try a translation on a test site. Covers the file name per plugin type (lang/<code>/<component>.php, an activity's <modname>.php), Moodle's language codes, keeping every key and only the keys of lang/en, placeholders ({$a}, {$a->name}) and HTML kept intact, _help strings, PHP quoting, checking a pack with php -l and a key and placeholder diff, keeping packs outside the plugin repository (the package ships lang/en only), installing a pack as a local customisation (<code>_local under $CFG->langlocalroot) to view it with ?lang=, and contributing it through AMOS. Skip when adding or renaming English strings (moodle-plugin-development) or finding hard-coded English (the /moodle-string-check command).
+
+# Moodle Language Pack
+
+## Overview
+
+A translation of a plugin's strings into one language, as a file that Moodle can load. It is kept outside the
+plugin repository, because a plugin's package ships only `lang/en/` and other languages reach sites through the
+Moodle language packs (AMOS). Keeping the file lets you view it on a test site and contribute it.
+
+## When to Use
+
+- "Add a language pack for ja", `/add-language-pack es`, "translate the plugin into Portuguese (Brazil)"
+- `lang/en` changed and the existing packs need the new and changed strings
+- Viewing a translation on a test site, or preparing it for AMOS
+- **Skip when:** adding or changing English strings (`moodle-plugin-development`) or finding hard-coded English
+  (`/moodle-string-check`)
+
+## Where the files go
+
+In the project's notes directory, never inside the plugin repository: the Plugins directory review expects only
+`lang/en/` in the package, and a non-English file in `lang/` ships with every release. Use the notes directory the
+project's instructions name; otherwise ask once.
+
+```
+<notes>/<plugin>/lang-<code>/<file>.php
+```
+
+`<file>` is the same file name as in `lang/en/`: `<type>_<name>.php` (`local_forumcare.php`), except an activity
+module, whose file is `<name>.php` without `mod_` (`public/lib/classes/string_manager_standard.php`, 5.3.0). Several
+plugins of one project each get their own `lang-<code>/` under their own notes folder.
+
+## Language codes
+
+Moodle's codes are lower case with an underscore: `es`, `ja`, `de`, `pt_br`, `zh_cn`, `zh_tw`, `es_mx`, `fr_ca`.
+`es` is international Spanish and `es_mx` a child of it; a child pack holds only what differs. The list of codes is
+at https://download.moodle.org/langpack/5.3/. If the user's code is not one of them (`pt-BR`, `zh`), map it to the
+Moodle code and say which was used, or ask when two fit (`zh`: `zh_cn` or `zh_tw`).
+
+## The recipe
+
+1. **Read the English file** `lang/en/<file>.php` from the repository at its current commit. Count the keys.
+2. **If the pack exists**, read it: keep every translation whose English text is unchanged, translate new keys,
+   retranslate keys whose English changed (compare with `git log -p lang/en/<file>.php` since the pack's date), and
+   drop keys no longer in English.
+3. **Translate each string.**
+   - Keep the placeholders exactly: `{$a}`, `{$a->name}`, and the same set in each string. Their order in the
+     sentence may change.
+   - Keep HTML tags and Markdown in `_help` strings; translate only the text.
+   - Keep the meaning of the UI: a button label stays short; a menu item matches how core translates the same word
+     in that language. Read core's pack for the language where one is installed
+     (`$CFG->dataroot/lang/<code>/moodle.php`) and reuse its terms ("course", "activity", "grade").
+   - Product and plugin names stay as they are unless the plugin's own English string translates them.
+   - Quote with single quotes and escape `'` as `\'`. Keep the file's sort order.
+4. **Write the file** with the plugin's licence header, a docblock naming the language
+   (`Japanese strings for local_forumcare.`) and the copyright holder of the translation, then the strings:
+
+   ```php
+   <?php
+   // This file is part of Moodle - http://moodle.org/
+   // ... the GPL header as in lang/en ...
+
+   /**
+    * Japanese strings for local_forumcare.
+    *
+    * @package    local_forumcare
+    * @copyright  2026 <translation's copyright holder>
+    * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+    */
+
+   defined('MOODLE_INTERNAL') || die();
+
+   $string['pluginname'] = 'フォーラムケア';
+   $string['reportpost'] = 'この投稿を報告';
+   ```
+
+5. **Check it** (below), then add a line to the plugin's notes: language, key count, date, the commit of
+   `lang/en` it matches, and who translated it ("machine translation, not reviewed by a native speaker" when that
+   is the case).
+
+## Checking a pack
+
+```bash
+php -l <notes>/<plugin>/lang-ja/local_forumcare.php
+php -r '
+  define("MOODLE_INTERNAL", 1);
+  $string = []; include $argv[1]; $en = $string;
+  $string = []; include $argv[2]; $xx = $string;
+  echo "missing: ", implode(", ", array_keys(array_diff_key($en, $xx))) ?: "none", "\n";
+  echo "extra: ", implode(", ", array_keys(array_diff_key($xx, $en))) ?: "none", "\n";
+  foreach ($en as $k => $v) {
+      if (!isset($xx[$k])) { continue; }
+      preg_match_all("/\{\\\$a(->\w+)?\}/", $v, $a); preg_match_all("/\{\\\$a(->\w+)?\}/", $xx[$k], $b);
+      sort($a[0]); sort($b[0]);
+      if ($a[0] !== $b[0]) { echo "placeholders differ: $k\n"; }
+  }' -- lang/en/local_forumcare.php <notes>/<plugin>/lang-ja/local_forumcare.php
+```
+
+Pass: `php -l` clean, missing and extra both `none`, no "placeholders differ" line. Then read the translated file
+once for strings left in English.
+
+## Viewing it on a test site
+
+Moodle loads a plugin's strings in a language from the plugin's `lang/<code>/`, then
+`$CFG->langotherroot/<code>/`, then local customisations in `$CFG->langlocalroot/<code>_local/` (both default to
+`$CFG->dataroot/lang`; `public/lib/classes/string_manager_standard.php`, 5.3.0). To view a pack without touching
+the plugin or the installed language pack:
+
+1. The language itself must be installed on the site (Site administration > Language > Language packs).
+2. Copy the file to `$CFG->dataroot/lang/<code>_local/<file>.php`, readable by the web server user.
+3. Purge caches (`php admin/cli/purge_caches.php`), then open a page with `?lang=<code>`.
+
+The `_local` copy overrides the official translation on that site. Remove it when done, and say in the notes if it
+is left in place.
+
+## Contributing it
+
+Once the plugin is in the Plugins directory, its English strings are imported into AMOS (https://lang.moodle.org),
+and translations reach sites through the language packs. Contribute the pack there: log in, import the file into
+your AMOS stage, and submit the staged strings to the language pack maintainers (described in the AMOS
+documentation, not run here). A plugin not yet in the directory has nothing in AMOS to translate.
+
+## Common mistakes
+
+| Mistake | What happens | Fix |
+|---|---|---|
+| The pack put in the plugin's `lang/<code>/` | It ships in the release; reviewers ask for `lang/en` only | Keep it in the notes directory |
+| `mod_<name>.php` for an activity | The file is never loaded | `<name>.php` |
+| A placeholder translated or dropped | `{$a}` shows literally, or a value is missing from the sentence | Keep the same placeholder set; check with the diff |
+| An apostrophe not escaped | Parse error: every string of the plugin fails in that language | `\'`, and `php -l` |
+| Keys missing after `lang/en` grew | Those strings fall back to English | Re-run the key diff on every update |
+| A code that is not Moodle's (`pt-BR`) | The directory name matches no language | `pt_br` |
+| Copying into `<code>/` instead of `<code>_local/` | The next language pack update overwrites it | `<code>_local/` |
+| A machine translation presented as reviewed | Users trust wording no speaker checked | Say who translated it |
+
+## References
+
+- https://moodledev.io/docs/5.3/apis/core/string
+- https://docs.moodle.org/en/AMOS
+- https://download.moodle.org/langpack/5.3/
+
+
+---
+
+### moodle-marketplace-package
+
+> Use when asked to prepare a Moodle Plugins directory (Marketplace) submission or listing update - "make the Marketplace package", "publishing docs", listing text, screenshots for the plugin page. Produces one folder per release with listing.txt (every form field ready to paste: name, type, component, short description, full description as HTML, source control URL, bug tracker URL, documentation URL, supported versions, maturity, release notes, screenshot captions), listing.md (where each claim and screenshot came from), the numbered screenshots and the release ZIP. Covers reading the field values from version.php, the git remote and the README, checking the issue tracker is enabled, writing descriptions that make only checked claims, and taking listing screenshots. Skip when building the ZIP, tagging or answering a reviewer (moodle-plugin-release), auditing the code before release (moodle-release-preflight), or making an internal walkthrough report (moodle-walkthrough).
+
+# Moodle Marketplace Package
+
+## Overview
+
+Everything needed to submit a plugin, or a new version, to the Moodle Plugins directory, gathered in one folder so
+that submitting is copy, paste and upload. The rules the listing must meet (required tracker, licence, service
+disclosure) are owned by `moodle-plugin-release`; this skill produces the files.
+
+## When to Use
+
+- "Make the Marketplace package", "prepare the publishing docs", "write the listing" for a plugin or theme
+- A first submission, a new version upload, or a change to the listing text or screenshots
+- **Skip when:** building the ZIP itself, tagging or replying to a reviewer (`moodle-plugin-release`), auditing the
+  code for review findings (`moodle-release-preflight`), or an internal walkthrough (`moodle-walkthrough`)
+
+## Where the files go
+
+Outside the plugin repository, in the project's notes directory (the project's instructions name it; otherwise
+ask once). One folder per release, never overwritten:
+
+```
+<notes>/<plugin>/marketplace-<release>/
+    listing.txt            every field, ready to paste; open in any text editor
+    listing.md             provenance: commit, screenshot site, demo data, how each claim was checked
+    01-<what>.png ...      screenshots, in upload order
+    <name>-<release>.zip   the release ZIP (built with moodle-plugin-release)
+```
+
+For a new version of a plugin already listed, copy the previous folder's text and screenshots forward, change
+what the release changed, and say in `listing.md` what was carried over and why it still holds.
+
+## listing.txt
+
+A plain text file (`.txt`, so it opens in any editor) with one labelled block per form field, in the form's order.
+The short description is plain text. The full description is HTML, because the directory's description field
+takes formatted text; keep to simple tags (`<p>`, `<h3>`, `<ul>`, `<ol>`, `<li>`, `<strong>`, `<em>`, `<a>`,
+`<code>`), no styles, classes or scripts.
+
+```text
+PLUGIN NAME
+Scribbles
+
+PLUGIN TYPE
+Local plugins
+
+COMPONENT
+local_scribbles
+
+SHORT DESCRIPTION
+Draw on any Moodle page with pen, highlighter, text, box and ellipse tools, then save the annotations or a screenshot.
+
+FULL DESCRIPTION (HTML)
+<p>Scribbles lets teachers draw on any Moodle page. ...</p>
+<h3>Who it is for</h3>
+<p>...</p>
+<h3>Features</h3>
+<ul>
+<li>...</li>
+</ul>
+<h3>Requirements</h3>
+<ul>
+<li>Moodle 5.2 or 5.3.</li>
+</ul>
+<h3>Privacy</h3>
+<p>...</p>
+
+SOURCE CONTROL URL
+https://github.com/<owner>/moodle-local_scribbles
+
+BUG TRACKER URL
+https://github.com/<owner>/moodle-local_scribbles/issues
+
+DOCUMENTATION URL
+https://github.com/<owner>/moodle-local_scribbles#readme
+
+SUPPORTED MOODLE VERSIONS
+5.2, 5.3
+
+MATURITY
+Beta
+
+RELEASE NAME
+0.1.1
+
+VERSION
+2026110404
+
+RELEASE NOTES
+- ...
+
+LICENCE
+GNU GPL v3 or later
+
+SCREENSHOTS (upload in this order)
+01-annotate-course-page.png
+A course page annotated with the pen, highlighter, box and text tools.
+02-...
+```
+
+Where each value comes from (never from memory):
+
+| Field | Source |
+|---|---|
+| Plugin name | `pluginname` in `lang/en/<component>.php` (`modulename` for an activity) |
+| Type and component | `$plugin->component` in `version.php`; the type is its prefix, named as the directory names it ("Activities", "Blocks", "Local plugins") |
+| Supported versions | `$plugin->supported`, checked against `$plugin->requires` and the CI matrix |
+| Maturity, release, version | `$plugin->maturity`, `$plugin->release`, `$plugin->version` at the release tag |
+| Source control URL | `git remote get-url origin`, written as the `https://` web URL |
+| Bug tracker URL | the repository's issues page; check issues are enabled (`gh api repos/<owner>/<repo> --jq .has_issues` is `true`): a tracker is required for approval |
+| Documentation URL | the README on the forge (`...#readme`), or the plugin's documentation page if one exists |
+| Release notes | this release's section of `CHANGES.md` (or the changelog the repository keeps) |
+| Licence | the `LICENSE` file and the file headers |
+
+If the plugin needs an external service, the full description says so, what depends on it, what happens without
+it and how to get credentials, and `listing.txt` has a block of demo credentials for the reviewer
+(`moodle-plugin-release`, reference `plugins-directory-submission.md`).
+
+## Writing the descriptions
+
+- **Short description:** one or two sentences: what it does and for whom. It shows in search results.
+- **Full description:** what it does, who it is for, the features, what administrators set up, limits,
+  requirements (Moodle and PHP versions, databases tested, other plugins, services), privacy (what personal
+  data it stores and where it is sent). Same facts as the README.
+- Every claim is one you checked: a feature you saw on the site, a version CI ran, a capability in
+  `db/access.php`. Record the check in `listing.md`. "Works in all browsers" without testing them is not a claim
+  to make; say which were tested.
+- State limits plainly. A reviewer or an admin finding an unstated limit costs more than the sentence.
+- Name settings and labels exactly as they appear in the UI, with the settings path
+  (`Site administration > Plugins > Local plugins > Scribbles`).
+- No marketing superlatives, no comparisons with other plugins, no Moodle trademark misuse.
+
+## Screenshots
+
+Take them with the `moodle-walkthrough` recipe (demo data, Playwright, read each image), with these listing rules:
+
+- The current release's code, on a stock Boost site, light mode, at least 1280 x 800 (a 1.5x device scale gives
+  sharper images). Crop to the plugin's UI where the rest of the page adds nothing.
+- Every visible name is demo data chosen for the listing: course, users, site name. Read every proper noun in
+  each image. No test leftovers, no other plugins' buttons, no offensive or placeholder text.
+- 4 to 10 images, in the order a new user meets the plugin; the first one shows it doing its main job.
+- Each has a one-sentence caption in `listing.txt`.
+
+## listing.md
+
+The record a later release, or a reviewer's question, needs:
+
+- the commit and tag the package was made from, and whether CI passed on it;
+- the site, Moodle version and theme the screenshots were taken on, and that the deployed code matched the commit;
+- the demo data and whether it is still on the site;
+- a table of screenshots with captions;
+- "How the claims were checked": one line per claim that needed checking.
+
+## The ZIP
+
+Build and inspect it with `moodle-plugin-release`: its root folder is the plugin directory name, `LICENSE` is in
+it, `lang/` holds only `en/`. Put the ZIP in the folder so the upload is from the same place.
+
+## Hand it over
+
+Give the folder path and say what to do: on a first submission, create the plugin in the directory and fill each
+field from `listing.txt`; on a version, upload the ZIP with the release notes. Submitting is the maintainer's
+action: prepare it, do not submit.
+
+## Common mistakes
+
+| Mistake | What happens | Fix |
+|---|---|---|
+| Full description as plain text | Paragraphs and lists run together on the plugin page | HTML in `listing.txt`, simple tags only |
+| Values typed from memory | The listing's versions or maturity disagree with `version.php` | Read each from the source in the table |
+| Issues disabled on the repository | Approval is blocked: the reviewer has nowhere to file | Check `has_issues`, enable it |
+| Claims nobody checked | A reviewer or admin finds the plugin does not do what the page says | Record each check in `listing.md` |
+| Screenshots from an old build or with test names | The page shows the wrong UI or someone's real data | Current code, demo data, read every image |
+| Package folder inside the repository | Screenshots and the ZIP end up in the next release | The notes directory |
+| A new version overwrites the last folder | The record of what was submitted is lost | One folder per release |
+
+## References
+
+- https://moodledev.io/general/community/plugincontribution/checklist
+- https://moodle.org/plugins
+
+
+---
+
 ### moodle-mobile-app
 
 > Use when adding Moodle app (mobile) support to a plugin - db/mobile.php handlers and delegates (CoreMainMenuDelegate, CoreCourseModuleDelegate, CoreCourseOptionsDelegate, CoreBlockDelegate, CoreQuestionDelegate), classes/output/mobile.php methods called through tool_mobile_get_content, templates/mobileapp Mustache with {{=<% %>=}} and Ionic markup, otherdata and CONTENT_OTHERDATA, core-site-plugins-call-ws and other site-plugin directives, handler JavaScript (this.CoreSitesProvider, updateContent caching, detectChanges), offlinefunctions and prefetch, app CSS (--ion-*-color-step-N, :root.dark), push notifications, and errors such as "Scalar type expected, array or object received", "Access control exception", "serverconnectionajax" or a plugin that silently does nothing in the app. Skip when the plugin has no app UI and only needs web services (moodle-web-services).
@@ -7865,6 +8198,204 @@ The longer list (formslib, navigation, course formats, older PHP-era functions) 
 
 ---
 
+### moodle-walkthrough
+
+> Use when asked to "make the walkthrough", walk through a Moodle plugin or theme on a real site, or produce screenshots and a report (usually a PDF) of what each role sees. Covers listing what to cover from the code, deploying and checking the installed version, demo courses and users made for the walkthrough, driving Chromium and Firefox with Playwright as each role at desktop and phone width, user tours and drawers that spoil shots, reading every screenshot before using it, separating plugin problems from harness problems, the report's structure, keeping the Markdown source beside the PDF with relative image links, rendering the PDF and checking it. Skip when writing automated acceptance tests (moodle-behat-testing), checking a task before calling it done (moodle-definition-of-done), or preparing a Plugins directory listing and its screenshots (moodle-marketplace-package).
+
+# Moodle Walkthrough
+
+## Overview
+
+A walkthrough uses the plugin on a real Moodle site the way people will: as each role, through every screen,
+with a screenshot of each step. The result is a report in two forms that are kept together: the Markdown file,
+which is the source and the copy an assistant reads later, and a PDF made from it for people.
+
+## When to Use
+
+- "Make the walkthrough", "do a full walkthrough", "walk me through the plugin with screenshots"
+- After a feature or a release candidate is finished, to show and check what each role sees
+- When the user later says "in that walkthrough ...": open the Markdown report, not the PDF
+- **Skip when:** the goal is a repeatable automated test (`moodle-behat-testing`), the pre-completion checklist
+  (`moodle-definition-of-done`), or a Plugins directory listing and its screenshots (`moodle-marketplace-package`)
+
+## Where the files go
+
+Never inside the plugin repository: a walkthrough is about the plugin, not part of it, and screenshots would
+end up in the release ZIP. Use the project's notes directory. If the project's instructions (`CLAUDE.md`, a
+harness or contributing document) name one, use it, together with the test site, credentials and PDF tool they
+name. Otherwise ask once where reports go.
+
+```
+<notes>/<plugin>/WALKTHROUGH-YYYY-MM-DD.md          the report: the source, kept permanently
+<notes>/<plugin>/walkthrough-YYYY-MM-DD/NN-role-what.png
+<notes>/<plugin>/pdf/WALKTHROUGH-YYYY-MM-DD.pdf     made from the .md, never edited on its own
+```
+
+- **Both files are kept.** The PDF is for reading; the Markdown is what an assistant opens when the user refers
+  to the walkthrough later, because it is text, searchable and cheap to read. Never delete it after rendering,
+  and never write the report only into the PDF tool's temporary input.
+- **Image links are relative** to the `.md` file (`walkthrough-2026-11-15/03-student-view.png`), so the report
+  still works when the folder is copied or read on another machine. An absolute path breaks both.
+- A second walkthrough on the same day gets a suffix (`WALKTHROUGH-2026-11-15-mobile.md`), not an overwrite.
+- If the notes directory has an index or README for the plugin, add one line linking the new report.
+
+## The recipe
+
+### 1. List what to cover, from the code
+
+Before opening a browser, build the coverage list from the plugin itself, not from memory of what it does:
+
+```bash
+ls settings.php db/access.php *.php classes/output templates amd/src 2>/dev/null
+grep -n "=> \[" db/access.php | head -40          # capabilities: each one is a role to walk
+grep -c "string\['" lang/en/*.php                 # a rough size check for the UI
+```
+
+- Every page a user can open, every setting, every capability that changes what a role sees, every mode and
+  option (group modes, anonymous and named, empty states, a hidden instance).
+- The roles: at least admin (settings), teacher (set-up and the teacher view), student. Add the others the
+  capabilities name: a non-editing teacher, a guest, a user with no enrolment.
+- Width and theme cases where the plugin has UI: desktop 1280 x 900, phone 390 x 844, dark colour mode on
+  Moodle 5.3, a second browser (Firefox), reduced motion if the plugin animates.
+- Read the project's notes on the plugin first: an earlier walkthrough, open questions, known problems.
+
+### 2. Prepare the site
+
+- Deploy the current code, run the upgrade and purge caches. Then read the installed version from the site
+  (`get_config('<component>', 'version')`) and check it equals `version.php`. A walkthrough of stale code is
+  worthless and looks fine.
+- Record for the report header: plugin release and version, Moodle version and build, theme, browsers, sizes.
+- Take a snapshot of the plugin's settings (`get_config('<component>')`) before changing any, and restore it at
+  the end. Compare the two in the final step.
+
+### 3. Make demo data for the walkthrough
+
+- Create courses, users and activities just for it, with names that say so ("Walkthrough: <feature>"). Never
+  change existing accounts or courses: other people and other reports rely on them. Never reset an existing
+  user's password.
+- Give every course a real one-sentence description of what it is for, or none. The data generator writes
+  "Test course N" and lorem ipsum when `summary` is not passed (`public/lib/testing/generator/data_generator.php`,
+  5.3.0), and that text then shows in the screenshots. Do the same for activity intros.
+- Build the data with one CLI script that can be re-run, so the walkthrough can be repeated. Keep the script
+  with the screenshots, not in the plugin.
+- Give the data a story: students at different stages, a group with members and a student in no group,
+  realistic names and submissions. An empty page proves little.
+- Questions go in a question bank made for the walkthrough, never a shared or system bank.
+
+### 4. Drive the browser
+
+Use Playwright: the skeleton, login and per-page error capture are in
+[reference/playwright-recipes.md](moodle-skill-files/moodle-walkthrough/reference/playwright-recipes.md).
+
+- Log in through the login form with credentials the project's instructions or the user gave. Do not guess
+  passwords, read password hashes or change them. If a credential is missing, stop and say so.
+- A new user's first Dashboard visit opens a user tour that covers the page and makes clicks time out. Mark the
+  tours done for the walkthrough users only (`tool_usertours_tour_completion_time_<tourid>` preferences),
+  never by disabling tours site-wide.
+- Close the block and course-index drawers (`drawer-open-block`, `drawer-open-index` preferences) when they
+  would cover content.
+- Logging in lands on the Dashboard, so anything that fires once per visit has already fired before the first
+  explicit visit. Reset it after login if the shot needs it.
+- Record console errors and failed requests on every page. A screen that looks right with a JavaScript error
+  behind it is a finding.
+- Name screenshots `NN-role-what.png` in walk order. Screenshot the area that matters, or the full page when the
+  layout is the point.
+
+### 5. Read every screenshot
+
+Open each image and check it shows what its caption will say, before it goes in the report:
+
+- the right user is logged in, the right page, the state the step describes;
+- no error notice, debug output, missing-string markers (`[[stringname]]`), spinner or half-loaded page;
+- nothing covers the content: a tour, a drawer, a cookie banner, a floating button;
+- no placeholder content: lorem ipsum, "Test course 1", a fake-camera test pattern. Use real-looking
+  content, or leave the shot out.
+
+Retake any that fails. A walkthrough whose screenshots were not looked at reports what the script hoped for.
+
+### 6. Findings
+
+Sort every problem into one of two kinds and say which in the report:
+
+- **The plugin's problems**: wrong behaviour, missing strings, layout breaks, errors, a role seeing what it
+  should not. Each with the screenshot, where it happens and what was expected.
+- **The walkthrough's own problems**: tours, stale caches, bad demo data. Fix them and re-shoot; mention them
+  briefly so the next run avoids them.
+
+The walkthrough reports; it does not redesign. Fix plugin defects only when the request included fixing, and
+then re-run the affected steps and record each fix with its test. A finding about how a feature should work,
+or a control that seems unnecessary, is a question for the user, never a change made on the walkthrough's say-so.
+
+### 7. Write the report
+
+```markdown
+# <Plugin name> (<component>): walkthrough report
+
+- **Date:** ... **Plugin:** <release> (<maturity>), version <version>
+- **Site:** Moodle <version> (Build ...), <theme>
+- **Browsers:** ... **Viewports:** ...
+
+## Summary            a table: area, result; the count of problems found
+## Problems found     numbered: what, where, screenshot, expected; fixed or open
+## Demo data          the courses, users and settings, and that they were left on the site
+## 1. <Area>          one section per area in walk order: a sentence or two of what was observed, then the shots
+## Not covered        what was not walked or not run, in one line each, and why
+## Left on the site   what the walkthrough created or changed and did not undo
+```
+
+- Write what was seen, not what the code should do. Every statement comes from the run that took the
+  screenshot.
+- Each screenshot has alt text saying what it shows: `![Student view, group mode, no group](...)`.
+- Quote UI labels exactly as rendered.
+- Put any HTML or script payload in a code span. Raw HTML in Markdown is passed through to the PDF renderer, and
+  a payload such as `onerror=alert(1)` runs there and can stall the render.
+
+### 8. Render the PDF and check it
+
+Use the project's PDF tool if it names one. Otherwise Markdown to HTML, then headless Chromium:
+[reference/playwright-recipes.md](moodle-skill-files/moodle-walkthrough/reference/playwright-recipes.md) has a short script.
+
+- The HTML must resolve the relative image links from the Markdown file's directory (a `<base href>` or writing
+  the HTML beside the `.md`). Rendered from a temporary directory without it, every image is a broken box.
+- Check the result, not the exit code: `pdfinfo` for the page count, `pdfimages -list` for the number of images
+  (it should equal the screenshots in the report), and open one page to see a picture rendered. Some Chromium
+  builds silently cut a long single print at a fixed page count; a page count far below what the report needs
+  means the PDF is truncated.
+
+### 9. Hand it over
+
+Give the user both paths, the Markdown and the PDF, and send the PDF if the session can send files. Say in a
+few lines: the problems found, what was fixed, what was not covered, and what was left on the site.
+
+## Common mistakes
+
+| Mistake | What happens | Fix |
+|---|---|---|
+| Only the PDF is kept | A later "in that walkthrough ..." means reading a PDF, or the report is lost | Keep `WALKTHROUGH-*.md` beside `pdf/`; the PDF is made from it |
+| Absolute image paths in the `.md` | Images break when the folder is copied or read elsewhere | Relative paths from the `.md` file |
+| Report or screenshots in the plugin repo | They ship in the release ZIP | The project's notes directory |
+| Walking stale code | Shots of the old behaviour; fixes "not working" | Deploy, upgrade, purge, compare the installed version |
+| Generator placeholders | "Test course 1" and lorem ipsum in every shot | Pass `summary` and `intro` explicitly |
+| A user tour on the first visit | Clicks time out; every shot shows the tour | Mark the tours done for the walkthrough users |
+| Screenshots not opened | Error notices, wrong user or a tour in the report | Read each image before captioning it |
+| Changing existing users or settings | Other work breaks; the site differs after | Dedicated data; snapshot and restore settings |
+| A finding treated as an order | A feature removed or redesigned unasked | Report it as a question |
+| PDF checked by exit code | A truncated or imageless PDF is delivered | `pdfinfo`, `pdfimages -list`, look at a page |
+
+## Reference files
+
+| File | Read it when |
+|---|---|
+| [reference/playwright-recipes.md](moodle-skill-files/moodle-walkthrough/reference/playwright-recipes.md) | Writing the browser script (login, tours, error capture, widths, dark mode, Firefox) or rendering the PDF without a project tool |
+
+## References
+
+- https://playwright.dev/python/docs/intro
+- https://moodledev.io/general/development/tools/behat (the same site set-up traps apply)
+
+
+---
+
 ### moodle-web-services
 
 > Use when adding, changing, calling or debugging a Moodle external function or web service - db/services.php, classes/external/, execute_parameters/execute_returns, validate_parameters, validate_context, 'ajax' => true for core/ajax, 'loginrequired' => false, readonlysession, REST/SOAP tokens, login/token.php, webservice/upload.php, pluginfile URLs for token clients, or errors such as "Invalid parameter value detected", "Invalid response value detected", servicenotavailable, servicerequireslogin, accessexception, a function missing from external_functions. Skip when writing the JavaScript caller (moodle-amd-javascript) or the Moodle app integration (moodle-mobile-app).
@@ -8631,6 +9162,28 @@ generator are in the `moodle-phpunit-testing` skill.
 ---
 
 ## Commands (one-shot workflows)
+
+### /add-language-pack
+
+> Translate a Moodle plugin's strings into one language and save the pack in the project's notes directory, not the plugin.
+
+You will add or update a language pack for a Moodle plugin, following the `moodle-language-pack` skill.
+
+User's input: <args>
+
+1. The first word is the language code. If it is missing, ask for it. If it is not a Moodle code (`pt-BR`, `zh`),
+   map it as the skill says and state the code used, or ask when two fit.
+2. The plugin is the path given, or else the plugin repository of the current directory (the one holding
+   `version.php`). If neither, ask.
+3. The pack goes in the project's notes directory as `<notes>/<plugin>/lang-<code>/<file>.php`. Take the notes
+   directory from the project's instructions; if they name none, ask once. Never write it inside the plugin.
+4. If the pack exists, update it (new, changed and removed keys); otherwise translate every key of `lang/en`.
+5. Check it: `php -l`, the key and placeholder diff from the skill. Report the key count, the result of each
+   check, the file path, and that the translation is not reviewed by a native speaker unless it was.
+6. Do not install it on a site or contribute it to AMOS unless asked.
+
+
+---
 
 ### /moodle-bump-version
 

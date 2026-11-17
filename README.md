@@ -16,8 +16,8 @@ quietly serves stock Boost, a release that CI passes and a Plugins directory rev
 licence file. These skills carry that detail: the rule, what you see when it is ignored, the fix, and where in
 Moodle's source it comes from.
 
-- **25 skills** that load themselves when the task matches.
-- **10 slash commands** for common jobs.
+- **28 skills** that load themselves when the task matches.
+- **11 slash commands** for common jobs.
 - **2 subagents**: a reviewer and a scaffolder.
 
 ## How the skills are built
@@ -66,7 +66,7 @@ claude plugin install wisecat-moodle-dev@wisecat-moodle-dev
 Start a new Claude Code session after installing. Then check it:
 
 - `claude plugin list` shows `wisecat-moodle-dev@wisecat-moodle-dev` as enabled.
-- `claude plugin details wisecat-moodle-dev@wisecat-moodle-dev` lists 25 skills, 10 commands and 2 agents.
+- `claude plugin details wisecat-moodle-dev@wisecat-moodle-dev` lists 28 skills, 11 commands and 2 agents.
 - Ask for something a skill covers, for example "Start a Boost child theme called theme_campus". The
   `moodle-theme-development` skill should load before any file is written.
 
@@ -161,6 +161,9 @@ The installer overwrites files of the same name. Back up an existing `.continue/
 | `moodle-definition-of-done` | The checklist before calling work complete |
 | `moodle-release-preflight` | The defects that reviews catch after CI is green |
 | `moodle-plugin-release` | Versions, release notes, the package, tagging and the Plugins directory |
+| `moodle-marketplace-package` | Everything for a Plugins directory submission in one folder: the listing text (full description in HTML), URLs, screenshots and the ZIP |
+| `moodle-language-pack` | Translating a plugin's strings into another language, kept outside the plugin, checked, viewable on a test site |
+| `moodle-walkthrough` | Using the plugin on a real site as each role, with screenshots, a Markdown report and a PDF made from it |
 | `moodle-upgrade-migration` | Moving a plugin to a newer Moodle or PHP |
 | `moodle-5-3-changes` | What Moodle 5.3 removed, moved, deprecated and added |
 
@@ -176,6 +179,7 @@ The installer overwrites files of the same name. Back up an existing `.continue/
 | `/moodle-security-review` | Run the security checklist on a file or plugin |
 | `/moodle-capability-audit` | Compare `db/access.php` with the capability checks in the code |
 | `/moodle-string-check` | Find hard-coded English |
+| `/add-language-pack` | Translate the plugin into one language (`/add-language-pack ja`) |
 | `/moodle-codestyle` | Run `phpcs` with the Moodle standard and fix what it reports |
 | `/moodle-mustache-lint` | Lint Mustache templates, including theme overrides |
 
