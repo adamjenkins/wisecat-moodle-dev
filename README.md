@@ -80,7 +80,10 @@ claude plugin disable moodle-dev@moodle-dev
 Slash commands are typed as listed below (`/moodle-new-theme`). If another plugin has a command with the same
 name, use the full form, `/wisecat-moodle-dev:moodle-new-theme`.
 
-**Update** to the newest commit, then start a new session:
+A plugin installed from a local folder is read from that folder: after pulling or editing, run `/reload-plugins`
+or start a new session; there is nothing to update.
+
+**Update** an install from GitHub to the newest commit, then run `/reload-plugins` or start a new session:
 
 ```
 claude plugin marketplace update wisecat-moodle-dev
