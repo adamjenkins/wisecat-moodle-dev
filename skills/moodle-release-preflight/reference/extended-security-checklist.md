@@ -7,7 +7,8 @@ Classes 1 to 6 are the defects that Plugins directory and external security revi
 This file widens the net. It comes from a static audit of several dozen widely installed third-party plugins;
 each class below was found in more than one of them. Examples are described as patterns only.
 
-Report each line of the Checklist section at the end as pass, fail (file:line) or N/A (reason). Where a line
+The Checklist section at the end has ten groups, `SKILL.md` checks 7a to 7j: one report row per group,
+naming each line that fails (file:line) or the reason it is N/A. Where a line
 repeats a finding already reported under classes 1 to 6, report it once.
 
 ## How to run it
@@ -32,7 +33,7 @@ repeats a finding already reported under classes 1 to 6, report it once.
 G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,build,tests} "$@" .; }
 ```
 
-## A. Injection
+## Injection
 
 - **SQL built from request input.**
   - Pattern: a mobile or web service argument, a comma-separated id list, or a filter value concatenated into
@@ -60,7 +61,7 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
   - Fix: prefix cells that start with `= + - @`, a tab or a carriage return with `'`, and never build formulas
     from user data.
 
-## B. Output (XSS)
+## Output (XSS)
 
 - **`noclean` or `'trusted' => true` on student-influenced text.**
   - Typical cases: program output, report cells, HTML pulled from another module or block.
@@ -84,7 +85,7 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
   - grade fractions above 100%
   - role ids from another site
 
-## C. CSRF
+## CSRF
 
 - **A state change on GET with no `require_sesskey()`.** An `<img src>` in a forum post, viewed by an admin,
   fires it.
@@ -94,7 +95,7 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
 - **The sesskey leaking into content.** A filter or template expands a `{sesskey}`-style token inside
   student-authored text, which hands the viewer's token to the author's link.
 
-## D. Authorisation and trust boundaries
+## Authorisation and trust boundaries
 
 - **IDOR.** The most common class.
   - The capability is checked on the URL's cm, but the record id comes from the request and is never bound to
@@ -125,7 +126,7 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
     same work double-counted.
   - Content edited after it was reviewed or submitted, without a server-side lock or a re-review.
 
-## E. Outbound requests and secrets
+## Outbound requests and secrets
 
 - **SSRF.**
   - Typical sources: content tags that fetch a URL, import-by-URL, template HTML rendered by a PDF library.
@@ -140,7 +141,7 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
 - **Undeclared data egress.** Analytics scripts on the login and reset pages, or code and names sent to an
   external service, while the privacy provider is a `null_provider`.
 
-## F. Resource abuse
+## Resource abuse
 
 - Typical cases:
   - an unauthenticated endpoint that compiles and caches per request key, which fills the disk
@@ -150,7 +151,7 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
 - Fix: validate the key against real records first, bound loops and stored versions, and key rate limits on the
   user and the site.
 
-## G. Lifecycle, privacy, defaults
+## Lifecycle, privacy, defaults
 
 - **Privacy:**
   - a `null_provider` despite stored preferences or files
@@ -168,7 +169,7 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
 
 ## Checklist
 
-**Entry points and authorisation**
+**7a. Entry points and authorisation**
 - [ ] Every page calls `require_login` with the right course and cm before output or a write, with no `popup` or `embed` bypass.
 - [ ] Every page and web service function that does more than show the user their own data names a capability; `require_login()` alone is not authorisation.
 - [ ] Every write needs a write capability. No role-shortname checks.
@@ -179,7 +180,7 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
 - [ ] AJAX and API scripts check the specific target instance.
 - [ ] `pluginfile` checks the cm, an allowlisted filearea, and whether the user may see that item.
 
-**Client-supplied ids and values**
+**7b. Client-supplied ids and values**
 - [ ] Every request id is scoped to the authorised parent, `MUST_EXIST`.
 - [ ] Hidden ids use `setConstant()` or are re-validated; select values are re-checked against the offered set.
 - [ ] No client `userid`, `rid` or `submissionid` decides whose data is touched.
@@ -187,18 +188,18 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
 - [ ] Every request parameter has the narrowest `PARAM_*` type that fits; each `PARAM_RAW*` has a reason.
 - [ ] Status transitions are checked against the current state; content cannot change after review or submission without re-review; races are guarded.
 
-**CSRF**
+**7c. CSRF**
 - [ ] Every mutating branch has `require_sesskey()` or goes through moodleform `get_data()`.
 - [ ] No filter or template expands a secret into user-authored content.
 
-**Injection**
+**7d. Injection**
 - [ ] No request, `$args` or imported value is interpolated into SQL; IN lists use `get_in_or_equal()`; columns are allowlisted.
 - [ ] No `unserialize()` without `allowed_classes`.
 - [ ] No exec or eval reachable from a request; restored compiled caches are cleared.
 - [ ] File paths are `PARAM_FILE` plus `basename()` plus a containment check.
 - [ ] Exports neutralise leading `= + - @`.
 
-**Output**
+**7e. Output**
 - [ ] No `noclean` or `trusted` on student- or LLM-influenced text.
 - [ ] Tag content and string-built HTML are `s()`-escaped; no raw attributes; no `format_string()` inside attributes.
 - [ ] Every `{{{ }}}` is traced to safe HTML.
@@ -206,27 +207,27 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
 - [ ] Non-`RISK_XSS` uploads are force-downloaded unless proven media.
 - [ ] Sanitisers are allowlists.
 
-**Backup, restore, import**
+**7f. Backup, restore, import**
 - [ ] `process_*` applies the form's cleaning; URLs reject `javascript:`.
 - [ ] Cross-course and cross-site ids are remapped or dropped.
 - [ ] Importers apply the edit form's validation.
 
-**Outbound and secrets**
+**7g. Outbound and secrets**
 - [ ] No server fetch of a user URL, including through a PDF or HTML renderer, unless it is admin-only and allowlisted.
 - [ ] Keys go only to the configured host.
 - [ ] Redirects are `PARAM_LOCALURL`; mail and AI endpoints need login and are rate-limited.
 - [ ] Every external flow is declared in `get_metadata()`.
 
-**Messaging and visibility**
+**7h. Messaging and visibility**
 - [ ] Message recipients are computed on the server, and `can_send_message()` is honoured by every action that reaches another user.
 - [ ] SEPARATEGROUPS is respected; hidden courses, fields, auth methods and anonymous authors do not leak, including in web service payloads.
 - [ ] No membership is driven by self-editable fields.
 
-**Resource use**
+**7i. Resource use**
 - [ ] Unauthenticated endpoints validate keys before caching.
 - [ ] Loops, regexes and stored versions are bounded; throttles are not session-scoped; heavy jobs need sesskey and a capability.
 
-**Lifecycle and privacy**
+**7j. Lifecycle and privacy**
 - [ ] The provider covers every table, preference and file area, includes `core_userlist_provider`, and one user's erasure touches only that user.
 - [ ] The reset triad clears the data, and cron does not undo it.
 - [ ] Course deletion and uninstall clean up, including the plugin's user preferences.

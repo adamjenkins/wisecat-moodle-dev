@@ -3,7 +3,7 @@
 Read this when the plugin is about to be submitted to the Moodle Plugins directory (a first submission or a new
 version), or when a reviewer has opened an issue on it and you are fixing what it reports.
 
-Each section is one kind of finding that Plugins directory reviewers raised on real submissions, none of which
+Each section is headed with the ID of the `SKILL.md` check it serves. Each is one kind of finding that Plugins directory reviewers raised on real submissions, none of which
 `moodle-plugin-ci` caught. Each gives what is flagged, a command that detects it, the fix, and what answer was
 accepted. Run the commands from the plugin's root directory. Set the component once:
 
@@ -17,7 +17,7 @@ The licence-file and ZIP-root-folder findings are the most common of all; they a
 belong to `moodle-plugin-release`. The repository half takes one command: `git ls-files --error-unmatch LICENSE`
 must succeed in the plugin root (the full licence text, committed before the tag).
 
-## 1. Missing language strings (high)
+## 6a. Missing language strings (high)
 
 Flagged: a string that the plugin's code or core asks for is not in `lang/en/<component>.php`. The reviewers' tool
 reports it as a missing required string with the key and component.
@@ -63,17 +63,34 @@ Each `missing:` line is a finding. Add the type-specific keys from the table by 
 (four-space indentation in `db/*.php`, literal keys); keys built at runtime and `getStrings([{key, component}])`
 calls need a read. Fix: add the string. A string added under the wrong key still prints `[[key]]`.
 
-## 2. Global names without the frankenstyle prefix (high, approval blocker)
+## 6b. Global names without the frankenstyle prefix (high, approval blocker)
 
-The check and its grep are in `SKILL.md` class 6, since this one blocks approval. Summary: every global function,
-class and `define()`d constant takes the full component prefix, including helpers in top-level pages and `cli/`
-scripts. `phpcs` checks function names for lower case only
-(`moodle.NamingConventions.ValidFunctionName`), so CI stays green.
+Every global function, global class and `define()`d constant takes the frankenstyle prefix, including helpers in
+top-level pages and `cli/` scripts, which is where they hide. For `mod_`, core's prefix is the bare module name, so
+set `c` to that.
+
+```bash
+c=local_myplugin
+grep -rnE '^(abstract |final )?(function|class|interface|trait) +[A-Za-z_0-9]+' --include='*.php' \
+    --exclude-dir=classes --exclude-dir=tests --exclude-dir=thirdparty --exclude-dir=vendor . \
+    | grep -vE ":(abstract |final )?(function|class|interface|trait) +(xmldb_)?${c}_"
+grep -rnE "^ *define\('" --include='*.php' --exclude-dir=tests --exclude-dir=thirdparty --exclude-dir=vendor . \
+    | grep -vE "define\('(CLI_SCRIPT|AJAX_SCRIPT|NO_MOODLE_COOKIES|NO_DEBUG_DISPLAY|READ_ONLY_SESSION|MOODLE_INTERNAL)'|define\('$(echo "$c" | tr a-z A-Z)_"
+```
+
+Each line printed is a finding or needs a reason. Names core dictates are not findings: `block_<name>`,
+`backup_*` and `restore_*` classes in `backup/moodle2/`, `mod_<name>_mod_form`, `mod_<name>_core_calendar_*`,
+`assign_submission_<name>` and `assign_feedback_<name>`, and `<filter>_filter_local_settings_form`. No output
+with exit status 1 is the pass; check that `grep` itself ran. Fix: rename to `<component>_<name>()`, or move the
+code into a class under `classes/`.
+
+`phpcs` checks function names for lower case only (`moodle.NamingConventions.ValidFunctionName`), so CI stays
+green.
 
 Accepted fix: rename to `<component>_<name>()`, and search for siblings of the same mistake in other scripts
 before replying. Better still, move the helper into a class under `classes/`.
 
-## 3. Pages that need only a login (medium)
+## 1b. Pages that need only a login (medium)
 
 Flagged: pages (and the web service behind them) that call `require_login()` and nothing else, so any account
 can upload, share or publish.
@@ -94,7 +111,7 @@ Each file printed needs a capability or a written reason (a page that shows the 
 add a capability in `db/access.php` with the right `riskbitmask` (`RISK_SPAM` or `RISK_XSS` for content others
 see), call `require_capability()` on the page and in the web service, and hide the entry links without it.
 
-## 4. A rule applied to one action but not its siblings (medium)
+## 1c. A rule applied to one action but not its siblings (medium)
 
 Flagged: the main action (sending a message) applied a rule (blocking, contacts-only privacy, a disabled
 conversation), and two secondary actions on the same object (reacting, pinning) did not, although the
@@ -105,7 +122,7 @@ Where the main action calls a shared check, every sibling calls it too, and the 
 fails. Add one PHPUnit test per action for the denied case. Moodle's own rule for messaging is
 `\core_message\api::can_send_message()` and `\core_message\api::is_blocked()`.
 
-## 5. `PARAM_RAW` where a narrower type fits (medium)
+## 6c. `PARAM_RAW` where a narrower type fits (medium)
 
 Flagged: inputs read as `PARAM_RAW` or `PARAM_RAW_TRIMMED` although a narrower type exists, even behind sesskey
 and a capability, and even when the value is escaped on output.
@@ -118,7 +135,7 @@ is escaped. Check a suggested type before you apply it: `PARAM_USERNAME` strips 
 `$CFG->extendedusernamechars` is on, and `PARAM_ALPHANUMEXT` strips `.`, so `5.2` becomes `52`
 (`public/lib/classes/param.php`, 5.3.0). A kept `PARAM_RAW` with its reason stated was accepted.
 
-## 6. Directories created with a literal mode (medium) and temp files outside the File API (low)
+## 6d. Directories created with a literal mode (medium) and temp files outside the File API (low)
 
 Flagged: `mkdir($dir, 0777, true)`, which ignores the site's `$CFG->directorypermissions`.
 
@@ -135,7 +152,7 @@ $dir = make_writable_directory($CFG->dataroot . '/local_myplugin');
 mkdir($path, $CFG->directorypermissions, true);
 ```
 
-## 7. Course-scoped data with no backup and restore (medium)
+## 4d. Course-scoped data with no backup and restore (medium)
 
 Flagged: tables keyed by course (and user) but no `backup/moodle2/` code. For an activity module a missing
 backup is an approval blocker; for other types it is a question.
@@ -147,7 +164,7 @@ belongs to the course content. For operational or historical records that must n
 write the reason in the README (deleted with the course, covered by the privacy provider) and give it as the
 answer. That reasoned "no" was accepted without a code change. Backup recipes: `moodle-plugin-development`.
 
-## 8. Outbound HTTP that ignores the site proxy (medium)
+## 6e. Outbound HTTP that ignores the site proxy (medium)
 
 Flagged: raw `curl_init()` instead of Moodle's `\curl`, so `$CFG->proxyhost` is never used and the feature fails
 silently on a site that reaches the internet only through a proxy.
@@ -161,7 +178,7 @@ The same goes for any limitation the README states about a feature (what it neve
 data goes): it also belongs in that feature's setting description, `<setting>_desc` in the lang file. The
 finding was raised although the README already said it.
 
-## 9. Database queries on a hot path (medium)
+## 6f. Database queries on a hot path (medium)
 
 Flagged: a filter that ran one query per ancestor context on every `format_text()` and `format_string()` call.
 Core calls each active filter's `setup()` for every `format_text()` call, and for every `format_string()` call
@@ -181,6 +198,25 @@ $this->assertLessThanOrEqual(5, $DB->perf_get_queries() - $before);
 Fix: resolve each context once per request (a static array keyed by context id, or a MUC request cache), and
 reuse what core already loaded (`$this->localconfig` in a filter). Caching recipes: `moodle-performance`.
 
+## 6g. Minor gates
+
+- `error_log()` in a best-effort `catch` is flagged by `phpcs`. Prefer silent handling, `debugging()` or an
+  event; if kept, document why and add the `phpcs:ignore`.
+- Scaffolding left in file headers (a generator's default `@copyright` holder, `TODO` package names): grep for
+  them.
+- `version.php` `$plugin->requires` is not below the lowest branch in `$plugin->supported`.
+- **Test helpers in production code.** `moodleform::mock_submit()` replaces `$_POST` and `$_FILES` (and `$_GET`
+  for a GET form); code that uses it outside tests saves and restores all of them in a `finally`. Reflection into
+  protected core members needs a test that fails when they change.
+- **Admin-facing messages in literal English** (validation problems, import reports) are flagged. Use lang
+  strings with placeholders; two messages share a string only when its `{$a}` means the same in both.
+- **Timezones:** another user's raw `timezone` field may be `99` ("server default"), and
+  `core_date::get_user_timezone(99)` resolves to the viewer's zone (`public/lib/classes/date.php`, 5.3.0); use
+  `core_date::get_server_timezone()` for that case. JS that converts wall-clock time by diffing offsets is off by
+  the DST amount inside a transition window.
+- **"Is X required?" has two authorities:** the core code path (what breaks) and the moodledev.io plugin-type and
+  contribution docs (what a reviewer demands). A core plugin omitting something is not a licence to omit it.
+
 ## Answering a review
 
 How to reply on the reviewer's issue (naming the fixing release, a reasoned no, checking a suggested fix before
@@ -188,4 +224,4 @@ applying it) is in `moodle-plugin-release`. For the code side, two things from t
 
 - Look for the same mistake elsewhere in the plugin before answering; reviewers report one instance.
 - A precise reason for not making a suggested change is an acceptable answer (seen accepted for `PARAM_RAW`
-  kept with a stated reason, section 5, and for data deliberately left out of backup, section 7).
+  kept with a stated reason, section 6c, and for data deliberately left out of backup, section 4d).

@@ -28,6 +28,10 @@ entries below are what changed here.
 - `moodle-plugin-release` covers the package itself: the licence file in the ZIP root, the ZIP root folder, and
   inspecting the ZIP before upload, which CI never sees.
 - `moodle-release-preflight` checks for each kind of feedback that Plugins directory reviewers give.
+- `moodle-release-preflight`: every check has its own ID (1a to 7j), and the report is one row per ID in a fixed
+  order. Checks that were listed twice (a login-only page; course tables with no backup) have one home each. The
+  reference files' sections carry the same IDs. The minor gates and the frankenstyle grep moved to the
+  directory-review reference to keep `SKILL.md` under 400 lines.
 - README installation section: shell commands, project scope, how to check, update and remove the plugin, the
   clash with the `moodle-dev` plugin, and what to do after `install.sh` for each assistant.
 - Adapters carry the reference and version files (`moodle-skill-files/`) with working links, and Cursor rules

@@ -102,7 +102,7 @@ require_capability('local/example:view', context_course::instance($item->coursei
   `$USER->id` instead.
 - **`require_login()` is not authorisation.** Every page and web service function that does more than show users
   their own data names a capability. Sibling actions on the same object (edit, delete, react, pin) make the same
-  checks as the main action (`moodle-release-preflight` class 1).
+  checks as the main action (`moodle-release-preflight` checks 1b and 1c).
 - **Write actions need a write capability**, with the right `riskbitmask` in `db/access.php` (`RISK_XSS` when
   what it writes is shown to others, `RISK_PERSONAL`, `RISK_CONFIG`, `RISK_DATALOSS`, `RISK_SPAM`). Never check a
   role shortname or `$USER->id == 2`; use `is_siteadmin()` or a capability.

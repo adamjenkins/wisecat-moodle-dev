@@ -43,15 +43,16 @@ the moodle-plugin-ci 4.5 and moodle-cs 3.7 source, not run):
 
 ## How to run it
 
-Scope to the changed files, or the whole plugin for a release. For each class: run the check, report pass, fail
-or N/A with a reason, and cite evidence (file:line, grep output, a test name). "Looks fine" is not a pass. The
-deliverable is the report; do not fix unless asked.
+Scope to the changed files, or the whole plugin for a release. The audit has seven classes, and every check in
+them has its own ID (`1a` to `7j`), listed in order under **Report format**. For each check: run it, report pass,
+fail or N/A with a reason, and cite evidence (file:line, grep output, a test name). "Looks fine" is not a pass.
+The deliverable is the report; do not fix unless asked.
 
 **Triage by plugin shape first,** from the file tree, not the prefix:
 
 - **Editor (`tiny_`, `atto_`), filter, block, theme**: usually no request handlers, uploads, restore or stored
-  data. Classes 1 and 3 are typically N/A, and so are 2b and the reset and uninstall half of 4; focus on 2a, the
-  privacy half of 4, 5 and 6. Prove N/A with a grep; do not assume.
+  data. Classes 1 and 3 are typically N/A, and so are 2b, 4b, 4c and 4d; focus on 2a, 4a, 5a and class 6. Prove
+  N/A with a grep; do not assume.
 - **`mod_`, `assignsubmission_`, `assignfeedback_`, anything with an upload endpoint, external functions or its
   own tables**: run classes 1 to 6, then 7.
 - **`local_`, `tool_`, `report_`**: a `local_` with an AJAX endpoint and a table is activity-shaped (run all); a
@@ -66,6 +67,8 @@ calls `require_login()` and `require_capability()` (or `validate_context()` in a
 client-supplied id to that instance.
 
 ## 1. Trust boundary: never trust what the client sends
+
+### 1a. Submitted ids and values are re-validated
 
 **Seen in reviews:** a report plugin took the target course from a hidden form field, and its async grade-push
 task never re-checked the capability: a cross-course gradebook write. An activity trusted a client-sent "type".
@@ -92,15 +95,15 @@ if (!array_key_exists($data->accountid, $options)) {
 }
 ```
 
-### 1a. `require_login()` is not authorisation
+### 1b. `require_login()` is not authorisation
 
 **Seen in reviews:** share and upload pages, and the web service behind them, called only `require_login()`, so
 any account could upload files that a task then parsed. Each page and web service function that does more than
 show users their own data names the capability it requires, with a `riskbitmask`, and the UI hides the link
 without it. Command and fix: [reference/directory-review-checks.md](reference/directory-review-checks.md)
-section 3.
+section 1b.
 
-### 1b. Sibling actions make the same checks as the main action
+### 1c. Sibling actions make the same checks as the main action
 
 **Seen in reviews:** sending a message applied blocking and contacts-only privacy; reacting to and pinning a
 message on the same conversation checked only membership. A blocked user could still react, and the other user
@@ -108,14 +111,14 @@ saw it with their name. No grep finds this: for each write action, list the chec
 object and compare. Where the main action calls a shared check, every sibling calls it, and a PHPUnit test per
 action covers the denied case.
 
-### 1c. Client-side-only limits are advisory
+### 1d. Client-side-only limits are advisory
 
 **Seen in reviews:** maximum duration and size enforced only in the browser; a direct POST ignored both. For
 each limit (size, duration, count, rate) grep the server endpoint for a matching guard. If the only enforcement
 is in `amd/src/*.js`, it is bypassable. Enforce it on the server: `get_user_max_upload_file_size()`, a duration
 probe, a `$DB->count_records()` gate.
 
-### 1d. Two roles writing the same state value into one column
+### 1e. Two roles writing the same state value into one column
 
 **Seen in reviews:** an owner-facing visibility toggle reused the status value moderators used for a takedown,
 so authors could silently undo moderation. The readers of the column had been checked; the writers had not.
@@ -125,7 +128,7 @@ For every status, enum or flag column the change starts writing, grep every othe
 put a row into the same state, give each actor a distinct value (`hidden_by_moderator`, which the author setter
 refuses to touch) or store the actor on the row, and confirm the privileged action is still reversible in the UI.
 
-### 1e. Building a core form's data in code skips its freezes
+### 1f. Building a core form's data in code skips its freezes
 
 **Seen in reviews:** a plugin read a core form's defaults, overlaid its own values and saved without posting the
 form. Core had `hardFreeze()`d capability-gated fields for that user (`course_edit_form` freezes `visible` and
@@ -134,7 +137,7 @@ no capability of its own. Wherever code fills a core form's data itself, skip ev
 `$mform->getElement($name)->isFrozen()` and take the pinned value from `_constantValues`. Test with a user who
 lacks the gating capability.
 
-### 1f. The question engine processes every slot the post names
+### 1g. The question engine processes every slot the post names
 
 `$quba->process_all_actions($timenow, $postdata)` processes the slots named in `$postdata['slots']`, or every
 slot in the usage if that key is absent (`public/question/engine/questionusage.php`, 5.3.0), so a client-shaped
@@ -246,21 +249,26 @@ draft status explicitly in every import branch.
 `<modname>_reset_userdata()` without the reset form definition and defaults, so the reset option never
 appeared. Plugins writing core grade items had no `db/uninstall.php`. Course-keyed tables had no backup code.
 
-Check (data-storing plugins):
-- Every table and field in `get_metadata()` appears in an export path and in every delete path; after a table
-  rename, grep `classes/privacy/` for the old name. A `tests/privacy/provider_test.php` exercises all six methods
-  against generated rows. Recipes and traps: `moodle-privacy-gdpr`.
-- Reset is the full triad, `<modname>_reset_course_form_definition()`, `<modname>_reset_course_form_defaults()`
-  and `<modname>_reset_userdata()`, with no `mod_` prefix (`public/course/reset_form.php`, 5.3.0), including the
-  gradebook reset.
-- `db/uninstall.php` exists if the plugin writes outside its own tables. Core's uninstall does not delete the
-  plugin's user preferences (`uninstall_plugin()`, `public/lib/adminlib.php`, 5.3.0); details in
-  `moodle-definition-of-done`.
-- Each course-keyed table is either backed up (and round-trips every field, remapping cross-activity ids in
-  `after_restore()`) or left out for a reason written in the README. An activity without backup and restore is
-  an approval blocker.
+Checks (data-storing plugins):
 
-## 5. Tests exist and cover the sinks
+- **4a. Privacy.** Every table, field, preference and file area in `get_metadata()` appears in an export path
+  and in every delete path; after a table rename, grep `classes/privacy/` for the old name. A
+  `tests/privacy/provider_test.php` exercises all six methods against generated rows. Recipes and traps:
+  `moodle-privacy-gdpr`.
+- **4b. Course reset.** Reset is the full triad, `<modname>_reset_course_form_definition()`,
+  `<modname>_reset_course_form_defaults()` and `<modname>_reset_userdata()`, with no `mod_` prefix
+  (`public/course/reset_form.php`, 5.3.0), including the gradebook reset.
+- **4c. Uninstall and course deletion.** `db/uninstall.php` exists if the plugin writes outside its own tables.
+  Core's uninstall does not delete the plugin's user preferences (`uninstall_plugin()`,
+  `public/lib/adminlib.php`, 5.3.0); details in `moodle-definition-of-done`.
+- **4d. Backup and restore coverage.** Each course-keyed table (`grep -n 'NAME="courseid"' db/install.xml`) is
+  either backed up (and round-trips every field, remapping cross-activity ids in `after_restore()`) or left out
+  for a reason written in the README. An activity without backup and restore is an approval blocker. What the
+  restore code does with the data is 3a.
+
+## 5. Tests
+
+### 5a. Tests exist and cover the sinks
 
 **Seen in reviews:** plugins ran `moodle-plugin-ci phpunit` and `behat` over an empty `tests/` directory: green,
 and vacuous. `find tests -name '*_test.php' -o -name '*.feature'`: are there real tests, and do they cover the
@@ -270,60 +278,34 @@ seen failing with the fix reverted, at the exact sink. If CI runs test steps ove
 ## 6. Plugins directory review checks
 
 These are the code findings reviewers raise that no CI step catches. Each row's command, fix and accepted
-answer are in [reference/directory-review-checks.md](reference/directory-review-checks.md); every other
-guideline, with what CI covers, is in [reference/submission-guidelines.md](reference/submission-guidelines.md).
+answer are in [reference/directory-review-checks.md](reference/directory-review-checks.md), under the same ID;
+every other guideline, with what CI covers, is in
+[reference/submission-guidelines.md](reference/submission-guidelines.md). Two review findings have their home in
+earlier classes and are not repeated here: pages that need only a login (1b) and course tables with no backup
+(4d).
 
-| Check | Detect with | Priority seen |
-|---|---|---|
-| Every string core or the code asks for exists (`pluginname`; `filtername` for a filter; `cachedef_<area>`; `<name>:<cap>`; `messageprovider:<name>`) | the lang-key script in the reference | high |
-| Global functions, classes and constants carry the frankenstyle prefix | the greps below | high, blocker |
-| Pages and web services require a capability, not only a login | the page loop in the reference | medium |
-| Narrowest `PARAM_*` type, or a stated reason for `PARAM_RAW` | `grep -rn PARAM_RAW --include='*.php' .` | medium |
-| Directories via `make_temp_directory()`, `make_request_directory()` or `$CFG->directorypermissions`, never `0777` | `grep -rnE '\bmkdir\(' --include='*.php' .` | medium, low |
-| Outbound HTTP through `\curl` (proxy, blocked hosts), or the setting says the proxy is not used; every caveat the README states is also in the setting's description | `grep -rn curl_init --include='*.php' .` | medium |
-| No per-call queries on a hot path (a filter's `setup()` runs on every `format_text()` call) | a query-count test | medium |
-| Course-keyed tables backed up, or left out with a reason | `grep -n 'NAME="courseid"' db/install.xml` | medium |
+| ID | Check | Detect with | Priority seen |
+|---|---|---|---|
+| 6a | Every string core or the code asks for exists (`pluginname`; `filtername` for a filter; `cachedef_<area>`; `<name>:<cap>`; `messageprovider:<name>`) | the lang-key script in the reference | high |
+| 6b | Global functions, classes and constants carry the frankenstyle prefix | the greps below | high, blocker |
+| 6c | Narrowest `PARAM_*` type, or a stated reason for `PARAM_RAW` | `grep -rn PARAM_RAW --include='*.php' .` | medium |
+| 6d | Directories via `make_temp_directory()`, `make_request_directory()` or `$CFG->directorypermissions`, never `0777` | `grep -rnE '\bmkdir\(' --include='*.php' .` | medium, low |
+| 6e | Outbound HTTP through `\curl` (proxy, blocked hosts), or the setting says the proxy is not used; every caveat the README states is also in the setting's description | `grep -rn curl_init --include='*.php' .` | medium |
+| 6f | No per-call queries on a hot path (a filter's `setup()` runs on every `format_text()` call; a block's `get_content()` on every page that shows it) | a query-count test | medium |
+| 6g | The minor gates below | the greps they name | low |
 
-**Namespace collisions block approval.** Every global function, global class and `define()`d constant takes the
-frankenstyle prefix, including helpers in top-level pages and `cli/` scripts, which is where they hide. For
-`mod_`, core's prefix is the bare module name, so set `c` to that.
-
-```bash
-c=local_myplugin
-grep -rnE '^(abstract |final )?(function|class|interface|trait) +[A-Za-z_0-9]+' --include='*.php' \
-    --exclude-dir=classes --exclude-dir=tests --exclude-dir=thirdparty --exclude-dir=vendor . \
-    | grep -vE ":(abstract |final )?(function|class|interface|trait) +(xmldb_)?${c}_"
-grep -rnE "^ *define\('" --include='*.php' --exclude-dir=tests --exclude-dir=thirdparty --exclude-dir=vendor . \
-    | grep -vE "define\('(CLI_SCRIPT|AJAX_SCRIPT|NO_MOODLE_COOKIES|NO_DEBUG_DISPLAY|READ_ONLY_SESSION|MOODLE_INTERNAL)'|define\('$(echo "$c" | tr a-z A-Z)_"
-```
-
-Each line printed is a finding or needs a reason. Names core dictates are not findings: `block_<name>`,
-`backup_*` and `restore_*` classes in `backup/moodle2/`, `mod_<name>_mod_form`, `mod_<name>_core_calendar_*`,
-`assign_submission_<name>` and `assign_feedback_<name>`, and `<filter>_filter_local_settings_form`. No output
-with exit status 1 is the pass; check that `grep` itself ran. Fix: rename to `<component>_<name>()`, or move the
-code into a class under `classes/`.
+**6b blocks approval.** Every global function, global class and `define()`d constant takes the frankenstyle
+prefix, including helpers in top-level pages and `cli/` scripts, where they hide. The two greps, the names core
+dictates, and the pass condition are in the reference, section 6b.
 
 **Release files** (the `LICENSE` file, the ZIP's root folder, only `lang/en/` in the package) are checked on the
 built ZIP: `moodle-plugin-release`.
 
-### Minor gates
+### 6g. Minor gates
 
-- `error_log()` in a best-effort `catch` is flagged by `phpcs`. Prefer silent handling, `debugging()` or an
-  event; if kept, document why and add the `phpcs:ignore`.
-- Scaffolding left in file headers (a generator's default `@copyright` holder, `TODO` package names): grep for
-  them.
-- `version.php` `$plugin->requires` is not below the lowest branch in `$plugin->supported`.
-- **Test helpers in production code.** `moodleform::mock_submit()` replaces `$_POST` and `$_FILES` (and `$_GET`
-  for a GET form); code that uses it outside tests saves and restores all of them in a `finally`. Reflection into
-  protected core members needs a test that fails when they change.
-- **Admin-facing messages in literal English** (validation problems, import reports) are flagged. Use lang
-  strings with placeholders; two messages share a string only when its `{$a}` means the same in both.
-- **Timezones:** another user's raw `timezone` field may be `99` ("server default"), and
-  `core_date::get_user_timezone(99)` resolves to the viewer's zone (`public/lib/classes/date.php`, 5.3.0); use
-  `core_date::get_server_timezone()` for that case. JS that converts wall-clock time by diffing offsets is off by
-  the DST amount inside a transition window.
-- **"Is X required?" has two authorities:** the core code path (what breaks) and the moodledev.io plugin-type and
-  contribution docs (what a reviewer demands). A core plugin omitting something is not a licence to omit it.
+One row in the report; name each gate that fails. The gates (`error_log()`, scaffolding in headers,
+`requires` against `supported`, test helpers in production code, literal English messages, timezones) are in
+[reference/directory-review-checks.md](reference/directory-review-checks.md) section 6g.
 
 ## 7. Extended security checklist
 
@@ -333,7 +315,7 @@ GET-without-sesskey writes, `noclean` on student or LLM text, SSRF through PDF
 renderers, SEPARATEGROUPS leaks. For any plugin with request entry points, walk
 [reference/extended-security-checklist.md](reference/extended-security-checklist.md) after classes 1 to 6 and
 report each line; where they overlap, report a finding once. Its `riskbitmask` line includes `RISK_XSS` on any
-capability whose writes are rendered for other users (3b).
+capability whose writes are rendered for other users (3b). The checklist's ten groups are checks 7a to 7j.
 
 ## Common mistakes
 
@@ -361,16 +343,39 @@ capability whose writes are rendered for other users (3b).
 
 ## Report format
 
-A short table: class, pass, fail or N/A, evidence; one row per lettered subsection, one row per class 6 check,
-and class 7 as one row per checklist group. List each fail with file:line and the fix pattern. Do not fix unless
-asked.
+One table, one row per check ID, every ID in this order, each exactly once:
+
+| Class | IDs |
+|---|---|
+| 1 Trust boundary | 1a submitted ids, 1b login is not authorisation, 1c sibling actions, 1d client-side limits, 1e two roles one state, 1f frozen core form fields, 1g question engine slots |
+| 2 Output | 2a escaping at the sink, 2b uploaded files |
+| 3 Input from data | 3a backup and restore, 3b authored definitions and imports |
+| 4 Data lifecycle | 4a privacy, 4b course reset, 4c uninstall and course deletion, 4d backup coverage |
+| 5 Tests | 5a tests exist and cover the sinks |
+| 6 Directory review | 6a strings, 6b frankenstyle prefixes, 6c `PARAM_*` types, 6d directories, 6e outbound HTTP, 6f hot-path queries, 6g minor gates |
+| 7 Extended | 7a entry points and authorisation, 7b client-supplied ids, 7c CSRF, 7d injection, 7e output, 7f backup, restore and import, 7g outbound and secrets, 7h messaging and visibility, 7i resource use, 7j lifecycle and privacy |
+
+Columns: ID, check (the short name above), result (pass, fail or N/A), evidence. An N/A row keeps its line and
+gives the reason, so the reader sees every check was considered. A finding that fits two checks is reported under
+the first ID and referred to by ID in the other row. After the table, list each fail with its ID, file:line,
+severity and the fix pattern. Do not fix unless asked.
+
+```markdown
+| ID | Check | Result | Evidence |
+|---|---|---|---|
+| 1a | Submitted ids | Pass | `overview.php:28` takes the course from the block instance, not the request |
+| 1b | Login is not authorisation | Pass | `overview.php:35` `require_capability('block/x:viewoverview', ...)` |
+| 2b | Uploaded files | N/A | no `send_file`, `send_stored_file` or file areas (grep) |
+| 6f | Hot-path queries | Fail | ~28 queries per uncached student in `get_content()`; see below |
+```
 
 ## Extending this checklist
 
 When a Plugins directory or security review finds a defect class not listed here, add it in the same shape (what
 was seen, described generically; the check; the fix) so the next release is audited against it. A code finding
 that a command can detect goes in class 6 and the directory-review reference; a trust-boundary or output defect
-goes in classes 1 to 3.
+goes in classes 1 to 3. Give it the next free ID in its class and add it to the Report format table; never reuse
+or renumber an ID, so old reports stay readable.
 
 ## Reference files
 
