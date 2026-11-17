@@ -108,7 +108,7 @@ not.
 - On uninstall core blanks the theme name in `course`, `course_categories`, `user` and `mnet_host`, and removes
   the theme from `themelist`. Pages that used it fall back to the next level.
   **5.3+:** `cohort.theme` is blanked too; on 5.2 a cohort keeps the name of the removed theme.
-- A theme that is another installed theme's dependency cannot be uninstalled until the dependant is removed; that
+- A theme that is another installed theme's dependency cannot be uninstalled until the theme that depends on it is removed; that
   is the standard plugin dependency rule driven by `$plugin->dependencies`.
 
 ## Device themes no longer exist

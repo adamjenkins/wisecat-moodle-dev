@@ -161,7 +161,7 @@ G() { grep -rnE --include='*.php' --exclude-dir={thirdparty,vendor,node_modules,
 - **Reset** does not clear the data, deletes by the wrong key, or cron undoes it.
 - **Uninstall or course deletion** leaves locked memberships and orphan rows behind.
 - **Raw deletes that bypass core APIs and events**, or that use the wrong key column.
-- **Dangerous defaults:** bulk tools that pre-select everything, and filters enabled site-wide at install.
+- **Dangerous defaults:** bulk tools that preselect everything, and filters enabled site-wide at install.
 - **Capabilities missing `RISK_XSS`, `RISK_PERSONAL`, `RISK_CONFIG` or `RISK_DATALOSS`.**
 - **Debug parameters** that show SQL to non-admins.
 - **Spoofable conditions:** user-agent detection used as access control. It is advisory only, especially on AJAX

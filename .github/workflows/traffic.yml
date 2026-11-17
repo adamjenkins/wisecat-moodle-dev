@@ -19,6 +19,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out
+          if [ -z "${GH_TOKEN}" ]; then
+            # The traffic API needs a token with repository administration read access, stored as TRAFFIC_TOKEN.
+            echo "::notice::TRAFFIC_TOKEN is not set; no traffic snapshot taken."
+            echo "TRAFFIC_TOKEN not set" > out/skipped.txt
+            exit 0
+          fi
           date=$(date -u +%Y-%m-%d)
           gh api "repos/$REPO/traffic/clones"           > "out/clones-$date.json"
           gh api "repos/$REPO/traffic/views"            > "out/views-$date.json"

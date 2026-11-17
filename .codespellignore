@@ -10,3 +10,6 @@ pluginfile
 boost
 phpcs
 phpunit
+thirdparty
+datebase
+statics
