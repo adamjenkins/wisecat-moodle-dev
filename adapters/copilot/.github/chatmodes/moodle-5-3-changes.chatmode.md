@@ -138,6 +138,11 @@ Full list, with the admin setting rename map: [reference/deprecations.md](../moo
   MDL-89050, MDL-88949, MDL-89496.
 - **Fresh installs have `enablemyhome = 0`** (also on a fresh 5.2 install): `/` and Behat "I am on site homepage"
   land on the user's start page. Set `enablemyhome = 1` and `defaulthomepage = 0` where a test needs the site home.
+- **The linear navigation footer is fixed to the bottom of activity pages** (about 65 px,
+  `.course-linear-navigation-footer-content`, MDL-89406) and takes clicks meant for plugin controls and dropdown
+  menus under it, as the fixed navbar does at the top. Leave room for it, reveal a focused control only on
+  `:focus-visible` (scrolling on a mouse-press focus moves the control between mousedown and mouseup), and check
+  with `document.elementFromPoint()` without scrolling: Playwright's `click()` scrolls first and passes anyway.
 - **A wide table on a `report` layout page inside an activity** sat under the course index on 5.3; use `incourse`
   (`moodle-theme-layouts-templates`).
 - **Stylelint** rejects `container-type`, `@container` and `clamp()` in `font-size` through `csstree/validator`.
@@ -225,6 +230,7 @@ if (method_exists(\core\user::class, 'create_user')) {
 | Counting on `delete_course()` being synchronous in a setup script | Shortname collision on sites with async deletion | `delete_course($course, false, false)` |
 | Using the 5.3 OAuth2 server as an SSO identity provider | No `id_token`; relying party fails | An OIDC provider plugin |
 | Fixing only PHPUnit failures | Behat fails on deprecation debugging | Fix every notice |
+| A plugin control at the bottom of an activity page, tested with Playwright `click()` | Passes; a person clicks the footer | `elementFromPoint()` unscrolled; leave room for the footer |
 
 ## Reference files
 

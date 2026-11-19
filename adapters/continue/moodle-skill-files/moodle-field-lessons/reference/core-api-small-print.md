@@ -110,6 +110,13 @@ configured.
   `is_action_enabled_in_context()` false for your action on saved activities, because a course module's
   `enabledaiactions` lists only declared actions (`public/course/modlib.php`, `public/ai/classes/manager.php`). A
   plugin that is not a placement reads the activity's `enableaitools` setting directly.
+- **An activity created from code with `add_moduleinfo()` has its AI actions off**: a missing
+  `action-<name>` field is stored as 0 in `course_modules.enabledaiactions` (`public/course/modlib.php`,
+  `add_moduleinfo()`), while the form defaults new activities to on (`public/course/moodleform_mod.php`). Pass
+  `'action-generate_text' => 1` in setup and demo scripts.
+- **`ai_providers.provider` holds the provider's class name** (`aiprovider_ollama\provider`, from
+  `get_class($this)` in `public/ai/classes/provider.php`), not the component name; copy filter values for core
+  tables from a stored row or from core's writer.
 
 ## References
 

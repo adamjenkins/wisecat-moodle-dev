@@ -103,6 +103,13 @@ Samples are valid on Moodle 5.2 and 5.3; source lines were read in 5.3.0 unless 
   that passes may hide a file that fails when run alone.
 - **New settings without a version bump are never stored**, so a select shows its first choice and Save writes it (`moodle-theme-settings`).
 - **A `configtext` regex paramtype takes no trailing modifier** (`/u` aborts install); use `(*UTF)` (`moodle-theme-settings`).
+- **An optional `admin_setting_encryptedpassword` can trap the upgrade page.** Its "Click to enter text" widget
+  posts nothing while unopened, so the setting stays unset, `get_setting()` returns null and
+  `admin/upgradesettings.php` sends the admin back to the same page after every Save. For an optional key, subclass
+  it so `get_setting()` returns `''` when unset, and show a service's keys only when that service is chosen. Submit
+  the upgrade settings page once in a browser with every new field left empty.
+- **A setting passed to JavaScript is not a setting the JavaScript reads.** Grep the consumer for the config key
+  and run the page once with the non-default value; a switch tested only at its default can do nothing for months.
 - **A new course-wide setting must win over older per-item values** where that is what the setting promises.
   When an earlier version stored a per-item value (per section, per activity), decide the precedence explicitly
   and test on a course that already has per-item values; a fresh test course hides the conflict.

@@ -75,7 +75,8 @@ Then:
    vendor/bin/phpunit --testsuite theme_<name>_testsuite
    ```
    (`phpcs` with the `moodle` standard comes from `moodlehq/moodle-cs`; core's own Composer file does not
-   install it. `moodle-plugin-ci phpcs --max-warnings 0` is the same check as CI runs.)
+   install it, and a global install can be newer than CI's. `moodle-plugin-ci phpcs --max-warnings 0` is the same
+   check as CI runs.)
    and how to look at it: select the theme in the theme selector, or enable `allowthemechangeonurl` and open a
    page with `?theme=<name>`.
 8. List what is left for the user: `pix/screenshot.png` (about 500 by 400 px; until it exists the selector shows

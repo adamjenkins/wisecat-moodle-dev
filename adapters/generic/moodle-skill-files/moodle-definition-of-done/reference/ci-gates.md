@@ -7,6 +7,14 @@ local script that stands in for a CI step.
 Facts about `moodle-plugin-ci` below were read in version 4.5.11 of its source (`src/Command/*.php`) with
 moodle-cs 3.7.0 and local_moodlecheck 1.3.2, not observed in a run unless stated. Later versions may differ.
 
+Upstream moodle-cs is ahead of the version CI runs: v3.9.0 (2026-11-05) and v3.9.1 add one rule to the `moodle`
+standard, `moodle.Deprecations.DeprecatedCFGProperties`, a warning (so a CI failure under `--max-warnings 0`) on
+`$CFG->admin` and `$CFG->httpswwwroot`, and make `@codingStandards*` docblock tags an error. moodle-plugin-ci 4.5.11
+still locks v3.7.0, so CI applies them from the moodle-plugin-ci release that updates its lock, and a local
+`composer global require moodlehq/moodle-cs` (which resolves the newest release, possibly on PHP_CodeSniffer 4)
+reports what CI does not yet. Read in the moodle-cs v3.9.1 `CHANGELOG.md` and `Standards/moodle/ruleset.xml`, and
+the moodle-plugin-ci 4.5.11 `composer.lock`.
+
 ## What each step checks, and how it can mislead
 
 | Step | Checks | Exit code | Trap |

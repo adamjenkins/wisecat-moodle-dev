@@ -11,6 +11,22 @@ entries below are what changed here.
 
 ## [Unreleased]
 
+### Changed
+
+- moodle-cs v3.9 is ahead of the v3.7.0 that moodle-plugin-ci 4.5.11 locks. `moodle-definition-of-done` (CI gates),
+  `moodle-field-lessons`, `/moodle-codestyle`, `/moodle-new-theme` and the scaffolder say so. They cover the new
+  `$CFG->admin` and `$CFG->httpswwwroot` warning, `@codingStandards*` tags becoming an error, and copying a
+  `phpcs:ignore` code from `phpcs -s`.
+- `moodle-5-3-changes` and `moodle-field-lessons`: 5.3's fixed activity-navigation footer takes clicks, and
+  Playwright's auto-scroll hides that. Check with `elementFromPoint()` without scrolling.
+- `moodle-field-lessons`:
+  - An optional `admin_setting_encryptedpassword` can make the upgrade settings page loop.
+  - Run each setting passed to JavaScript once at its non-default value.
+  - Voice features need an echo test as well as a fake microphone file.
+  - `add_moduleinfo()` turns AI actions off.
+  - `ai_providers.provider` holds a class name.
+- `moodle-walkthrough`: demo activities made with `add_moduleinfo()` need `action-generate_text`.
+
 ### Added
 
 - Seven theme skills, replacing the single theme skill: `moodle-theme-development` (the entry point: how Moodle

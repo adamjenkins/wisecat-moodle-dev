@@ -124,6 +124,15 @@ See also `moodle-behat-testing`.
   submitting. Select buttons by role and name (submit buttons are never unique on a Moodle page); read
   `getAttribute('action')`, not `form.action` (shadowed by a hidden input named `action`); quiz answer radios have
   no `label[for]`.
+- **Playwright's `click()` and `fill()` scroll the target clear first**, so they pass on a control a person cannot
+  click. On 5.3 activity pages a fixed activity-navigation footer (about 65 px, `.course-linear-navigation`) covers
+  the bottom of the window and dropdown menus under it; Boost's fixed navbar covers the top. Check each control
+  with `document.elementFromPoint()` at its centre, without scrolling and after the page's own initial scroll, on
+  5.3 (5.2 has no footer).
+- **A voice feature tested with a fake microphone file never hears itself.** Chromium's
+  `--use-file-for-fake-audio-capture=<wav>%noloop` feeds a file; also run with the page's audio output looped back
+  into `getUserMedia` (an init script that tees `AudioNode.connect` to the destination into a
+  `MediaStreamDestination`). An echo-only run must not trigger barge-in or a turn.
 - **A form-decorating plugin is tested on a Moodle with only standard plugins** as well as on your development
   site: other installed plugins add fields, hooks and JS that hide or cause failures.
 
@@ -137,6 +146,10 @@ See also `moodle-ci-matrix` and `moodle-definition-of-done`.
 - **Vacuous passes:** an empty `tests/` passes phpunit and behat; `phpmd` exits 0 with violations; `mustache`
   needs an `Example context (json):` block per template; `.mustachelintignore` silences only HTML validation;
   `grunt --force` hides eslint failures and stale builds.
+- **CI's coding standard lags upstream.** moodle-plugin-ci 4.5.11 locks moodle-cs v3.7.0; v3.9 adds a warning for
+  `$CFG->admin` and `$CFG->httpswwwroot` and makes `@codingStandards*` tags an error. A plugin green today fails
+  on the moodle-plugin-ci release that updates the lock: remove both now (`moodle-definition-of-done`,
+  `reference/ci-gates.md`).
 - **No `error_log()` in best-effort catch blocks** (a forbidden function in the coding standard). Treat
   "Unexpected debugging() call" or deprecation notices in a green run as findings; `--fail-on-warning` will fail
   them on the next branch.

@@ -28,7 +28,10 @@ Steps:
    ```bash
    composer global require moodlehq/moodle-cs
    ```
-   and do not report the code as clean: say that the check was not run.
+   and do not report the code as clean: say that the check was not run. This installs the newest moodle-cs, which
+   can be ahead of the version `moodle-plugin-ci` locks (v3.7.0 in moodle-plugin-ci 4.5.11; v3.9 adds a warning
+   for `$CFG->admin` and `$CFG->httpswwwroot`). Fix what it reports, but take "CI passes" only from
+   `moodle-plugin-ci phpcs`.
 
 4. Categorize findings:
    - **Auto-fixable** — run `phpcbf --standard=moodle <path>` (whitespace, missing newlines, brace style)
@@ -44,6 +47,11 @@ Steps:
    - **Line length** — over 132 characters is a warning and over 180 an error; wrap at logical breakpoints
    - **Indent** — convert tabs to 4 spaces
    - **Lang file order** — keys in `lang/en/*.php` in alphabetical order
+   - **Deprecated `$CFG` properties** (moodle-cs 3.9 and later) — `$CFG->admin` becomes the literal `admin` path
+     (`new moodle_url('/admin/settings.php')`), `$CFG->httpswwwroot` becomes `$CFG->wwwroot`
+   - **A finding that must stay** — silence that one code with `// phpcs:ignore <code>` or a
+     `phpcs:disable`/`phpcs:enable` pair, never `@codingStandardsIgnore*` (an error from moodle-cs 3.9). Copy the
+     code from `phpcs -s` output; never guess it
    - Never edit generated or third-party files to satisfy the linter (`amd/build/`, vendored libraries listed in
      `thirdpartylibs.xml`)
 

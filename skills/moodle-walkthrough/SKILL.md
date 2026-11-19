@@ -82,6 +82,8 @@ grep -c "string\['" lang/en/*.php                 # a rough size check for the U
 - Give the data a story: students at different stages, a group with members and a student in no group,
   realistic names and submissions. An empty page proves little.
 - Questions go in a question bank made for the walkthrough, never a shared or system bank.
+- An activity made with `add_moduleinfo()` has its AI actions off unless the data has
+  `'action-generate_text' => 1`; a plugin that calls core AI then shows its fallback in every shot.
 
 ### 4. Drive the browser
 

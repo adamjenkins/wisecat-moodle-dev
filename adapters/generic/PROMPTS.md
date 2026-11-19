@@ -145,6 +145,11 @@ Full list, with the admin setting rename map: [reference/deprecations.md](moodle
   MDL-89050, MDL-88949, MDL-89496.
 - **Fresh installs have `enablemyhome = 0`** (also on a fresh 5.2 install): `/` and Behat "I am on site homepage"
   land on the user's start page. Set `enablemyhome = 1` and `defaulthomepage = 0` where a test needs the site home.
+- **The linear navigation footer is fixed to the bottom of activity pages** (about 65 px,
+  `.course-linear-navigation-footer-content`, MDL-89406) and takes clicks meant for plugin controls and dropdown
+  menus under it, as the fixed navbar does at the top. Leave room for it, reveal a focused control only on
+  `:focus-visible` (scrolling on a mouse-press focus moves the control between mousedown and mouseup), and check
+  with `document.elementFromPoint()` without scrolling: Playwright's `click()` scrolls first and passes anyway.
 - **A wide table on a `report` layout page inside an activity** sat under the course index on 5.3; use `incourse`
   (`moodle-theme-layouts-templates`).
 - **Stylelint** rejects `container-type`, `@container` and `clamp()` in `font-size` through `csstree/validator`.
@@ -232,6 +237,7 @@ if (method_exists(\core\user::class, 'create_user')) {
 | Counting on `delete_course()` being synchronous in a setup script | Shortname collision on sites with async deletion | `delete_course($course, false, false)` |
 | Using the 5.3 OAuth2 server as an SSO identity provider | No `id_token`; relying party fails | An OIDC provider plugin |
 | Fixing only PHPUnit failures | Behat fails on deprecation debugging | Fix every notice |
+| A plugin control at the bottom of an activity page, tested with Playwright `click()` | Passes; a person clicks the footer | `elementFromPoint()` unscrolled; leave room for the footer |
 
 ## Reference files
 
@@ -1963,7 +1969,8 @@ client names; `get_gradable_users()` throws while a regrade is pending; single a
 
 **Forms and settings** ([reference/forms-and-settings.md](moodle-skill-files/moodle-field-lessons/reference/forms-and-settings.md)): read submit buttons with
 `PARAM_RAW`; `hideIf()` also disables, so hidden fields are not posted; `confirm_sesskey()` with no argument throws;
-`validation()` must not call `get_file_content()`; `admin_setting_filetypes` needs a `lang_string` label.
+`validation()` must not call `get_file_content()`; `admin_setting_filetypes` needs a `lang_string` label; an
+optional encrypted password field can make the upgrade settings page loop.
 
 **JavaScript and UI** ([reference/javascript-and-ui.md](moodle-skill-files/moodle-field-lessons/reference/javascript-and-ui.md)): no `.finally()` on
 `core/ajax` promises; `export default` drops named exports in the AMD build; `ModalEvents.destroyed` on the root never
@@ -1971,11 +1978,12 @@ fires; Bootstrap 5 names only; a module page's secondary navigation is extended 
 
 **Testing and CI** ([reference/testing-blind-spots.md](moodle-skill-files/moodle-field-lessons/reference/testing-blind-spots.md)): `assign_capability()`
 does not overwrite; `CLI_SCRIPT` is true under PHPUnit; a security test counts only after it was seen failing;
-`I navigate to ... in site administration` does not fail on an ambiguous path; empty `tests/` passes CI.
+`I navigate to ... in site administration` does not fail on an ambiguous path; empty `tests/` passes CI; CI's
+moodle-cs lags upstream; Playwright's auto-scroll hides controls under 5.3's fixed footer.
 
 **Core API and core AI** ([reference/core-api-small-print.md](moodle-skill-files/moodle-field-lessons/reference/core-api-small-print.md)):
 `user_create_user($u, false)` stores the password verbatim; `empty($PAGE->cm)` is always true; `end()` throws on a
-`readonly` array; `process_action()` can throw `\InvalidArgumentException`.
+`readonly` array; `process_action()` can throw `\InvalidArgumentException`; `add_moduleinfo()` turns AI actions off.
 
 ## Common mistakes
 
@@ -8281,6 +8289,8 @@ grep -c "string\['" lang/en/*.php                 # a rough size check for the U
 - Give the data a story: students at different stages, a group with members and a student in no group,
   realistic names and submissions. An empty page proves little.
 - Questions go in a question bank made for the walkthrough, never a shared or system bank.
+- An activity made with `add_moduleinfo()` has its AI actions off unless the data has
+  `'action-generate_text' => 1`; a plugin that calls core AI then shows its fallback in every shot.
 
 ### 4. Drive the browser
 
@@ -9141,8 +9151,8 @@ generator are in the `moodle-phpunit-testing` skill.
    vendor/bin/phpunit --testsuite <component>_testsuite
    ```
    `phpcs` with the `moodle` standard comes from `moodlehq/moodle-cs` (`composer global require
-   moodlehq/moodle-cs`); core's own `composer.json` in 5.2 and 5.3 does not install it.
-   `moodle-plugin-ci phpcs --max-warnings 0` is the same check as CI runs.
+   moodlehq/moodle-cs`); core's own `composer.json` in 5.2 and 5.3 does not install it. That installs the newest
+   moodle-cs, which can be ahead of CI's; `moodle-plugin-ci phpcs --max-warnings 0` is the same check as CI runs.
    Select tests by `--testsuite` or by a test file, not by a bare directory: a directory finds no Moodle test
    files and reports "No tests executed!" with exit status 0.
    For a theme, add how to try it without making it the site theme and how to see a compile error
@@ -9337,7 +9347,10 @@ Steps:
    ```bash
    composer global require moodlehq/moodle-cs
    ```
-   and do not report the code as clean: say that the check was not run.
+   and do not report the code as clean: say that the check was not run. This installs the newest moodle-cs, which
+   can be ahead of the version `moodle-plugin-ci` locks (v3.7.0 in moodle-plugin-ci 4.5.11; v3.9 adds a warning
+   for `$CFG->admin` and `$CFG->httpswwwroot`). Fix what it reports, but take "CI passes" only from
+   `moodle-plugin-ci phpcs`.
 
 4. Categorize findings:
    - **Auto-fixable** — run `phpcbf --standard=moodle <path>` (whitespace, missing newlines, brace style)
@@ -9353,6 +9366,11 @@ Steps:
    - **Line length** — over 132 characters is a warning and over 180 an error; wrap at logical breakpoints
    - **Indent** — convert tabs to 4 spaces
    - **Lang file order** — keys in `lang/en/*.php` in alphabetical order
+   - **Deprecated `$CFG` properties** (moodle-cs 3.9 and later) — `$CFG->admin` becomes the literal `admin` path
+     (`new moodle_url('/admin/settings.php')`), `$CFG->httpswwwroot` becomes `$CFG->wwwroot`
+   - **A finding that must stay** — silence that one code with `// phpcs:ignore <code>` or a
+     `phpcs:disable`/`phpcs:enable` pair, never `@codingStandardsIgnore*` (an error from moodle-cs 3.9). Copy the
+     code from `phpcs -s` output; never guess it
    - Never edit generated or third-party files to satisfy the linter (`amd/build/`, vendored libraries listed in
      `thirdpartylibs.xml`)
 
@@ -9641,7 +9659,8 @@ Then:
    vendor/bin/phpunit --testsuite theme_<name>_testsuite
    ```
    (`phpcs` with the `moodle` standard comes from `moodlehq/moodle-cs`; core's own Composer file does not
-   install it. `moodle-plugin-ci phpcs --max-warnings 0` is the same check as CI runs.)
+   install it, and a global install can be newer than CI's. `moodle-plugin-ci phpcs --max-warnings 0` is the same
+   check as CI runs.)
    and how to look at it: select the theme in the theme selector, or enable `allowthemechangeonurl` and open a
    page with `?theme=<name>`.
 8. List what is left for the user: `pix/screenshot.png` (about 500 by 400 px; until it exists the selector shows

@@ -199,7 +199,8 @@ client names; `get_gradable_users()` throws while a regrade is pending; single a
 
 **Forms and settings** ([reference/forms-and-settings.md](../moodle-skill-files/moodle-field-lessons/reference/forms-and-settings.md)): read submit buttons with
 `PARAM_RAW`; `hideIf()` also disables, so hidden fields are not posted; `confirm_sesskey()` with no argument throws;
-`validation()` must not call `get_file_content()`; `admin_setting_filetypes` needs a `lang_string` label.
+`validation()` must not call `get_file_content()`; `admin_setting_filetypes` needs a `lang_string` label; an
+optional encrypted password field can make the upgrade settings page loop.
 
 **JavaScript and UI** ([reference/javascript-and-ui.md](../moodle-skill-files/moodle-field-lessons/reference/javascript-and-ui.md)): no `.finally()` on
 `core/ajax` promises; `export default` drops named exports in the AMD build; `ModalEvents.destroyed` on the root never
@@ -207,11 +208,12 @@ fires; Bootstrap 5 names only; a module page's secondary navigation is extended 
 
 **Testing and CI** ([reference/testing-blind-spots.md](../moodle-skill-files/moodle-field-lessons/reference/testing-blind-spots.md)): `assign_capability()`
 does not overwrite; `CLI_SCRIPT` is true under PHPUnit; a security test counts only after it was seen failing;
-`I navigate to ... in site administration` does not fail on an ambiguous path; empty `tests/` passes CI.
+`I navigate to ... in site administration` does not fail on an ambiguous path; empty `tests/` passes CI; CI's
+moodle-cs lags upstream; Playwright's auto-scroll hides controls under 5.3's fixed footer.
 
 **Core API and core AI** ([reference/core-api-small-print.md](../moodle-skill-files/moodle-field-lessons/reference/core-api-small-print.md)):
 `user_create_user($u, false)` stores the password verbatim; `empty($PAGE->cm)` is always true; `end()` throws on a
-`readonly` array; `process_action()` can throw `\InvalidArgumentException`.
+`readonly` array; `process_action()` can throw `\InvalidArgumentException`; `add_moduleinfo()` turns AI actions off.
 
 ## Common mistakes
 
