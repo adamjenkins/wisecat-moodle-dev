@@ -36,7 +36,7 @@ In scope:
 - Dependency vulnerabilities in pinned GitHub Actions
 
 Out of scope:
-- Vulnerabilities in Moodle core (report to [Moodle Tracker](https://tracker.moodle.org/))
+- Vulnerabilities in Moodle core (report to [Moodle Tracker](https://moodle.atlassian.net/jira/projects))
 - Vulnerabilities in Claude Code itself (report to Anthropic)
 - Issues that require an attacker to already control the user's editor or shell
 

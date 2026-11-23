@@ -248,8 +248,8 @@ if (method_exists(\core\user::class, 'create_user')) {
 - https://moodledev.io/general/releases/5.3
 - https://moodledev.io/docs/5.3/devupdate
 - https://moodledev.io/general/development/policies/deprecation
-- https://tracker.moodle.org/browse/MDL-82650 (user/lib.php to `\core\user`)
-- https://tracker.moodle.org/browse/MDL-81225 (legacy external classes)
-- https://tracker.moodle.org/browse/MDL-68037 (colour modes)
-- https://tracker.moodle.org/browse/MDL-88351 (Classic removal)
-- https://tracker.moodle.org/browse/MDL-88766 (Bootstrap imports)
+- https://moodle.atlassian.net/browse/MDL-82650 (user/lib.php to `\core\user`)
+- https://moodle.atlassian.net/browse/MDL-81225 (legacy external classes)
+- https://moodle.atlassian.net/browse/MDL-68037 (colour modes)
+- https://moodle.atlassian.net/browse/MDL-88351 (Classic removal)
+- https://moodle.atlassian.net/browse/MDL-88766 (Bootstrap imports)

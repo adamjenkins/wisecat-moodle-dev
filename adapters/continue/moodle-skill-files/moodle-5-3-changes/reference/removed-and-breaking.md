@@ -5,7 +5,7 @@ and the summary table in `SKILL.md` is not enough to fix it.
 
 Each entry: what changed, how it shows, the fix, the source. Sources are the `## 5.3` section of the root
 `UPGRADING.md` of the 5.3.0 tree and the cited files in that tree (`public/...`), read, not run, unless an entry
-says otherwise. Tracker links are `https://tracker.moodle.org/browse/MDL-NNNNN`.
+says otherwise. Tracker links are `https://moodle.atlassian.net/browse/MDL-NNNNN`.
 
 ## Install, upgrade and fatal errors
 
