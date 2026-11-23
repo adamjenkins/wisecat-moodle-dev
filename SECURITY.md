@@ -10,9 +10,13 @@ Only the latest minor release receives security updates. Pin to a tagged release
 
 ## Reporting a Vulnerability
 
-**Do not open a public issue for security reports.**
+**Do not open a public issue, pull request or discussion for security reports.**
 
-Email: **adam@wisecat.net** with subject `[wisecat-moodle-dev security]`.
+Report privately through GitHub: open the repository's **Security** tab and choose **Report a vulnerability**, or go
+straight to <https://github.com/adamjenkins/wisecat-moodle-dev/security/advisories/new>. Only the maintainer sees
+the report, and the fix can be discussed and prepared in the same private advisory before anything is published.
+
+If you cannot use GitHub, email **adam@wisecat.net** with the subject `[wisecat-moodle-dev security]` instead.
 
 Include:
 - Affected skill / command / agent / adapter file
@@ -38,4 +42,5 @@ Out of scope:
 
 ## Disclosure
 
-Coordinated disclosure preferred. Public credit in `CHANGELOG.md` and release notes unless you request anonymity.
+Coordinated disclosure preferred. Once a fix is released, the GitHub security advisory is published, with you
+credited in it and in `CHANGELOG.md` and the release notes unless you ask to stay anonymous.

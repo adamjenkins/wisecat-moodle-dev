@@ -35,8 +35,8 @@ The full contract is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Claude Code
 
-You need Claude Code with plugin support and `git`. Installing from GitHub needs read access to the repository:
-Claude Code clones it with your own git credentials.
+You need Claude Code with plugin support and `git`. Claude Code clones the public repository from GitHub; no
+account or credentials are needed.
 
 Inside Claude Code:
 
@@ -226,3 +226,9 @@ whose skills, commands, agents and adapter generator are its foundation. The the
 version file structure, and the field rules were added here by Adam Jenkins.
 
 Built on the [Moodle Developer Documentation](https://moodledev.io) and the Moodle source.
+
+## Trademarks
+
+Moodle™ is a registered trademark of Moodle Pty Ltd. This project is not affiliated with or endorsed by Moodle
+Pty Ltd or Moodle HQ. Other product names are used only to say which tools it works with, and belong to their
+owners.
